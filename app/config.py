@@ -37,6 +37,10 @@ class Settings:
     # Optional admin protection. When set, /admin/* endpoints require this key
     # via X-Admin-Key header or ?admin_key= query parameter.
     admin_api_key: str = os.getenv("ADMIN_API_KEY", "")
+    session_cookie_name: str = os.getenv("SESSION_COOKIE_NAME", "cse_session")
+    session_ttl_days: int = int(os.getenv("SESSION_TTL_DAYS", "7"))
+    bootstrap_admin_username: str = os.getenv("BOOTSTRAP_ADMIN_USERNAME", "admin")
+    bootstrap_admin_password: str = os.getenv("BOOTSTRAP_ADMIN_PASSWORD", "admin123")
 
 
 settings = Settings()
