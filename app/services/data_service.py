@@ -7,7 +7,7 @@ from fastapi import HTTPException
 
 from ..config import settings
 from ..mock_data import DEMO_SYMBOLS, demo_prediction
-from ..ml.model_store import latest_bundle
+from ..ml.model_store import activate_bundle, latest_bundle
 from ..ml.predict import predict_next
 from ..providers.base import MarketDataProvider
 from ..providers.cse_provider import CSEProvider
@@ -24,13 +24,33 @@ _storage = Storage(settings.database_url)
 _storage.init()
 _cache = TTLCache(ttl_seconds=settings.cache_ttl_seconds)
 _provider: Optional[MarketDataProvider] = None
+_provider_key: Optional[str] = None
+
+
+def get_effective_provider_name() -> str:
+    configured = (_storage.get_meta("active_provider") or settings.data_provider or "hybrid").lower()
+    if configured not in {"db", "mock", "cse", "hybrid", "yfinance"}:
+        return settings.data_provider
+    return configured
+
+
+def set_effective_provider_name(name: str) -> str:
+    normalized = (name or "").lower().strip()
+    if normalized not in {"db", "mock", "cse", "hybrid", "yfinance"}:
+        raise HTTPException(status_code=400, detail="Invalid provider")
+    _storage.set_meta("active_provider", normalized)
+    global _provider, _provider_key
+    _provider = None
+    _provider_key = None
+    return normalized
 
 
 def get_provider() -> MarketDataProvider:
-    global _provider
-    if _provider is not None:
+    global _provider, _provider_key
+    p = get_effective_provider_name()
+    if _provider is not None and _provider_key == p:
         return _provider
-    p = settings.data_provider
+    _provider_key = p
     if p == "db":
         _provider = DBProvider(_storage)
         return _provider
@@ -537,6 +557,204 @@ def set_preferences(values: Dict[str, Any], profile: str = "default") -> Dict[st
     return get_preferences(profile)
 
 
+def list_models() -> List[Dict[str, Any]]:
+    return _storage.list_models()
+
+
+def activate_model(model_id: str) -> bool:
+    ok_db = _storage.activate_model(model_id)
+    ok_fs = activate_bundle(Path(settings.model_dir), model_id)
+    return bool(ok_db and ok_fs)
+
+
+
+
+# ---- Alerts / Notifications / Announcement logic ----
+def _ensure_notification(username: str, category: str, title: str, message: str, *, symbol: Optional[str] = None, severity: str = 'info', link: Optional[str] = None, dedupe_key: Optional[str] = None, meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    existing = _storage.list_notifications(username)
+    if dedupe_key:
+        for n in existing:
+            n_meta = n.get('meta') or {}
+            if n_meta.get('dedupe_key') == dedupe_key:
+                return n
+    payload = dict(meta or {})
+    if dedupe_key:
+        payload['dedupe_key'] = dedupe_key
+    return _storage.create_notification(username, category, title, message, symbol=symbol, severity=severity, link=link, meta=payload)
+
+
+def _latest_close_and_prev(symbol: str) -> Tuple[Optional[float], Optional[float], Optional[float]]:
+    hist = _storage.get_price_history(symbol.upper(), limit=21)
+    if not hist:
+        return None, None, None
+    latest = _to_float(hist[-1].get('close'))
+    prev = _to_float(hist[-2].get('close')) if len(hist) >= 2 else None
+    avg_vol = None
+    vols = [_to_float(r.get('volume')) for r in hist[-20:] if _to_float(r.get('volume')) is not None]
+    if vols:
+        avg_vol = sum(vols) / len(vols)
+    return latest, prev, avg_vol
+
+
+def _sync_important_announcement_notifications(username: str) -> None:
+    watched = set(_storage.list_watchlist(profile=username))
+    for a in _storage.list_alerts(username):
+        if a.get('alert_type') == 'important_announcement' and a.get('symbol'):
+            watched.add(str(a['symbol']).upper())
+    if not watched:
+        return
+    recent = announcements(None, limit=100)
+    for ann in recent:
+        sym = (ann.get('symbol') or '').upper()
+        if sym not in watched:
+            continue
+        if not ann.get('is_important'):
+            continue
+        dedupe_key = f"important-ann:{ann.get('ann_id')}:{sym}"
+        _ensure_notification(username, 'announcement', f"Important announcement for {sym}", ann.get('title') or 'Important announcement', symbol=sym, severity='warning', link=ann.get('url'), dedupe_key=dedupe_key, meta={'ann_id': ann.get('ann_id'), 'importance': ann.get('importance')})
+
+
+def evaluate_alerts(username: str) -> List[Dict[str, Any]]:
+    alerts = _storage.list_alerts(username)
+    triggered = []
+    for alert in alerts:
+        if not alert.get('is_enabled'):
+            continue
+        symbol = (alert.get('symbol') or '').upper()
+        latest, prev, avg_vol = _latest_close_and_prev(symbol) if symbol else (None, None, None)
+        fire = False
+        message = None
+        if alert.get('alert_type') == 'above_price' and latest is not None and alert.get('target_value') is not None:
+            if latest >= float(alert['target_value']):
+                fire = True
+                message = f"{symbol} moved above {float(alert['target_value']):.2f}. Latest price is {latest:.2f}."
+        elif alert.get('alert_type') == 'below_price' and latest is not None and alert.get('target_value') is not None:
+            if latest <= float(alert['target_value']):
+                fire = True
+                message = f"{symbol} moved below {float(alert['target_value']):.2f}. Latest price is {latest:.2f}."
+        elif alert.get('alert_type') == 'pct_move' and latest is not None and prev not in (None, 0) and alert.get('target_value') is not None:
+            pct = abs((latest / prev - 1.0) * 100.0)
+            if pct >= float(alert['target_value']):
+                fire = True
+                message = f"{symbol} moved {pct:.2f}% today."
+        elif alert.get('alert_type') == 'volume_spike' and symbol:
+            bar = _storage.get_latest_bar(symbol)
+            vol = _to_float((bar or {}).get('volume'))
+            multiple = float(alert.get('target_value') or 2.0)
+            if vol is not None and avg_vol not in (None, 0) and vol >= avg_vol * multiple:
+                fire = True
+                message = f"{symbol} volume spiked to {int(vol)} against a recent average of {int(avg_vol or 0)}."
+        if fire:
+            _storage.mark_alert_triggered(str(alert['alert_id']))
+            dedupe_key = f"alert:{alert.get('alert_id')}:{alert.get('last_triggered_at') or ''}"
+            _ensure_notification(username, 'alert', f"Alert triggered for {symbol or 'market'}", message or 'Alert triggered', symbol=symbol or None, severity='info', dedupe_key=f"alert:{alert.get('alert_id')}", meta={'alert_id': alert.get('alert_id')})
+            triggered.append(alert)
+    _sync_important_announcement_notifications(username)
+    return triggered
+
+
+def list_alerts(username: str) -> List[Dict[str, Any]]:
+    evaluate_alerts(username)
+    return _storage.list_alerts(username)
+
+
+def create_alert(username: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    alert = _storage.create_alert(username, payload.get('symbol'), str(payload.get('alert_type') or 'above_price'), _to_float(payload.get('target_value')), meta=payload.get('meta') if isinstance(payload.get('meta'), dict) else {})
+    return {'alert': alert, 'alerts': list_alerts(username)}
+
+
+def update_alert(username: str, alert_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    ok = _storage.update_alert(alert_id, username, symbol=payload.get('symbol'), target_value=_to_float(payload.get('target_value')) if payload.get('target_value') is not None else None, is_enabled=payload.get('is_enabled') if isinstance(payload.get('is_enabled'), bool) else None, meta=payload.get('meta') if isinstance(payload.get('meta'), dict) else None)
+    if not ok:
+        raise HTTPException(status_code=404, detail='Alert not found')
+    return {'ok': True, 'alerts': list_alerts(username)}
+
+
+def delete_alert(username: str, alert_id: str) -> Dict[str, Any]:
+    if not _storage.delete_alert(alert_id, username):
+        raise HTTPException(status_code=404, detail='Alert not found')
+    return {'ok': True, 'alerts': list_alerts(username)}
+
+
+def list_notifications(username: str, unread_only: bool = False) -> List[Dict[str, Any]]:
+    evaluate_alerts(username)
+    return _storage.list_notifications(username, unread_only=unread_only)
+
+
+def mark_notification_read(username: str, notification_id: str) -> Dict[str, Any]:
+    if not _storage.mark_notification_read(notification_id, username):
+        raise HTTPException(status_code=404, detail='Notification not found')
+    return {'ok': True, 'notifications': list_notifications(username)}
+
+
+def mark_all_notifications_read(username: str) -> Dict[str, Any]:
+    _storage.mark_all_notifications_read(username)
+    return {'ok': True, 'notifications': list_notifications(username)}
+
+
+def get_user_settings(username: str) -> Dict[str, Any]:
+    prefs = _storage.get_preferences(profile=username)
+    defaults = {
+        'theme': 'dark',
+        'default_timeframe': '6M',
+        'email_notifications': False,
+        'push_notifications': False,
+        'alert_notifications': True,
+        'announcement_notifications': True,
+    }
+    defaults.update(prefs)
+    return {'profile': username, 'settings': defaults}
+
+
+def update_user_settings(username: str, values: Dict[str, Any]) -> Dict[str, Any]:
+    for k, v in (values or {}).items():
+        _storage.set_preference(k, v, profile=username)
+    return get_user_settings(username)
+
+
+def announcements_filtered(symbol: Optional[str], limit: int = 50, important_only: bool = False, categories: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    rows = announcements(symbol, limit)
+    if important_only:
+        rows = [r for r in rows if r.get('is_important')]
+    if categories:
+        wanted = {c.lower() for c in categories}
+        rows = [r for r in rows if str(r.get('category') or '').lower() in wanted or str(r.get('importance') or '').lower() in wanted]
+    return rows
+
+
+def review_announcement(ann_id: str, *, importance: Optional[str], review_status: Optional[str], tags: Optional[List[str]], review_notes: Optional[str], reviewed_by: str) -> Dict[str, Any]:
+    _storage.set_announcement_meta(ann_id, importance=importance, review_status=review_status, tags=tags or [], review_notes=review_notes, reviewed_by=reviewed_by)
+    # notify users who watch the symbol if the announcement became important
+    anns = _storage.get_announcements(None, limit=500)
+    ann = next((a for a in anns if str(a.get('ann_id')) == ann_id), None)
+    if ann and ann.get('is_important') and ann.get('symbol'):
+        sym = str(ann['symbol']).upper()
+        for user in _storage.list_users():
+            uname = str(user.get('username'))
+            if sym in _storage.list_watchlist(profile=uname):
+                _ensure_notification(uname, 'announcement', f"Important announcement for {sym}", ann.get('title') or 'Important announcement', symbol=sym, severity='warning', link=ann.get('url'), dedupe_key=f"important-ann:{ann_id}:{sym}", meta={'ann_id': ann_id})
+    return {'ok': True, 'announcement': ann}
+
+
+def admin_jobs(limit: int = 100) -> List[Dict[str, Any]]:
+    return _storage.list_job_runs(limit=limit)
+
+
+def admin_alerts() -> List[Dict[str, Any]]:
+    # evaluate users before returning monitor data
+    for user in _storage.list_users():
+        evaluate_alerts(str(user.get('username')))
+    return _storage.list_alerts()
+
+
+def admin_notifications() -> List[Dict[str, Any]]:
+    return _storage.list_notifications(None)
+
+
+def get_provider_settings() -> Dict[str, Any]:
+    return {'active_provider': get_effective_provider_name(), 'configured_provider': settings.data_provider}
+
+
 def admin_status() -> Dict[str, Any]:
     coverage = _storage.data_coverage()
     last_sync = _storage.get_meta("last_sync_utc")
@@ -557,9 +775,19 @@ def admin_status() -> Dict[str, Any]:
             "companies": len(companies()),
             "watchlist_symbols": len(_storage.list_watchlist()),
             "job_runs": len(_storage.list_job_runs(limit=20)),
+            "users": len(_storage.list_users()),
+            "models": len(_storage.list_models()),
+            "alerts": len(_storage.list_alerts()),
+            "notifications": len(_storage.list_notifications(None)),
         },
         "model": model_status(),
+        "models": _storage.list_models(),
+        "active_model": _storage.get_active_model(),
+        "users": _storage.list_users(),
         "jobs": _storage.list_job_runs(limit=20),
+        "provider_settings": get_provider_settings(),
+        "alerts": admin_alerts()[:100],
+        "notifications": admin_notifications()[:100],
         "watchlist": get_watchlist(),
         "top_signals": top_signals(limit=5),
         "symbols_needing_history": [r for r in coverage.get("rows", []) if (r.get("rows") or 0) < 120][:20],
