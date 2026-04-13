@@ -233,7 +233,8 @@ def train_from_db(
     train_dates = pd.to_datetime(train_df["date"])
     test_dates = pd.to_datetime(test_df["date"])
     meta = {
-        "model_version": "v3",
+        "model_version": "v5",
+        "model_id": f"model_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
         "trained_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "horizon_days": horizon_days,
         "feature_names": feat_cols,
