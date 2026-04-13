@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import secrets
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -113,8 +114,83 @@ if metadata is not None:
         Column("status", String(32), nullable=True),
         Column("details", Text, nullable=True),
     )
+
+    users_t = Table(
+        "users",
+        metadata,
+        Column("username", String(64), primary_key=True),
+        Column("password_hash", Text, nullable=False),
+        Column("role", String(32), nullable=False),
+        Column("display_name", Text, nullable=True),
+        Column("email", Text, nullable=True),
+        Column("created_at", DateTime, nullable=True),
+        Column("last_login_at", DateTime, nullable=True),
+    )
+
+    sessions_t = Table(
+        "sessions",
+        metadata,
+        Column("session_id", String(128), primary_key=True),
+        Column("username", String(64), nullable=False),
+        Column("created_at", DateTime, nullable=True),
+        Column("expires_at", DateTime, nullable=True),
+    )
+
+    model_registry_t = Table(
+        "model_registry",
+        metadata,
+        Column("model_id", String(128), primary_key=True),
+        Column("path", Text, nullable=False),
+        Column("created_at", DateTime, nullable=True),
+        Column("is_active", Integer, nullable=False),
+        Column("meta", Text, nullable=True),
+    )
+
+    alerts_t = Table(
+        "alerts",
+        metadata,
+        Column("alert_id", String(128), primary_key=True),
+        Column("username", String(64), nullable=False, index=True),
+        Column("symbol", String(32), nullable=True, index=True),
+        Column("alert_type", String(64), nullable=False),
+        Column("target_value", Float, nullable=True),
+        Column("is_enabled", Integer, nullable=False),
+        Column("is_triggered", Integer, nullable=False),
+        Column("last_triggered_at", DateTime, nullable=True),
+        Column("created_at", DateTime, nullable=True),
+        Column("updated_at", DateTime, nullable=True),
+        Column("meta", Text, nullable=True),
+    )
+
+    notifications_t = Table(
+        "notifications",
+        metadata,
+        Column("notification_id", String(128), primary_key=True),
+        Column("username", String(64), nullable=False, index=True),
+        Column("category", String(64), nullable=False),
+        Column("title", Text, nullable=False),
+        Column("message", Text, nullable=True),
+        Column("symbol", String(32), nullable=True, index=True),
+        Column("severity", String(32), nullable=True),
+        Column("link", Text, nullable=True),
+        Column("is_read", Integer, nullable=False),
+        Column("created_at", DateTime, nullable=True),
+        Column("meta", Text, nullable=True),
+    )
+
+    announcement_meta_t = Table(
+        "announcement_meta",
+        metadata,
+        Column("ann_id", String(128), primary_key=True),
+        Column("importance", String(32), nullable=True),
+        Column("review_status", String(32), nullable=True),
+        Column("tags", Text, nullable=True),
+        Column("review_notes", Text, nullable=True),
+        Column("reviewed_by", String(64), nullable=True),
+        Column("reviewed_at", DateTime, nullable=True),
+    )
 else:  # pragma: no cover
-    companies_t = prices_t = indices_t = announcements_t = meta_t = watchlists_t = preferences_t = job_runs_t = None  # type: ignore
+    companies_t = prices_t = indices_t = announcements_t = meta_t = watchlists_t = preferences_t = job_runs_t = users_t = sessions_t = model_registry_t = alerts_t = notifications_t = announcement_meta_t = None  # type: ignore
 
 
 def _utc_now() -> str:
@@ -237,6 +313,66 @@ class Storage:
                         finished_at TEXT,
                         status TEXT,
                         details TEXT
+                    );
+                    CREATE TABLE IF NOT EXISTS users (
+                        username TEXT PRIMARY KEY,
+                        password_hash TEXT NOT NULL,
+                        role TEXT NOT NULL,
+                        display_name TEXT,
+                        email TEXT,
+                        created_at TEXT,
+                        last_login_at TEXT
+                    );
+                    CREATE TABLE IF NOT EXISTS sessions (
+                        session_id TEXT PRIMARY KEY,
+                        username TEXT NOT NULL,
+                        created_at TEXT,
+                        expires_at TEXT
+                    );
+                    CREATE TABLE IF NOT EXISTS model_registry (
+                        model_id TEXT PRIMARY KEY,
+                        path TEXT NOT NULL,
+                        created_at TEXT,
+                        is_active INTEGER NOT NULL DEFAULT 0,
+                        meta TEXT
+                    );
+                    CREATE TABLE IF NOT EXISTS alerts (
+                        alert_id TEXT PRIMARY KEY,
+                        username TEXT NOT NULL,
+                        symbol TEXT,
+                        alert_type TEXT NOT NULL,
+                        target_value REAL,
+                        is_enabled INTEGER NOT NULL,
+                        is_triggered INTEGER NOT NULL,
+                        last_triggered_at TEXT,
+                        created_at TEXT,
+                        updated_at TEXT,
+                        meta TEXT
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_alerts_username ON alerts(username);
+                    CREATE INDEX IF NOT EXISTS idx_alerts_symbol ON alerts(symbol);
+                    CREATE TABLE IF NOT EXISTS notifications (
+                        notification_id TEXT PRIMARY KEY,
+                        username TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        message TEXT,
+                        symbol TEXT,
+                        severity TEXT,
+                        link TEXT,
+                        is_read INTEGER NOT NULL,
+                        created_at TEXT,
+                        meta TEXT
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_notifications_username ON notifications(username);
+                    CREATE TABLE IF NOT EXISTS announcement_meta (
+                        ann_id TEXT PRIMARY KEY,
+                        importance TEXT,
+                        review_status TEXT,
+                        tags TEXT,
+                        review_notes TEXT,
+                        reviewed_by TEXT,
+                        reviewed_at TEXT
                     );
                     CREATE INDEX IF NOT EXISTS idx_prices_symbol_date ON prices(symbol, date DESC);
                     CREATE INDEX IF NOT EXISTS idx_indices_name_date ON indices(name, date DESC);
@@ -630,21 +766,42 @@ class Storage:
                         """,
                         (limit,),
                     ).fetchall()
-            return [dict(r) for r in rows]
-        with self.engine().connect() as conn:
-            stmt = select(
-                announcements_t.c.ann_id,
-                announcements_t.c.symbol,
-                announcements_t.c.date,
-                announcements_t.c.title,
-                announcements_t.c.url,
-                announcements_t.c.category,
-            )
-            if symbol:
-                stmt = stmt.where(announcements_t.c.symbol == symbol.upper())
-            stmt = stmt.order_by(announcements_t.c.date.desc()).limit(limit)
-            rows = conn.execute(stmt).mappings().all()
-            return [dict(r) for r in rows]
+            out = [dict(r) for r in rows]
+        else:
+            with self.engine().connect() as conn:
+                stmt = select(
+                    announcements_t.c.ann_id,
+                    announcements_t.c.symbol,
+                    announcements_t.c.date,
+                    announcements_t.c.title,
+                    announcements_t.c.url,
+                    announcements_t.c.category,
+                )
+                if symbol:
+                    stmt = stmt.where(announcements_t.c.symbol == symbol.upper())
+                stmt = stmt.order_by(announcements_t.c.date.desc()).limit(limit)
+                rows = conn.execute(stmt).mappings().all()
+                out = [dict(r) for r in rows]
+        meta = self.list_announcement_meta()
+        for r in out:
+            m = meta.get(str(r.get('ann_id')))
+            if m:
+                r['importance'] = m.get('importance')
+                r['review_status'] = m.get('review_status')
+                r['tags'] = m.get('tags') or []
+                r['review_notes'] = m.get('review_notes')
+                r['reviewed_by'] = m.get('reviewed_by')
+                r['reviewed_at'] = m.get('reviewed_at')
+                r['is_important'] = bool((m.get('importance') or '').lower() in {'important','high','critical'})
+            else:
+                r['importance'] = None
+                r['review_status'] = None
+                r['tags'] = []
+                r['review_notes'] = None
+                r['reviewed_by'] = None
+                r['reviewed_at'] = None
+                r['is_important'] = False
+        return out
 
     # ---- User state ----
     def list_watchlist(self, profile: str = "default") -> List[str]:
@@ -870,3 +1027,397 @@ class Storage:
             "latest_price_date": latest,
             "rows": rows,
         }
+
+
+    # ---- Users / Sessions ----
+    def upsert_user(self, username: str, password_hash: str, role: str = "user", display_name: Optional[str] = None, email: Optional[str] = None) -> None:
+        row = {
+            "username": username.lower(),
+            "password_hash": password_hash,
+            "role": role,
+            "display_name": display_name or username,
+            "email": email,
+            "created_at": _utc_now(),
+            "last_login_at": None,
+        }
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO users (username, password_hash, role, display_name, email, created_at, last_login_at)
+                    VALUES (:username, :password_hash, :role, :display_name, :email, COALESCE((SELECT created_at FROM users WHERE username=:username), :created_at), COALESCE((SELECT last_login_at FROM users WHERE username=:username), :last_login_at))
+                    """,
+                    row,
+                )
+            return
+        with self.engine().begin() as conn:
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+            stmt = pg_insert(users_t).values(row)
+            conn.execute(stmt.on_conflict_do_update(index_elements=[users_t.c.username], set_={"password_hash": stmt.excluded.password_hash, "role": stmt.excluded.role, "display_name": stmt.excluded.display_name, "email": stmt.excluded.email}))
+
+    def get_user(self, username: str) -> Optional[Dict[str, Any]]:
+        uname = username.lower()
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                row = conn.execute("SELECT username, password_hash, role, display_name, email, created_at, last_login_at FROM users WHERE username=?", (uname,)).fetchone()
+            return dict(row) if row else None
+        with self.engine().connect() as conn:
+            r = conn.execute(select(users_t).where(users_t.c.username == uname)).mappings().first()
+            return dict(r) if r else None
+
+    def list_users(self) -> List[Dict[str, Any]]:
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                rows = conn.execute("SELECT username, role, display_name, email, created_at, last_login_at FROM users ORDER BY username").fetchall()
+            return [dict(r) for r in rows]
+        with self.engine().connect() as conn:
+            return [dict(r) for r in conn.execute(select(users_t.c.username, users_t.c.role, users_t.c.display_name, users_t.c.email, users_t.c.created_at, users_t.c.last_login_at).order_by(users_t.c.username)).mappings().all()]
+
+    def set_user_role(self, username: str, role: str) -> None:
+        uname = username.lower()
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.execute("UPDATE users SET role=? WHERE username=?", (role, uname))
+            return
+        with self.engine().begin() as conn:
+            conn.execute(users_t.update().where(users_t.c.username == uname).values(role=role))
+
+    def touch_last_login(self, username: str) -> None:
+        uname = username.lower()
+        now = _utc_now()
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.execute("UPDATE users SET last_login_at=? WHERE username=?", (now, uname))
+            return
+        with self.engine().begin() as conn:
+            conn.execute(users_t.update().where(users_t.c.username == uname).values(last_login_at=now))
+
+    def create_session(self, username: str, expires_at: str) -> str:
+        sid = secrets.token_urlsafe(32)
+        row = {"session_id": sid, "username": username.lower(), "created_at": _utc_now(), "expires_at": expires_at}
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.execute("INSERT OR REPLACE INTO sessions (session_id, username, created_at, expires_at) VALUES (:session_id, :username, :created_at, :expires_at)", row)
+            return sid
+        with self.engine().begin() as conn:
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+            stmt = pg_insert(sessions_t).values(row)
+            conn.execute(stmt.on_conflict_do_update(index_elements=[sessions_t.c.session_id], set_={"username": stmt.excluded.username, "created_at": stmt.excluded.created_at, "expires_at": stmt.excluded.expires_at}))
+        return sid
+
+    def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+        if not session_id:
+            return None
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                row = conn.execute("SELECT session_id, username, created_at, expires_at FROM sessions WHERE session_id=?", (session_id,)).fetchone()
+            return dict(row) if row else None
+        with self.engine().connect() as conn:
+            r = conn.execute(select(sessions_t).where(sessions_t.c.session_id == session_id)).mappings().first()
+            return dict(r) if r else None
+
+    def delete_session(self, session_id: str) -> None:
+        if not session_id:
+            return
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.execute("DELETE FROM sessions WHERE session_id=?", (session_id,))
+            return
+        with self.engine().begin() as conn:
+            conn.execute(sessions_t.delete().where(sessions_t.c.session_id == session_id))
+
+    def cleanup_sessions(self) -> int:
+        now = _utc_now()
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                cur = conn.execute("DELETE FROM sessions WHERE expires_at < ?", (now,))
+                return cur.rowcount or 0
+        with self.engine().begin() as conn:
+            res = conn.execute(sessions_t.delete().where(sessions_t.c.expires_at < now))
+            return res.rowcount or 0
+
+    # ---- Models ----
+    def register_model(self, model_id: str, path: str, meta: Dict[str, Any], is_active: bool = False) -> None:
+        row = {"model_id": model_id, "path": path, "created_at": _utc_now(), "is_active": 1 if is_active else 0, "meta": _json_dumps(meta)}
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                if is_active:
+                    conn.execute("UPDATE model_registry SET is_active=0")
+                conn.execute("INSERT OR REPLACE INTO model_registry (model_id, path, created_at, is_active, meta) VALUES (:model_id, :path, COALESCE((SELECT created_at FROM model_registry WHERE model_id=:model_id), :created_at), :is_active, :meta)", row)
+            return
+        with self.engine().begin() as conn:
+            if is_active:
+                conn.execute(model_registry_t.update().values(is_active=0))
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+            stmt = pg_insert(model_registry_t).values(row)
+            conn.execute(stmt.on_conflict_do_update(index_elements=[model_registry_t.c.model_id], set_={"path": stmt.excluded.path, "is_active": stmt.excluded.is_active, "meta": stmt.excluded.meta}))
+
+    def list_models(self) -> List[Dict[str, Any]]:
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                rows = conn.execute("SELECT model_id, path, created_at, is_active, meta FROM model_registry ORDER BY created_at DESC").fetchall()
+            out = [dict(r) for r in rows]
+        else:
+            with self.engine().connect() as conn:
+                out = [dict(r) for r in conn.execute(select(model_registry_t).order_by(model_registry_t.c.created_at.desc())).mappings().all()]
+        for r in out:
+            try:
+                r["meta"] = json.loads(r.get("meta") or "{}")
+            except Exception:
+                r["meta"] = {}
+            r["is_active"] = bool(r.get("is_active"))
+        return out
+
+    def get_active_model(self) -> Optional[Dict[str, Any]]:
+        models = self.list_models()
+        for m in models:
+            if m.get("is_active"):
+                return m
+        return models[0] if models else None
+
+    def activate_model(self, model_id: str) -> bool:
+        found = False
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.execute("UPDATE model_registry SET is_active=0")
+                cur = conn.execute("UPDATE model_registry SET is_active=1 WHERE model_id=?", (model_id,))
+                found = (cur.rowcount or 0) > 0
+            return found
+        with self.engine().begin() as conn:
+            conn.execute(model_registry_t.update().values(is_active=0))
+            res = conn.execute(model_registry_t.update().where(model_registry_t.c.model_id == model_id).values(is_active=1))
+            found = (res.rowcount or 0) > 0
+        return found
+
+
+    # ---- Profile / Settings helpers ----
+    def update_user_profile(self, username: str, *, display_name: Optional[str] = None, email: Optional[str] = None) -> None:
+        uname = username.lower()
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.execute("UPDATE users SET display_name=COALESCE(?, display_name), email=COALESCE(?, email) WHERE username=?", (display_name, email, uname))
+            return
+        with self.engine().begin() as conn:
+            values = {}
+            if display_name is not None:
+                values['display_name'] = display_name
+            if email is not None:
+                values['email'] = email
+            if values:
+                conn.execute(users_t.update().where(users_t.c.username == uname).values(**values))
+
+    def set_user_password_hash(self, username: str, password_hash: str) -> None:
+        uname = username.lower()
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.execute("UPDATE users SET password_hash=? WHERE username=?", (password_hash, uname))
+            return
+        with self.engine().begin() as conn:
+            conn.execute(users_t.update().where(users_t.c.username == uname).values(password_hash=password_hash))
+
+    # ---- Announcement metadata ----
+    def list_announcement_meta(self) -> Dict[str, Dict[str, Any]]:
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                rows = conn.execute("SELECT ann_id, importance, review_status, tags, review_notes, reviewed_by, reviewed_at FROM announcement_meta").fetchall()
+            out = [dict(r) for r in rows]
+        else:
+            with self.engine().connect() as conn:
+                out = [dict(r) for r in conn.execute(select(announcement_meta_t)).mappings().all()]
+        result = {}
+        for r in out:
+            try:
+                r['tags'] = json.loads(r.get('tags') or '[]')
+            except Exception:
+                r['tags'] = []
+            result[str(r.get('ann_id'))] = r
+        return result
+
+    def set_announcement_meta(self, ann_id: str, *, importance: Optional[str] = None, review_status: Optional[str] = None, tags: Optional[List[str]] = None, review_notes: Optional[str] = None, reviewed_by: Optional[str] = None) -> None:
+        row = {
+            'ann_id': ann_id,
+            'importance': importance,
+            'review_status': review_status,
+            'tags': _json_dumps(tags or []),
+            'review_notes': review_notes,
+            'reviewed_by': reviewed_by,
+            'reviewed_at': _utc_now(),
+        }
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO announcement_meta (ann_id, importance, review_status, tags, review_notes, reviewed_by, reviewed_at)
+                    VALUES (:ann_id, COALESCE(:importance, (SELECT importance FROM announcement_meta WHERE ann_id=:ann_id)), COALESCE(:review_status, (SELECT review_status FROM announcement_meta WHERE ann_id=:ann_id)), COALESCE(:tags, (SELECT tags FROM announcement_meta WHERE ann_id=:ann_id)), COALESCE(:review_notes, (SELECT review_notes FROM announcement_meta WHERE ann_id=:ann_id)), COALESCE(:reviewed_by, (SELECT reviewed_by FROM announcement_meta WHERE ann_id=:ann_id)), :reviewed_at)
+                    """,
+                    row,
+                )
+            return
+        with self.engine().begin() as conn:
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+            stmt = pg_insert(announcement_meta_t).values(row)
+            conn.execute(stmt.on_conflict_do_update(index_elements=[announcement_meta_t.c.ann_id], set_={
+                'importance': stmt.excluded.importance,
+                'review_status': stmt.excluded.review_status,
+                'tags': stmt.excluded.tags,
+                'review_notes': stmt.excluded.review_notes,
+                'reviewed_by': stmt.excluded.reviewed_by,
+                'reviewed_at': stmt.excluded.reviewed_at,
+            }))
+
+    # ---- Alerts ----
+    def list_alerts(self, username: Optional[str] = None) -> List[Dict[str, Any]]:
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                if username:
+                    rows = conn.execute("SELECT alert_id, username, symbol, alert_type, target_value, is_enabled, is_triggered, last_triggered_at, created_at, updated_at, meta FROM alerts WHERE username=? ORDER BY created_at DESC", (username.lower(),)).fetchall()
+                else:
+                    rows = conn.execute("SELECT alert_id, username, symbol, alert_type, target_value, is_enabled, is_triggered, last_triggered_at, created_at, updated_at, meta FROM alerts ORDER BY created_at DESC").fetchall()
+            out = [dict(r) for r in rows]
+        else:
+            stmt = select(alerts_t)
+            if username:
+                stmt = stmt.where(alerts_t.c.username == username.lower())
+            stmt = stmt.order_by(alerts_t.c.created_at.desc())
+            with self.engine().connect() as conn:
+                out = [dict(r) for r in conn.execute(stmt).mappings().all()]
+        for r in out:
+            try:
+                r['meta'] = json.loads(r.get('meta') or '{}')
+            except Exception:
+                r['meta'] = {}
+            r['is_enabled'] = bool(r.get('is_enabled'))
+            r['is_triggered'] = bool(r.get('is_triggered'))
+        return out
+
+    def create_alert(self, username: str, symbol: Optional[str], alert_type: str, target_value: Optional[float], meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        row = {
+            'alert_id': f"alt_{secrets.token_urlsafe(9)}",
+            'username': username.lower(),
+            'symbol': symbol.upper() if symbol else None,
+            'alert_type': alert_type,
+            'target_value': target_value,
+            'is_enabled': 1,
+            'is_triggered': 0,
+            'last_triggered_at': None,
+            'created_at': _utc_now(),
+            'updated_at': _utc_now(),
+            'meta': _json_dumps(meta or {}),
+        }
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.execute("INSERT INTO alerts (alert_id, username, symbol, alert_type, target_value, is_enabled, is_triggered, last_triggered_at, created_at, updated_at, meta) VALUES (:alert_id,:username,:symbol,:alert_type,:target_value,:is_enabled,:is_triggered,:last_triggered_at,:created_at,:updated_at,:meta)", row)
+        else:
+            with self.engine().begin() as conn:
+                conn.execute(alerts_t.insert().values(**row))
+        return row
+
+    def update_alert(self, alert_id: str, username: str, *, symbol: Optional[str] = None, target_value: Optional[float] = None, is_enabled: Optional[bool] = None, meta: Optional[Dict[str, Any]] = None) -> bool:
+        values = {'updated_at': _utc_now()}
+        if symbol is not None:
+            values['symbol'] = symbol.upper() if symbol else None
+        if target_value is not None:
+            values['target_value'] = target_value
+        if is_enabled is not None:
+            values['is_enabled'] = 1 if is_enabled else 0
+        if meta is not None:
+            values['meta'] = _json_dumps(meta)
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                cur = conn.execute(f"UPDATE alerts SET {', '.join([k+'=?' for k in values])} WHERE alert_id=? AND username=?", tuple(values.values()) + (alert_id, username.lower()))
+                return (cur.rowcount or 0) > 0
+        with self.engine().begin() as conn:
+            res = conn.execute(alerts_t.update().where((alerts_t.c.alert_id == alert_id) & (alerts_t.c.username == username.lower())).values(**values))
+            return (res.rowcount or 0) > 0
+
+    def mark_alert_triggered(self, alert_id: str) -> None:
+        values = {'is_triggered': 1, 'last_triggered_at': _utc_now(), 'updated_at': _utc_now()}
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.execute("UPDATE alerts SET is_triggered=1, last_triggered_at=?, updated_at=? WHERE alert_id=?", (values['last_triggered_at'], values['updated_at'], alert_id))
+            return
+        with self.engine().begin() as conn:
+            conn.execute(alerts_t.update().where(alerts_t.c.alert_id == alert_id).values(**values))
+
+    def delete_alert(self, alert_id: str, username: str) -> bool:
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                cur = conn.execute("DELETE FROM alerts WHERE alert_id=? AND username=?", (alert_id, username.lower()))
+                return (cur.rowcount or 0) > 0
+        with self.engine().begin() as conn:
+            res = conn.execute(alerts_t.delete().where((alerts_t.c.alert_id == alert_id) & (alerts_t.c.username == username.lower())))
+            return (res.rowcount or 0) > 0
+
+    # ---- Notifications ----
+    def list_notifications(self, username: Optional[str] = None, unread_only: bool = False) -> List[Dict[str, Any]]:
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                q = "SELECT notification_id, username, category, title, message, symbol, severity, link, is_read, created_at, meta FROM notifications"
+                params = []
+                clauses = []
+                if username:
+                    clauses.append("username=?")
+                    params.append(username.lower())
+                if unread_only:
+                    clauses.append("is_read=0")
+                if clauses:
+                    q += " WHERE " + " AND ".join(clauses)
+                q += " ORDER BY created_at DESC"
+                rows = conn.execute(q, tuple(params)).fetchall()
+            out = [dict(r) for r in rows]
+        else:
+            stmt = select(notifications_t)
+            if username:
+                stmt = stmt.where(notifications_t.c.username == username.lower())
+            if unread_only:
+                stmt = stmt.where(notifications_t.c.is_read == 0)
+            stmt = stmt.order_by(notifications_t.c.created_at.desc())
+            with self.engine().connect() as conn:
+                out = [dict(r) for r in conn.execute(stmt).mappings().all()]
+        for r in out:
+            try:
+                r['meta'] = json.loads(r.get('meta') or '{}')
+            except Exception:
+                r['meta'] = {}
+            r['is_read'] = bool(r.get('is_read'))
+        return out
+
+    def create_notification(self, username: str, category: str, title: str, message: str, *, symbol: Optional[str] = None, severity: str = 'info', link: Optional[str] = None, meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        row = {
+            'notification_id': f"ntf_{secrets.token_urlsafe(10)}",
+            'username': username.lower(),
+            'category': category,
+            'title': title,
+            'message': message,
+            'symbol': symbol.upper() if symbol else None,
+            'severity': severity,
+            'link': link,
+            'is_read': 0,
+            'created_at': _utc_now(),
+            'meta': _json_dumps(meta or {}),
+        }
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.execute("INSERT INTO notifications (notification_id, username, category, title, message, symbol, severity, link, is_read, created_at, meta) VALUES (:notification_id,:username,:category,:title,:message,:symbol,:severity,:link,:is_read,:created_at,:meta)", row)
+        else:
+            with self.engine().begin() as conn:
+                conn.execute(notifications_t.insert().values(**row))
+        return row
+
+    def mark_notification_read(self, notification_id: str, username: str) -> bool:
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                cur = conn.execute("UPDATE notifications SET is_read=1 WHERE notification_id=? AND username=?", (notification_id, username.lower()))
+                return (cur.rowcount or 0) > 0
+        with self.engine().begin() as conn:
+            res = conn.execute(notifications_t.update().where((notifications_t.c.notification_id == notification_id) & (notifications_t.c.username == username.lower())).values(is_read=1))
+            return (res.rowcount or 0) > 0
+
+    def mark_all_notifications_read(self, username: str) -> int:
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                cur = conn.execute("UPDATE notifications SET is_read=1 WHERE username=?", (username.lower(),))
+                return cur.rowcount or 0
+        with self.engine().begin() as conn:
+            res = conn.execute(notifications_t.update().where(notifications_t.c.username == username.lower()).values(is_read=1))
+            return res.rowcount or 0
