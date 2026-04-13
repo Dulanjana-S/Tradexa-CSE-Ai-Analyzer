@@ -79,6 +79,7 @@ class SmokeTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.symbol = seed_real_like_db()
         cls.client = TestClient(app)
+        cls.client.post("/api/auth/login", json={"username": os.environ.get("BOOTSTRAP_ADMIN_USERNAME", "admin"), "password": os.environ.get("BOOTSTRAP_ADMIN_PASSWORD", "admin123")})
 
     def test_basic_routes(self):
         for path in [
@@ -90,6 +91,13 @@ class SmokeTest(unittest.TestCase):
             "/api/model/status",
             "/api/system/status",
             "/api/admin/status",
+            "/api/admin/models",
+            "/api/admin/users",
+            "/api/admin/jobs",
+            "/api/admin/provider",
+            "/api/admin/alerts",
+            "/api/admin/notifications",
+            "/api/admin/announcements/review",
             "/api/market/overview",
             "/api/indices",
             "/api/stocks?limit=10",
@@ -100,6 +108,9 @@ class SmokeTest(unittest.TestCase):
             "/api/announcements",
             "/api/watchlist",
             "/api/preferences",
+            "/api/settings",
+            "/api/alerts",
+            "/api/notifications",
             "/api/signals/top",
         ]:
             resp = self.client.get(path)
@@ -109,6 +120,29 @@ class SmokeTest(unittest.TestCase):
         resp = self.client.post("/api/watchlist", json={"symbol": self.symbol, "add": True})
         self.assertEqual(resp.status_code, 200)
         self.assertIn(self.symbol, resp.json().get("symbols") or [])
+
+    def test_alerts_settings_and_notifications(self):
+        resp = self.client.post("/api/settings", json={"settings": {"default_timeframe": "1Y", "alert_notifications": True}})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json().get("settings", {}).get("default_timeframe"), "1Y")
+
+        resp = self.client.post("/api/alerts", json={"symbol": self.symbol, "alert_type": "above_price", "target_value": 0.01})
+        self.assertEqual(resp.status_code, 200)
+        alerts = resp.json().get("alerts") or []
+        self.assertTrue(len(alerts) >= 1)
+        alert_id = alerts[0]["alert_id"]
+
+        resp = self.client.get("/api/notifications")
+        self.assertEqual(resp.status_code, 200)
+        notes = resp.json().get("notifications") or []
+        self.assertTrue(len(notes) >= 1)
+        nid = notes[0]["notification_id"]
+
+        resp = self.client.patch(f"/api/notifications/{nid}/read")
+        self.assertEqual(resp.status_code, 200)
+
+        resp = self.client.patch(f"/api/alerts/{alert_id}", json={"is_enabled": False})
+        self.assertEqual(resp.status_code, 200)
 
 
 if __name__ == "__main__":
