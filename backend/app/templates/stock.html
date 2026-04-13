@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex flex-col gap-6">
+  <section class="card">
+    <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+      <div>
+        <div class="text-xs text-slate-500">Stock</div>
+        <h1 class="text-2xl font-semibold">{{ company.symbol }} · {{ company.name }}</h1>
+        <div class="text-sm text-slate-600 mt-1">Sector: <span class="font-medium" id="sectorTag">{{ company.sector }}</span> · Market cap: <span class="font-medium" id="mcapTag">—</span></div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="watchBtn" class="btn">Add to Watchlist</button>
+        <a href="/screener" class="btnSecondary">Open Screener</a>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mt-5">
+      <div class="stat"><div class="statLabel">Live (LTP)</div><div class="statValue" id="lastPrice">—</div></div>
+      <div class="stat"><div class="statLabel">Change</div><div class="statValue" id="change">—</div></div>
+      <div class="stat"><div class="statLabel">Open</div><div class="statValue" id="openP">—</div></div>
+      <div class="stat"><div class="statLabel">High · Low</div><div class="statValue" id="hiLo">—</div></div>
+      <div class="stat"><div class="statLabel">Volume</div><div class="statValue" id="vol">—</div></div>
+      <div class="stat"><div class="statLabel">VWAP</div><div class="statValue" id="vwap">—</div></div>
+    </div>
+    <div class="text-xs text-slate-500 mt-3" id="asOf">—</div>
+  </section>
+
+  <section class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div class="card lg:col-span-2">
+      <div class="flex items-center justify-between">
+        <div><div class="cardLabel">Price chart</div><div class="text-sm text-slate-600">Candles + SMA(20)</div></div>
+        <div class="text-xs text-slate-500">
+          <button class="pill" data-days="60">60D</button>
+          <button class="pill" data-days="120">120D</button>
+          <button class="pill pillActive" data-days="180">180D</button>
+        </div>
+      </div>
+      <div id="priceChart" class="h-[420px] mt-3"></div>
+    </div>
+
+    <div class="card">
+      <div class="flex items-start justify-between gap-2">
+        <div><div class="cardLabel">AI signal</div><div class="text-sm text-slate-600">Experimental next-day prediction</div></div>
+        <div class="pill pillActive">1D</div>
+      </div>
+      <div id="predError" class="hidden mt-4 rounded-xl border border-dashed border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"></div>
+      <div id="predPanel" class="mt-4 grid grid-cols-2 gap-3">
+        <div class="stat col-span-2"><div class="statLabel">Predicted price</div><div class="statValue" id="predPrice">—</div><div class="text-xs text-slate-500 mt-1" id="priceBand">—</div></div>
+        <div class="stat"><div class="statLabel">Predicted return</div><div class="statValue" id="predRet">—</div></div>
+        <div class="stat"><div class="statLabel">Up probability</div><div class="statValue" id="upProb">—</div></div>
+        <div class="stat"><div class="statLabel">Signal</div><div class="statValue" id="signalLbl">—</div></div>
+        <div class="stat"><div class="statLabel">Confidence</div><div class="statValue" id="confLbl">—</div></div>
+        <div class="stat col-span-2"><div class="statLabel">Return band (P10–P90)</div><div class="statValue" id="band">—</div></div>
+      </div>
+      <div class="mt-5"><div class="text-xs font-semibold text-slate-700">Top drivers</div><div class="mt-2 overflow-x-auto"><table class="table" id="featTbl"></table></div></div>
+      <div class="mt-4 text-xs text-slate-500" id="predDisclaimer">—</div>
+      <div class="mt-2 text-xs text-slate-400" id="modelMeta">—</div>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const SYMBOL = "{{ company.symbol }}";
+  const shares = {{ company.shares or 0 }};
+  const watchBtn = document.getElementById("watchBtn");
+  const predError = document.getElementById("predError");
+  const predPanel = document.getElementById("predPanel");
+
+  async function updateWatchBtn() {
+    const wl = await getWatchlist();
+    const has = wl.includes(SYMBOL);
+    watchBtn.textContent = has ? "Remove from Watchlist" : "Add to Watchlist";
+    watchBtn.className = has ? "btnDanger" : "btn";
+  }
+  watchBtn.addEventListener("click", async () => {
+    await toggleWatchlist(SYMBOL);
+    await updateWatchBtn();
+    toast("Updated watchlist");
+  });
+  updateWatchBtn();
+
+  let currentDays = 180;
+  document.querySelectorAll(".pill[data-days]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".pill[data-days]").forEach(b => b.classList.remove("pillActive"));
+      btn.classList.add("pillActive");
+      currentDays = parseInt(btn.dataset.days, 10);
+      loadChart();
+    });
+  });
+
+  async function loadSnapshot() {
+    try {
+      const s = await fetchJSON(`/api/stock/${encodeURIComponent(SYMBOL)}`);
+      if (s.sector) document.getElementById("sectorTag").textContent = s.sector;
+      document.getElementById("lastPrice").textContent = fmtMoney(s.last);
+      document.getElementById("change").innerHTML = fmtChange(s.change, s.change_pct);
+      document.getElementById("openP").textContent = fmtMoney(s.open);
+      document.getElementById("hiLo").textContent = `${fmtMoney(s.high)} · ${fmtMoney(s.low)}`;
+      document.getElementById("vol").textContent = fmtInt(s.volume);
+      document.getElementById("vwap").textContent = fmtMoney(s.vwap);
+      const eodInfo = (s.eod_close != null && s.eod_date) ? ` · EOD close: ${fmtMoney(s.eod_close)} (${s.eod_date})` : "";
+      document.getElementById("asOf").textContent = `As of ${s.date || s.as_of || '—'}${eodInfo}`;
+      if (s.market_cap != null && Number.isFinite(Number(s.market_cap))) document.getElementById("mcapTag").textContent = fmtLKR(Number(s.market_cap));
+      else if (shares && s.last != null) document.getElementById("mcapTag").textContent = fmtLKR(Math.round(s.last * shares));
+    } catch (err) {
+      document.getElementById("asOf").innerHTML = `<span class="text-rose-700">${escapeHtml(err.message || 'Failed to load quote')}</span>`;
+    }
+  }
+
+  function calcSMA(values, w) {
+    const out = new Array(values.length).fill(null); let sum = 0; const q = [];
+    for (let i = 0; i < values.length; i++) { sum += values[i]; q.push(values[i]); if (q.length > w) sum -= q.shift(); if (q.length === w) out[i] = sum / w; }
+    return out;
+  }
+
+  async function loadChart() {
+    try {
+      const resp = await fetchJSON(`/api/stock/${encodeURIComponent(SYMBOL)}/history?days=${currentDays}`);
+      const h = resp.history || [];
+      if (!resp.available || !h.length) {
+        document.getElementById("priceChart").innerHTML = `<div class="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">${escapeHtml(resp.reason || 'No EOD candle history available for this symbol yet.')}</div>`;
+        return;
+      }
+      const x = h.map(d => d.date), open = h.map(d => d.open), high = h.map(d => d.high), low = h.map(d => d.low), close = h.map(d => d.close), sma20 = calcSMA(close, 20);
+      Plotly.react("priceChart", [{ x, open, high, low, close, type: "candlestick", name: SYMBOL }, { x, y: sma20, type: "scatter", mode: "lines", name: "SMA(20)" }], { margin: { l: 40, r: 10, t: 10, b: 40 }, showlegend: true, legend: { orientation: "h" }, xaxis: { title: "Date" }, yaxis: { title: "Price (LKR)" } }, { displayModeBar: false, responsive: true });
+      if (resp.scale_reason) document.getElementById("predDisclaimer").textContent = resp.scale_reason;
+    } catch (err) {
+      document.getElementById("priceChart").innerHTML = `<div class="rounded-xl border border-dashed border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">${escapeHtml(err.message || 'Failed to load price history')}</div>`;
+    }
+  }
+
+  async function loadPred() {
+    try {
+      const p = await fetchJSON(`/api/stock/${encodeURIComponent(SYMBOL)}/prediction?horizon=1D`);
+      if (!p.available) {
+        predError.classList.remove("hidden");
+        predError.textContent = p.reason || "Prediction unavailable.";
+        predPanel.classList.add("opacity-60");
+        document.getElementById("predDisclaimer").textContent = `History points: ${p.history_points || 0} / required: ${p.required_history_points || 120}`;
+        document.getElementById("modelMeta").textContent = "Train/import more data to enable prediction.";
+        return;
+      }
+      predError.classList.add("hidden");
+      predPanel.classList.remove("opacity-60");
+      document.getElementById("predRet").textContent = fmtPct(p.predicted_return);
+      document.getElementById("upProb").textContent = Math.round(p.up_probability * 100) + "%";
+      document.getElementById("band").textContent = `${fmtPct(p.band.p10)} to ${fmtPct(p.band.p90)}`;
+      document.getElementById("predPrice").textContent = p.predicted_price != null ? fmtMoney(p.predicted_price) : "—";
+      document.getElementById("priceBand").textContent = p.price_band && p.price_band.p10 != null && p.price_band.p90 != null ? `Price band: ${fmtMoney(p.price_band.p10)} to ${fmtMoney(p.price_band.p90)}` : "—";
+      document.getElementById("signalLbl").textContent = (p.signal || "neutral").replaceAll("_", " ");
+      document.getElementById("confLbl").textContent = p.confidence ? `${p.confidence.label} (${Math.round((p.confidence.score || 0) * 100)}%)` : "—";
+      buildFeatureTable("featTbl", p.features);
+      const extraFlags = (p.quality_flags || []).length ? ` · Flags: ${(p.quality_flags || []).join(", ")}` : "";
+      document.getElementById("predDisclaimer").textContent = (p.disclaimer || "") + extraFlags;
+      if (p.model && p.model.trained_at_utc) {
+        const met = p.model.metrics ? ` · acc=${Number(p.model.metrics.acc_up ?? 0).toFixed(2)} · auc=${Number(p.model.metrics.auc_up ?? 0).toFixed(2)}` : "";
+        const ver = p.model.version ? ` · ${p.model.version}` : "";
+        document.getElementById("modelMeta").textContent = `Model trained (UTC): ${p.model.trained_at_utc}${ver}${met}`;
+      }
+    } catch (err) {
+      predError.classList.remove("hidden");
+      predError.textContent = err.message || "Failed to load prediction";
+    }
+  }
+
+  loadSnapshot();
+  setInterval(loadSnapshot, 20000);
+  loadChart();
+  loadPred();
+})();
+</script>
+{% endblock %}

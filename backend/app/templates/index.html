@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex flex-col gap-6">
+  <section class="rounded-2xl bg-gradient-to-r from-slate-900 to-indigo-900 text-white p-6 sm:p-8 shadow-sm">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div>
+        <div class="text-sm text-white/80">Colombo Stock Exchange (CSE) · Analytics + prediction</div>
+        <h1 class="text-2xl sm:text-3xl font-semibold mt-1">Market dashboard</h1>
+        <p class="text-white/75 mt-2 max-w-2xl">Track market movement, browse stocks, and preview experimental AI signals. Watchlist and settings are now stored in the backend database.</p>
+      </div>
+      <div class="rounded-xl bg-white/10 border border-white/15 p-4 w-full md:w-auto">
+        <div class="text-xs text-white/70">Quick lookup</div>
+        <div class="flex gap-2 mt-2">
+          <input id="symbolInput" class="w-full md:w-56 rounded-lg px-3 py-2 text-slate-900 placeholder-slate-400" placeholder="e.g., LOLC.N0000" list="symbolsList" />
+          <datalist id="symbolsList">{% for s in symbols %}<option value="{{ s }}"></option>{% endfor %}</datalist>
+          <button id="goBtn" class="rounded-lg bg-white text-slate-900 px-4 py-2 font-medium hover:bg-white/90">Open</button>
+        </div>
+        <div class="text-xs text-white/60 mt-2">Tip: add symbols on any stock page.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div class="card"><div class="cardLabel">Market status</div><div class="cardValue" id="marketStatus">—</div><div class="cardSub" id="marketAsOf">—</div></div>
+    <div class="card"><div class="cardLabel">Turnover (LKR)</div><div class="cardValue" id="turnover">—</div><div class="cardSub">Total turnover</div></div>
+    <div class="card"><div class="cardLabel">Trades</div><div class="cardValue" id="trades">—</div><div class="cardSub">Total trades</div></div>
+    <div class="card"><div class="cardLabel">Market cap (LKR)</div><div class="cardValue" id="mcap">—</div><div class="cardSub">Total market cap</div></div>
+  </section>
+
+  <section class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div class="card lg:col-span-2">
+      <div class="flex items-center justify-between"><div><div class="cardLabel">Indices</div><div class="text-sm text-slate-600">ASPI & S&P SL20</div></div><div class="text-xs text-slate-500">Last 260 sessions</div></div>
+      <div id="indicesChart" class="h-[360px] mt-3"></div>
+    </div>
+    <div class="card">
+      <div class="cardLabel">Watchlist</div>
+      <div class="text-sm text-slate-600">Saved in the backend DB</div>
+      <div id="watchlistBox" class="mt-3 space-y-2"></div>
+    </div>
+  </section>
+
+  <section class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="card">
+      <div class="cardLabel">Top signals</div>
+      <div class="text-sm text-slate-600">Highest-confidence experimental model outputs</div>
+      <div class="mt-3 overflow-x-auto"><table class="table" id="signalsTbl"></table></div>
+    </div>
+    <div class="grid grid-cols-1 gap-4">
+      <div class="card"><div class="cardLabel">Top gainers</div><div class="mt-3 overflow-x-auto"><table class="table" id="gainersTbl"></table></div></div>
+      <div class="card"><div class="cardLabel">Top losers</div><div class="mt-3 overflow-x-auto"><table class="table" id="losersTbl"></table></div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="cardLabel">Most active</div>
+    <div class="mt-3 overflow-x-auto"><table class="table" id="activeTbl"></table></div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const goBtn = document.getElementById("goBtn");
+  const inp = document.getElementById("symbolInput");
+  goBtn.addEventListener("click", () => { const s = (inp.value || "").trim(); if (s) window.location.href = "/stock/" + encodeURIComponent(s); });
+  renderWatchlist("watchlistBox");
+
+  async function loadMarket() {
+    const mkt = await fetchJSON("/api/market/overview");
+    document.getElementById("marketStatus").textContent = mkt.status || "—";
+    document.getElementById("marketAsOf").textContent = "As of " + (mkt.as_of || "—");
+    document.getElementById("turnover").textContent = fmtLKR(mkt.turnover_lkr);
+    document.getElementById("trades").textContent = fmtInt(mkt.trades);
+    document.getElementById("mcap").textContent = fmtLKR(mkt.market_cap_lkr);
+    buildMoverTable("gainersTbl", mkt.top_gainers);
+    buildMoverTable("losersTbl", mkt.top_losers);
+    buildMoverTable("activeTbl", mkt.most_active);
+  }
+
+  async function loadIndices() {
+    const idx = await fetchJSON("/api/indices");
+    const cleanSeries = (arr) => (arr || []).filter(p => p && /^\d{4}-\d{2}-\d{2}$/.test(p.date) && Number.isFinite(Number(p.value))).map(p => ({ date: p.date, value: Number(p.value) }));
+    const s1 = cleanSeries(idx["ASPI"]); const s2 = cleanSeries(idx["S&P SL20"]);
+    const el = document.getElementById("indicesChart");
+    if (!s1.length && !s2.length) { el.innerHTML = `<div class="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">Indices data is not available right now.</div>`; return; }
+    Plotly.react("indicesChart", [
+      { x: s1.map(p => p.date), y: s1.map(p => p.value), type: "scatter", mode: "lines", name: "ASPI" },
+      { x: s2.map(p => p.date), y: s2.map(p => p.value), type: "scatter", mode: "lines", name: "S&P SL20" }
+    ], { margin: { l: 40, r: 10, t: 10, b: 40 }, legend: { orientation: "h" } }, { displayModeBar: false, responsive: true });
+  }
+
+  async function loadSignals() {
+    const data = await fetchJSON("/api/signals/top?limit=8");
+    const tbl = document.getElementById("signalsTbl");
+    tbl.innerHTML = `<thead><tr><th>Symbol</th><th>Signal</th><th class="text-right">Up %</th><th class="text-right">Pred. return</th><th class="text-right">Confidence</th></tr></thead>`;
+    const tbody = document.createElement("tbody");
+    (data.signals || []).forEach(r => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td><a class="link" href="/stock/${encodeURIComponent(r.symbol)}">${escapeHtml(r.symbol)}</a></td><td>${escapeHtml(r.signal || "—")}</td><td class="text-right">${r.up_probability != null ? Math.round(r.up_probability*100) + '%' : '—'}</td><td class="text-right">${fmtPct(r.predicted_return)}</td><td class="text-right">${escapeHtml(r.confidence_label || '—')}</td>`;
+      tbody.appendChild(tr);
+    });
+    tbl.appendChild(tbody);
+  }
+
+  loadMarket().catch(console.error);
+  loadIndices().catch(console.error);
+  loadSignals().catch(console.error);
+})();
+</script>
+{% endblock %}
