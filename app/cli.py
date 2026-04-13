@@ -17,6 +17,7 @@ from .config import settings
 from .mock_data import generate_dataset, load_dataset
 from .ml.train import train_from_db
 from .storage import Storage
+from .services.auth_service import ensure_bootstrap_admin
 
 
 def _utc_now() -> str:
@@ -44,6 +45,7 @@ def _pick_smoke_symbol(st: Storage) -> Optional[str]:
 def cmd_init_db(args: argparse.Namespace) -> None:
     st = Storage(settings.database_url)
     st.init()
+    ensure_bootstrap_admin()
     print(f"OK: initialized {settings.database_url}")
 
 
@@ -217,7 +219,14 @@ def cmd_train(args: argparse.Namespace) -> None:
     details = {"symbols": args.symbols or None, "horizon_days": args.horizon_days}
     try:
         res = train_from_db(database_url=settings.database_url, model_dir=settings.model_dir, symbols=[s.upper() for s in args.symbols] if args.symbols else None, horizon_days=args.horizon_days)
-        details.update({"rows": res.rows, "symbols_count": res.symbols, "metrics": res.metrics, "model_path": str(res.model_path)})
+        meta = {}
+        try:
+            meta = json.loads((Path(res.model_path) / "metadata.json").read_text(encoding="utf-8"))
+        except Exception:
+            meta = {"metrics_holdout": res.metrics}
+        model_id = meta.get("model_id") or Path(res.model_path).name
+        st.register_model(model_id=model_id, path=Path(res.model_path).name, meta=meta, is_active=True)
+        details.update({"rows": res.rows, "symbols_count": res.symbols, "metrics": res.metrics, "model_path": str(res.model_path), "model_id": model_id})
         st.record_job_run(job_name="train", status="ok", details=details, run_id=run_id, started_at=started, finished_at=_utc_now())
         print("Training complete")
         print(f"Rows: {res.rows} | Symbols: {res.symbols}")
@@ -448,6 +457,10 @@ def cmd_smoke_test(args: argparse.Namespace) -> None:
         "/api/signals/top",
     ]
     client = TestClient(app)
+    try:
+        client.post("/api/auth/login", json={"username": settings.bootstrap_admin_username, "password": settings.bootstrap_admin_password})
+    except Exception:
+        pass
     ok = True
     for path in paths:
         r = client.get(path)
@@ -542,6 +555,9 @@ def main(argv: Optional[List[str]] = None) -> None:
     sboot.add_argument("--verify-symbol", help="Optional symbol to use in final verification")
     sboot.set_defaults(func=cmd_bootstrap_real_data)
 
+
+    susers = sub.add_parser("list-users", help="List users and roles")
+    susers.set_defaults(func=lambda args: print(json.dumps(Storage(settings.database_url).list_users(), indent=2)))
     s6 = sub.add_parser("run-scheduler", help="Run periodic sync and optional train jobs")
     s6.add_argument("--once", action="store_true", help="Run one cycle and exit")
     s6.add_argument("--interval-minutes", type=int, default=1440)
