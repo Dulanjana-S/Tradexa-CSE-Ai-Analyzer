@@ -1,0 +1,582 @@
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --font-size: 16px;
+  
+  /* ============================================
+     Light Mode - TradexaLK Professional Theme
+     ============================================ */
+  
+  /* Core Background Layers */
+  --background: #fafbfc;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f8fa;
+  --bg-tertiary: #eef2f6;
+  --bg-elevated: #ffffff;
+  --bg-overlay: #ffffff;
+  
+  /* Surface Colors */
+  --surface-1: #ffffff;
+  --surface-2: #f6f8fa;
+  --surface-3: #eef2f6;
+  --surface-4: #e1e7ee;
+  
+  /* Card System */
+  --card: #ffffff;
+  --card-foreground: #1f2937;
+  --card-elevated: #ffffff;
+  --card-border: #e5e9ed;
+  --card-border-hover: #cbd5e1;
+  --card-border-focus: #10b981;
+  
+  /* Text Hierarchy */
+  --text-primary: #1f2937;
+  --text-secondary: #4b5563;
+  --text-tertiary: #6b7280;
+  --text-muted: #9ca3af;
+  --text-inverse: #ffffff;
+  
+  --foreground: #1f2937;
+  --primary: #1f2937;
+  --primary-foreground: #ffffff;
+  
+  /* Border System */
+  --border: #e5e9ed;
+  --border-default: #e5e9ed;
+  --border-subtle: #f0f3f7;
+  --border-strong: #cbd5e1;
+  --border-hover: #cbd5e1;
+  --border-focus: #10b981;
+  
+  /* Brand Colors - Emerald */
+  --brand-primary: #10b981;
+  --brand-primary-hover: #059669;
+  --brand-primary-light: #047857;
+  --brand-primary-bg: rgba(16, 185, 129, 0.08);
+  --brand-primary-border: rgba(16, 185, 129, 0.25);
+  
+  /* Semantic Colors */
+  --success-text: #047857;
+  --success-bg: rgba(16, 185, 129, 0.08);
+  --success-border: rgba(16, 185, 129, 0.25);
+  --success-base: #10b981;
+  --success-light: #34d399;
+  --success-dark: #047857;
+  
+  --danger-text: #dc2626;
+  --danger-bg: rgba(220, 38, 38, 0.08);
+  --danger-border: rgba(220, 38, 38, 0.25);
+  --danger-base: #ef4444;
+  --danger-light: #f87171;
+  --danger-dark: #dc2626;
+  
+  --warning-text: #b45309;
+  --warning-bg: rgba(180, 83, 9, 0.08);
+  --warning-border: rgba(180, 83, 9, 0.25);
+  --warning-base: #f59e0b;
+  
+  --info-text: #1d4ed8;
+  --info-bg: rgba(29, 78, 216, 0.08);
+  --info-border: rgba(29, 78, 216, 0.25);
+  --info-base: #3b82f6;
+  
+  /* Interactive States */
+  --hover-bg: rgba(0, 0, 0, 0.04);
+  --active-bg: rgba(0, 0, 0, 0.08);
+  --focus-ring: rgba(16, 185, 129, 0.4);
+  
+  /* Input System */
+  --input: #ffffff;
+  --input-background: #ffffff;
+  --input-border: #e5e9ed;
+  --input-border-hover: #cbd5e1;
+  --input-border-focus: #10b981;
+  --switch-background: #cbd5e1;
+  
+  /* Sidebar */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1f2937;
+  --sidebar-primary: #10b981;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f6f8fa;
+  --sidebar-accent-foreground: #4b5563;
+  --sidebar-border: #e5e9ed;
+  --sidebar-ring: #10b981;
+  
+  /* Other UI Elements */
+  --popover: #ffffff;
+  --popover-foreground: #1f2937;
+  --secondary: #f6f8fa;
+  --secondary-foreground: #1f2937;
+  --muted: #eef2f6;
+  --muted-foreground: #4b5563;
+  --accent: #f6f8fa;
+  --accent-foreground: #1f2937;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --ring: #10b981;
+  
+  /* Chart Colors */
+  --chart-1: #10b981;
+  --chart-2: #3b82f6;
+  --chart-3: #f59e0b;
+  --chart-4: #8b5cf6;
+  --chart-5: #ef4444;
+  --chart-6: #14b8a6;
+  
+  /* Common variables */
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --radius: 0.625rem;
+  
+  /* ============================================
+     Typography & Spacing System
+     ============================================ */
+  
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  
+  /* Display */
+  --text-display-size: 2.5rem;
+  --text-display-line: 3rem;
+  --text-display-weight: 700;
+  --text-display-tracking: -0.02em;
+  
+  /* H1 */
+  --text-h1-size: 2rem;
+  --text-h1-line: 2.5rem;
+  --text-h1-weight: 700;
+  --text-h1-tracking: -0.02em;
+  
+  /* H2 */
+  --text-h2-size: 1.5rem;
+  --text-h2-line: 2rem;
+  --text-h2-weight: 600;
+  --text-h2-tracking: -0.01em;
+  
+  /* H3 */
+  --text-h3-size: 1.125rem;
+  --text-h3-line: 1.75rem;
+  --text-h3-weight: 600;
+  --text-h3-tracking: -0.01em;
+  
+  /* H4 */
+  --text-h4-size: 0.9375rem;
+  --text-h4-line: 1.5rem;
+  --text-h4-weight: 600;
+  --text-h4-tracking: 0;
+  
+  /* Body */
+  --text-body-size: 0.875rem;
+  --text-body-line: 1.5rem;
+  --text-body-weight: 400;
+  
+  /* Small */
+  --text-sm-size: 0.8125rem;
+  --text-sm-line: 1.25rem;
+  --text-sm-weight: 400;
+  
+  /* Extra Small */
+  --text-xs-size: 0.75rem;
+  --text-xs-line: 1rem;
+  --text-xs-weight: 400;
+  
+  /* Weight Scale */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  
+  /* Spacing System */
+  --space-0: 0;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-20: 5rem;
+  --space-24: 6rem;
+  
+  --spacing-page-x: 2rem;
+  --spacing-page-y: 2rem;
+  --spacing-section: 3rem;
+  --spacing-section-tight: 2rem;
+  --spacing-card-padding: 1.5rem;
+  --spacing-card-padding-sm: 1rem;
+  --spacing-card-gap: 1.5rem;
+  
+  --spacing-button-x: 1rem;
+  --spacing-button-y: 0.5rem;
+  --spacing-input-x: 0.75rem;
+  --spacing-input-y: 0.5rem;
+  
+  /* Border Radius */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-full: 9999px;
+  
+  /* Shadows */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  
+  /* Transitions */
+  --transition-fast: 100ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slower: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* Z-Index */
+  --z-base: 0;
+  --z-dropdown: 10;
+  --z-sticky: 20;
+  --z-fixed: 30;
+  --z-overlay: 40;
+  --z-modal: 50;
+  --z-popover: 60;
+  --z-tooltip: 70;
+  
+  /* Convenience aliases for light mode */
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-bg-tertiary: var(--bg-tertiary);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-border: var(--border);
+}
+
+.dark {
+  /* ============================================
+     TradexaLK Premium Design System
+     Professional Financial Analytics Platform
+     ============================================ */
+  
+  /* Core Background Layers - Deep, sophisticated depth */
+  --background: #08090c;
+  --bg-primary: #08090c;
+  --bg-secondary: #0d1117;
+  --bg-tertiary: #161b22;
+  --bg-elevated: #1c2128;
+  --bg-overlay: #22272e;
+  
+  /* Surface Colors - Subtle elevation system */
+  --surface-1: #08090c;
+  --surface-2: #0d1117;
+  --surface-3: #161b22;
+  --surface-4: #1c2128;
+  
+  /* Card System - Refined and consistent */
+  --card: #0d1117;
+  --card-foreground: #e6edf3;
+  --card-elevated: #161b22;
+  --card-border: #30363d;
+  --card-border-hover: #484f58;
+  --card-border-focus: #10b981;
+  
+  /* Text Hierarchy - Professional, readable */
+  --text-primary: #e6edf3;
+  --text-secondary: #adbac7;
+  --text-tertiary: #768390;
+  --text-muted: #545d68;
+  --text-inverse: #0d1117;
+  
+  --foreground: #e6edf3;
+  --primary: #e6edf3;
+  --primary-foreground: #0d1117;
+  
+  /* Border System - Refined and subtle */
+  --border: #30363d;
+  --border-default: #30363d;
+  --border-subtle: #21262d;
+  --border-strong: #484f58;
+  --border-hover: #484f58;
+  --border-focus: #10b981;
+  
+  /* Brand Colors - Emerald for financial success */
+  --brand-primary: #10b981;
+  --brand-primary-hover: #059669;
+  --brand-primary-light: #047857;
+  --brand-primary-bg: rgba(16, 185, 129, 0.08);
+  --brand-primary-border: rgba(16, 185, 129, 0.2);
+  
+  /* Semantic Colors - Clear, professional signals */
+  --success-text: #10b981;
+  --success-bg: rgba(16, 185, 129, 0.08);
+  --success-border: rgba(16, 185, 129, 0.2);
+  --success-base: #10b981;
+  --success-light: #34d399;
+  --success-dark: #059669;
+  
+  --danger-text: #f85149;
+  --danger-bg: rgba(248, 81, 73, 0.08);
+  --danger-border: rgba(248, 81, 73, 0.2);
+  --danger-base: #f85149;
+  --danger-light: #ff6b6b;
+  --danger-dark: #da3633;
+  
+  --warning-text: #d29922;
+  --warning-bg: rgba(210, 153, 34, 0.08);
+  --warning-border: rgba(210, 153, 34, 0.2);
+  --warning-base: #d29922;
+  
+  --info-text: #58a6ff;
+  --info-bg: rgba(88, 166, 255, 0.08);
+  --info-border: rgba(88, 166, 255, 0.2);
+  --info-base: #58a6ff;
+  
+  /* Interactive States */
+  --hover-bg: rgba(177, 186, 196, 0.06);
+  --active-bg: rgba(177, 186, 196, 0.12);
+  --focus-ring: rgba(16, 185, 129, 0.4);
+  
+  /* Input System */
+  --input: #0d1117;
+  --input-background: #0d1117;
+  --input-border: #30363d;
+  --input-border-hover: #484f58;
+  --input-border-focus: #10b981;
+  
+  /* Sidebar */
+  --sidebar: #0d1117;
+  --sidebar-foreground: #e6edf3;
+  --sidebar-primary: #10b981;
+  --sidebar-primary-foreground: #e6edf3;
+  --sidebar-accent: #161b22;
+  --sidebar-accent-foreground: #adbac7;
+  --sidebar-border: #30363d;
+  --sidebar-ring: #10b981;
+  
+  /* Other UI Elements */
+  --popover: #161b22;
+  --popover-foreground: #e6edf3;
+  --secondary: #161b22;
+  --secondary-foreground: #e6edf3;
+  --muted: #30363d;
+  --muted-foreground: #768390;
+  --accent: #161b22;
+  --accent-foreground: #e6edf3;
+  --destructive: #da3633;
+  --destructive-foreground: #e6edf3;
+  --ring: #10b981;
+  
+  /* Chart Colors - Professional, distinct */
+  --chart-1: #10b981;
+  --chart-2: #58a6ff;
+  --chart-3: #d29922;
+  --chart-4: #a371f7;
+  --chart-5: #f85149;
+  --chart-6: #56d4dd;
+  
+  /* ============================================
+     Typography System
+     ============================================ */
+  
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  
+  /* Display - Large hero text */
+  --text-display-size: 2.5rem;
+  --text-display-line: 3rem;
+  --text-display-weight: 700;
+  --text-display-tracking: -0.02em;
+  
+  /* H1 - Page titles */
+  --text-h1-size: 2rem;
+  --text-h1-line: 2.5rem;
+  --text-h1-weight: 700;
+  --text-h1-tracking: -0.02em;
+  
+  /* H2 - Section titles */
+  --text-h2-size: 1.5rem;
+  --text-h2-line: 2rem;
+  --text-h2-weight: 600;
+  --text-h2-tracking: -0.01em;
+  
+  /* H3 - Subsection titles */
+  --text-h3-size: 1.125rem;
+  --text-h3-line: 1.75rem;
+  --text-h3-weight: 600;
+  --text-h3-tracking: -0.01em;
+  
+  /* H4 - Card titles */
+  --text-h4-size: 0.9375rem;
+  --text-h4-line: 1.5rem;
+  --text-h4-weight: 600;
+  --text-h4-tracking: 0;
+  
+  /* Body - Main content */
+  --text-body-size: 0.875rem;
+  --text-body-line: 1.5rem;
+  --text-body-weight: 400;
+  
+  /* Small - Secondary text */
+  --text-sm-size: 0.8125rem;
+  --text-sm-line: 1.25rem;
+  --text-sm-weight: 400;
+  
+  /* Extra Small - Captions, labels */
+  --text-xs-size: 0.75rem;
+  --text-xs-line: 1rem;
+  --text-xs-weight: 400;
+  
+  /* Weight Scale */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  
+  /* ============================================
+     Spacing System (4px base unit)
+     ============================================ */
+  
+  --space-0: 0;
+  --space-1: 0.25rem;    /* 4px */
+  --space-2: 0.5rem;     /* 8px */
+  --space-3: 0.75rem;    /* 12px */
+  --space-4: 1rem;       /* 16px */
+  --space-5: 1.25rem;    /* 20px */
+  --space-6: 1.5rem;     /* 24px */
+  --space-8: 2rem;       /* 32px */
+  --space-10: 2.5rem;    /* 40px */
+  --space-12: 3rem;      /* 48px */
+  --space-16: 4rem;      /* 64px */
+  --space-20: 5rem;      /* 80px */
+  --space-24: 6rem;      /* 96px */
+  
+  /* Layout Spacing */
+  --spacing-page-x: 2rem;
+  --spacing-page-y: 2rem;
+  --spacing-section: 3rem;
+  --spacing-section-tight: 2rem;
+  --spacing-card-padding: 1.5rem;
+  --spacing-card-padding-sm: 1rem;
+  --spacing-card-gap: 1.5rem;
+  
+  /* Component Spacing */
+  --spacing-button-x: 1rem;
+  --spacing-button-y: 0.5rem;
+  --spacing-input-x: 0.75rem;
+  --spacing-input-y: 0.5rem;
+  
+  /* ============================================
+     Border Radius System
+     ============================================ */
+  
+  --radius-sm: 0.375rem;   /* 6px - Small elements */
+  --radius-md: 0.5rem;     /* 8px - Default */
+  --radius-lg: 0.75rem;    /* 12px - Cards */
+  --radius-xl: 1rem;       /* 16px - Large cards */
+  --radius-2xl: 1.5rem;    /* 24px - Hero elements */
+  --radius-full: 9999px;   /* Pills, avatars */
+  
+  --radius: 0.5rem;        /* Default */
+  
+  /* ============================================
+     Shadow System
+     ============================================ */
+  
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+  
+  /* ============================================
+     Transitions
+     ============================================ */
+  
+  --transition-fast: 100ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slower: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* ============================================
+     Z-Index Scale
+     ============================================ */
+  
+  --z-base: 0;
+  --z-dropdown: 10;
+  --z-sticky: 20;
+  --z-fixed: 30;
+  --z-overlay: 40;
+  --z-modal: 50;
+  --z-popover: 60;
+  --z-tooltip: 70;
+  
+  /* Convenience aliases for dark mode */
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-bg-tertiary: var(--bg-tertiary);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-border: var(--border);
+}
+
+/* ============================================
+   Global Typography Styles
+   ============================================ */
+
+h1 {
+  font-size: var(--text-h1-size);
+  line-height: var(--text-h1-line);
+  font-weight: var(--text-h1-weight);
+  letter-spacing: var(--text-h1-tracking);
+  color: var(--text-primary);
+}
+
+h2 {
+  font-size: var(--text-h2-size);
+  line-height: var(--text-h2-line);
+  font-weight: var(--text-h2-weight);
+  letter-spacing: var(--text-h2-tracking);
+  color: var(--text-primary);
+}
+
+h3 {
+  font-size: var(--text-h3-size);
+  line-height: var(--text-h3-line);
+  font-weight: var(--text-h3-weight);
+  letter-spacing: var(--text-h3-tracking);
+  color: var(--text-primary);
+}
+
+h4 {
+  font-size: var(--text-h4-size);
+  line-height: var(--text-h4-line);
+  font-weight: var(--text-h4-weight);
+  letter-spacing: var(--text-h4-tracking);
+  color: var(--text-primary);
+}
+
+body {
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-line);
+  font-weight: var(--text-body-weight);
+  color: var(--text-secondary);
+}
+
+/* Tabular numbers for financial data */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+/* Monospaced numbers for precise alignment */
+.mono-nums {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
