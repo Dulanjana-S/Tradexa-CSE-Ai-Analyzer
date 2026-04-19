@@ -27,3 +27,6 @@ class TTLCache:
         value = factory()
         self._store[key] = _Entry(value=value, expires_at=now + self.ttl_seconds)
         return value
+
+    def clear(self) -> None:
+        self._store.clear()

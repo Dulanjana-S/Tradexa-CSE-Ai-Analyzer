@@ -27,6 +27,10 @@ _provider: Optional[MarketDataProvider] = None
 _provider_key: Optional[str] = None
 
 
+def clear_runtime_cache() -> None:
+    _cache.clear()
+
+
 def get_effective_provider_name() -> str:
     configured = (_storage.get_meta("active_provider") or settings.data_provider or "hybrid").lower()
     if configured not in {"db", "mock", "cse", "hybrid", "yfinance"}:
@@ -39,6 +43,7 @@ def set_effective_provider_name(name: str) -> str:
     if normalized not in {"db", "mock", "cse", "hybrid", "yfinance"}:
         raise HTTPException(status_code=400, detail="Invalid provider")
     _storage.set_meta("active_provider", normalized)
+    clear_runtime_cache()
     global _provider, _provider_key
     _provider = None
     _provider_key = None
