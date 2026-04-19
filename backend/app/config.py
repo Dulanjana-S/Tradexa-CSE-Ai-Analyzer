@@ -41,6 +41,7 @@ class Settings:
     session_ttl_days: int = int(os.getenv("SESSION_TTL_DAYS", "7"))
     bootstrap_admin_username: str = os.getenv("BOOTSTRAP_ADMIN_USERNAME", "admin")
     bootstrap_admin_password: str = os.getenv("BOOTSTRAP_ADMIN_PASSWORD", "admin123")
+    frontend_origins: str = os.getenv("FRONTEND_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
 
 
 settings = Settings()
