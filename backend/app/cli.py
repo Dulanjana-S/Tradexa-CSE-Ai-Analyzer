@@ -97,10 +97,13 @@ def _read_companies_file(path: str) -> List[Dict[str, object]]:
 
 
 def cmd_import_companies(args: argparse.Namespace) -> None:
+    from .services import data_service
+
     st = Storage(settings.database_url)
     st.init()
     rows = _read_companies_file(args.file)
     count = st.upsert_companies(rows)
+    data_service.clear_runtime_cache()
     print(f"Imported companies: {count}")
 
 
@@ -181,6 +184,7 @@ def cmd_sync(args: argparse.Namespace) -> None:
 
         st.ensure_price_symbols_as_companies()
         st.set_meta("last_sync_utc", _utc_now())
+        data_service.clear_runtime_cache()
         st.record_job_run(job_name="sync", status="ok", details=details, run_id=run_id, started_at=started, finished_at=_utc_now())
         print("Sync complete.")
         if details["failed_symbols"]:
@@ -194,6 +198,8 @@ def cmd_sync(args: argparse.Namespace) -> None:
 
 
 def cmd_seed_mock_db(args: argparse.Namespace) -> None:
+    from .services import data_service
+
     st = Storage(settings.database_url)
     st.init()
     ds = load_dataset(Path("data/mock"))
@@ -208,6 +214,7 @@ def cmd_seed_mock_db(args: argparse.Namespace) -> None:
         total_rows += st.upsert_prices(sym, hist)
     st.set_meta("seeded_mock_days", str(args.days))
     st.set_meta("last_sync_utc", _utc_now())
+    data_service.clear_runtime_cache()
     print(f"Seeded mock DB: companies={len(ds['companies'])}, price_rows={total_rows}, announcements={len(ds['announcements'])}")
 
 
@@ -304,6 +311,8 @@ def _read_symbol_csv(fp: io.TextIOBase) -> List[dict]:
 
 
 def cmd_import_eod_zip(args: argparse.Namespace) -> None:
+    from .services import data_service
+
     st = Storage(settings.database_url)
     st.init()
     zpath = args.file
@@ -348,6 +357,7 @@ def cmd_import_eod_zip(args: argparse.Namespace) -> None:
     if imported_symbols:
         auto_companies = st.ensure_price_symbols_as_companies()
     st.set_meta("last_sync_utc", _utc_now())
+    data_service.clear_runtime_cache()
     st.record_job_run(
         job_name="import_eod_zip",
         status="ok",

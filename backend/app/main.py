@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from fastapi import Body, FastAPI, Header, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -21,6 +22,14 @@ app = FastAPI(
     title="CSE AI Analyzer",
     description="CSE market analytics backend with live data support, auth, admin controls, and ML prediction.",
     version="0.7.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in settings.frontend_origins.split(',') if o.strip()],
+    allow_credentials=True,
+    allow_methods=['*'],
+    allow_headers=['*'],
 )
 
 
@@ -44,6 +53,70 @@ def _render(request: Request, template: str, context: Optional[Dict[str, Any]] =
         base.update(context)
     return templates.TemplateResponse(request, template, base, status_code=status_code)
 
+
+
+
+def _find_user_by_email(email: str) -> Optional[Dict[str, Any]]:
+    wanted = (email or '').strip().lower()
+    if not wanted:
+        return None
+    for user in list_users():
+        if str(user.get('email') or '').strip().lower() == wanted:
+            return user
+    return None
+
+
+def _derive_username(payload: Dict[str, Any]) -> str:
+    username = str(payload.get('username') or '').strip().lower()
+    if username:
+        return username
+    email = str(payload.get('email') or '').strip().lower()
+    if email and '@' in email:
+        base = ''.join(ch for ch in email.split('@', 1)[0] if ch.isalnum() or ch in {'_', '-'}) or 'user'
+    else:
+        name = str(payload.get('name') or payload.get('display_name') or '').strip().lower()
+        base = ''.join(ch for ch in name.replace(' ', '_') if ch.isalnum() or ch in {'_', '-'}) or 'user'
+    existing = {str(u.get('username') or '').lower() for u in list_users()}
+    if base not in existing:
+        return base
+    idx = 2
+    while f"{base}{idx}" in existing:
+        idx += 1
+    return f"{base}{idx}"
+
+
+def _system_settings_defaults() -> Dict[str, Any]:
+    return {
+        'siteName': 'TradexaLK',
+        'supportEmail': 'support@tradexalk.com',
+        'timezone': 'Asia/Colombo',
+        'maintenanceMode': False,
+        'sessionTimeout': '30',
+        'maxLoginAttempts': '5',
+        'passwordMinLength': '8',
+        'requireTwoFactor': False,
+        'autoSync': True,
+        'syncInterval': '60',
+        'maxRetries': '3',
+        'syncNotifications': True,
+        'emailNotifications': True,
+        'pushNotifications': False,
+        'smsNotifications': False,
+        'notificationDelay': '5',
+        'cacheEnabled': True,
+        'cacheDuration': '3600',
+        'rateLimitPerMinute': '60',
+        'apiTimeout': '30',
+        'provider': data_service.get_effective_provider_name() if hasattr(data_service, 'get_effective_provider_name') else settings.data_provider,
+    }
+
+
+def _system_settings() -> Dict[str, Any]:
+    values = data_service.get_preferences('__system__').get('preferences') or {}
+    defaults = _system_settings_defaults()
+    defaults.update(values)
+    defaults['provider'] = values.get('provider') or defaults.get('provider')
+    return defaults
 
 def _check_admin_access(request: Request, x_admin_key: Optional[str] = None) -> Dict[str, Any]:
     user = current_user_from_request(request)
@@ -122,13 +195,23 @@ def api_auth_me(request: Request):
 
 @app.post("/api/auth/register")
 def api_auth_register(payload: Dict[str, Any] = Body(...)):
-    user = create_user(str(payload.get("username") or ""), str(payload.get("password") or ""), role="user", display_name=payload.get("display_name"), email=payload.get("email"))
+    username = _derive_username(payload)
+    display_name = payload.get('display_name') or payload.get('name') or username
+    user = create_user(username, str(payload.get("password") or ""), role="user", display_name=display_name, email=payload.get("email"))
     return {"ok": True, "user": user}
 
 
 @app.post("/api/auth/login")
 def api_auth_login(payload: Dict[str, Any] = Body(...)):
-    result = login(str(payload.get("username") or ""), str(payload.get("password") or ""))
+    identifier = str(payload.get("username") or payload.get('email') or "").strip()
+    resolved = identifier
+    if '@' in identifier:
+        matched = _find_user_by_email(identifier)
+        if matched and matched.get('username'):
+            resolved = str(matched['username'])
+        else:
+            resolved = identifier.split('@', 1)[0]
+    result = login(resolved, str(payload.get("password") or ""))
     resp = JSONResponse({"ok": True, "user": result["user"], "expires_at": result["expires_at"]})
     resp.set_cookie(SESSION_COOKIE, result["session_id"], httponly=True, samesite="lax", secure=False, max_age=settings.session_ttl_days * 86400)
     return resp
@@ -432,6 +515,7 @@ def api_admin_provider(request: Request, x_admin_key: Optional[str] = Header(def
 def api_admin_provider_set(request: Request, payload: Dict[str, Any] = Body(...), x_admin_key: Optional[str] = Header(default=None)):
     _check_admin_access(request, x_admin_key)
     active = data_service.set_effective_provider_name(str(payload.get('provider') or 'hybrid'))
+    data_service.clear_runtime_cache()
     return {'ok': True, 'active_provider': active}
 
 
@@ -459,6 +543,29 @@ def api_admin_ann_update(ann_id: str, request: Request, payload: Dict[str, Any] 
     tags = payload.get('tags') if isinstance(payload.get('tags'), list) else None
     return data_service.review_announcement(ann_id, importance=payload.get('importance'), review_status=payload.get('review_status'), tags=tags, review_notes=payload.get('review_notes'), reviewed_by=str(admin.get('username') or 'admin'))
 
+
+
+
+@app.get('/api/admin/system-settings')
+def api_admin_system_settings(request: Request, x_admin_key: Optional[str] = Header(default=None)):
+    _check_admin_access(request, x_admin_key)
+    return {'settings': _system_settings()}
+
+
+@app.post('/api/admin/system-settings')
+def api_admin_system_settings_update(request: Request, payload: Dict[str, Any] = Body(...), x_admin_key: Optional[str] = Header(default=None)):
+    _check_admin_access(request, x_admin_key)
+    values = payload.get('settings') if isinstance(payload.get('settings'), dict) else payload
+    current = _system_settings()
+    current.update(values or {})
+    provider = str(current.get('provider') or settings.data_provider)
+    try:
+        active = data_service.set_effective_provider_name(provider)
+        current['provider'] = active
+    except Exception:
+        pass
+    data_service.set_preferences(current, profile='__system__')
+    return {'ok': True, 'settings': _system_settings()}
 
 def _safe_num(v: Any) -> Optional[float]:
     try:
