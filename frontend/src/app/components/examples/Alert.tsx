@@ -1,0 +1,96 @@
+import { AlertCircle, CheckCircle2, Info, X, XCircle } from "lucide-react";
+import { cn } from "../ui/utils";
+
+type AlertVariant = "info" | "success" | "warning" | "danger";
+
+interface AlertProps {
+  variant?: AlertVariant;
+  title?: string;
+  message: string;
+  dismissible?: boolean;
+  onDismiss?: () => void;
+  className?: string;
+}
+
+/**
+ * Alert Component
+ * 
+ * A reusable alert banner component for displaying notifications and messages.
+ * Follows TradexaLK Design System specifications.
+ * 
+ * @example
+ * ```tsx
+ * <Alert
+ *   variant="success"
+ *   title="Success"
+ *   message="Your changes have been saved successfully."
+ *   dismissible
+ *   onDismiss={() => setShowAlert(false)}
+ * />
+ * ```
+ */
+export function Alert({
+  variant = "info",
+  title,
+  message,
+  dismissible = false,
+  onDismiss,
+  className,
+}: AlertProps) {
+  const variants = {
+    info: {
+      container: "bg-blue-600/10 border border-blue-600/30",
+      icon: "text-blue-400",
+      title: "text-blue-300",
+      message: "text-blue-200",
+      IconComponent: Info,
+    },
+    success: {
+      container: "bg-emerald-600/10 border border-emerald-600/30",
+      icon: "text-emerald-400",
+      title: "text-emerald-300",
+      message: "text-emerald-200",
+      IconComponent: CheckCircle2,
+    },
+    warning: {
+      container: "bg-amber-600/10 border border-amber-600/30",
+      icon: "text-amber-400",
+      title: "text-amber-300",
+      message: "text-amber-200",
+      IconComponent: AlertCircle,
+    },
+    danger: {
+      container: "bg-red-600/10 border border-red-600/30",
+      icon: "text-red-400",
+      title: "text-red-300",
+      message: "text-red-200",
+      IconComponent: XCircle,
+    },
+  };
+
+  const variantStyles = variants[variant];
+  const IconComponent = variantStyles.IconComponent;
+
+  return (
+    <div className={cn(variantStyles.container, "rounded-lg p-4 flex items-start gap-3", className)}>
+      <IconComponent className={cn("h-5 w-5 flex-shrink-0 mt-0.5", variantStyles.icon)} />
+      <div className="flex-1 min-w-0">
+        {title && (
+          <h4 className={cn("text-sm font-semibold mb-1", variantStyles.title)}>
+            {title}
+          </h4>
+        )}
+        <p className={cn("text-sm", variantStyles.message)}>{message}</p>
+      </div>
+      {dismissible && onDismiss && (
+        <button
+          onClick={onDismiss}
+          className="ml-auto -mt-0.5 -mr-1 p-1 rounded hover:bg-white/10 transition-colors flex-shrink-0"
+          aria-label="Dismiss alert"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      )}
+    </div>
+  );
+}
