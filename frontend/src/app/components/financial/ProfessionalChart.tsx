@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { createChart, addCandlestickSeries, addHistogramSeries, addLineSeries, type IChartApi, type CandlestickData, type HistogramData } from '../../../lib/charts/lightweightCompat';
+import { createChart, CandlestickSeries, HistogramSeries, LineSeries, type IChartApi, type CandlestickData, type HistogramData, type LineData } from 'lightweight-charts';
 import { Card, CardHeader } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -23,7 +23,7 @@ function toCandles(rows: HistoricalDataPoint[]): CandlestickData[] {
 }
 
 function calculateSMA(data: CandlestickData[], period: number) {
-  const out: Array<{ time: string; value: number }> = [];
+  const out: LineData[] = [];
   for (let i = period - 1; i < data.length; i += 1) {
     const slice = data.slice(i - period + 1, i + 1);
     const sum = slice.reduce((acc, row) => acc + row.close, 0);
@@ -90,7 +90,7 @@ export function ProfessionalChart({
 
     chartRef.current = chart;
 
-    const candlestickSeries = addCandlestickSeries(chart, {
+    const candlestickSeries = chart.addSeries(CandlestickSeries, {
       upColor: '#10b981',
       downColor: '#f85149',
       borderUpColor: '#10b981',
@@ -102,11 +102,11 @@ export function ProfessionalChart({
 
     if (showIndicators) {
       if (candles.length >= 20) {
-        const sma20 = addLineSeries(chart, { color: '#d29922', lineWidth: 2, priceLineVisible: false });
+        const sma20 = chart.addSeries(LineSeries, { color: '#d29922', lineWidth: 2, priceLineVisible: false });
         sma20.setData(calculateSMA(candles, 20));
       }
       if (candles.length >= 50) {
-        const sma50 = addLineSeries(chart, { color: '#a371f7', lineWidth: 2, priceLineVisible: false });
+        const sma50 = chart.addSeries(LineSeries, { color: '#a371f7', lineWidth: 2, priceLineVisible: false });
         sma50.setData(calculateSMA(candles, 50));
       }
     }
@@ -117,11 +117,10 @@ export function ProfessionalChart({
       color: index > 0 && row.close >= row.open ? '#10b98133' : '#f8514933',
     }));
 
-    const volumeSeries = addHistogramSeries(chart, {
+    const volumeSeries = chart.addSeries(HistogramSeries, {
       color: '#10b98133',
       priceFormat: { type: 'volume' },
       priceScaleId: '',
-      scaleMargins: { top: 0.75, bottom: 0 },
     });
     volumeSeries.setData(volumeData);
 
@@ -227,7 +226,7 @@ export function ProfessionalChart({
       </CardHeader>
       <div className="p-0">
         {candles.length > 0 ? (
-          <div ref={chartContainerRef} className="w-full" />
+          <div ref={chartContainerRef} className="w-full" style={{ height: '500px' }} />
         ) : (
           <div className="flex h-[500px] items-center justify-center text-sm text-[#768390]">
             No historical chart data available.

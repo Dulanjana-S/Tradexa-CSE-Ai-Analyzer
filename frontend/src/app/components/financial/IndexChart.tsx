@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { createChart, addAreaSeries, type IChartApi, type AreaData } from '../../../lib/charts/lightweightCompat';
+import { createChart, LineSeries, type IChartApi, type LineData } from 'lightweight-charts';
 import { Card, CardHeader } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -43,7 +43,7 @@ export function IndexChart({
   const chartRef = useRef<IChartApi | null>(null);
   const [timeframe, setTimeframe] = useState('1D');
   const isPositive = change >= 0;
-  const series = useMemo(() => {
+  const series = useMemo<LineData[]>(() => {
     const rows = (data && data.length > 0 ? data : createFallbackSeries(currentValue, change)).map((item) => ({
       time: item.date,
       value: item.value,
@@ -69,19 +69,15 @@ export function IndexChart({
         timeVisible: true,
         secondsVisible: false,
       },
-      width: chartContainerRef.current.clientWidth,
-      height,
     });
 
     chartRef.current = chart;
-    const areaSeries = addAreaSeries(chart, {
-      lineColor: color,
-      topColor: `${color}33`,
-      bottomColor: `${color}05`,
+    const lineSeries = chart.addSeries(LineSeries, {
+      color: color,
       lineWidth: 2,
       priceLineVisible: false,
     });
-    areaSeries.setData(series as AreaData[]);
+    lineSeries.setData(series);
     chart.timeScale().fitContent();
 
     const handleResize = () => {
@@ -95,7 +91,7 @@ export function IndexChart({
       window.removeEventListener('resize', handleResize);
       chart.remove();
     };
-  }, [color, height, series]);
+  }, [color, series]);
 
   return (
     <Card className="border-[#30363d] bg-[#0d1117] shadow-none overflow-hidden">
@@ -162,7 +158,7 @@ export function IndexChart({
         </div>
       </CardHeader>
       {series.length > 0 ? (
-        <div ref={chartContainerRef} className="w-full" />
+        <div ref={chartContainerRef} className="w-full" style={{ height: `${height}px` }} />
       ) : (
         <div className="flex h-[320px] items-center justify-center text-sm text-[#768390]">
           No index data available.

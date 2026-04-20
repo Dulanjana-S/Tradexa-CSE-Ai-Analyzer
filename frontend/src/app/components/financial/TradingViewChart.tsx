@@ -4,18 +4,18 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import {
-  createChart,
-  addCandlestickSeries,
-  addHistogramSeries,
-  addLineSeries,
-  type IChartApi,
-  type ISeriesApi,
-  type CandlestickData,
-  type LineData,
-  type Time,
-  type MouseEventParams,
-} from '../../../lib/charts/lightweightCompat';
+import { 
+  createChart, 
+  CandlestickSeries,
+  HistogramSeries,
+  LineSeries,
+  IChartApi, 
+  ISeriesApi, 
+  CandlestickData, 
+  LineData,
+  Time,
+  MouseEventParams
+} from 'lightweight-charts';
 import { Card, CardContent, CardHeader } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -209,7 +209,7 @@ export function TradingViewChart({
     chartRef.current = chart;
 
     // Add main price series
-    const candlestickSeries = addCandlestickSeries(chart, {
+    const candlestickSeries = chart.addSeries(CandlestickSeries, {
       upColor: '#10b981',
       downColor: '#f85149',
       borderUpColor: '#10b981',
@@ -235,18 +235,17 @@ export function TradingViewChart({
         color: i > 0 && d.close >= d.open ? '#10b98133' : '#f8514933',
       }));
 
-      const volumeSeries = addHistogramSeries(chart, {
+      const volumeSeries = chart.addSeries(HistogramSeries, {
         color: '#10b98133',
         priceFormat: { type: 'volume' },
         priceScaleId: '',
-        scaleMargins: { top: 0.75, bottom: 0 },
       });
       volumeSeries.setData(volumeData);
     }
 
     // Add Technical Indicators
     if (indicators.sma20) {
-      const sma20 = addLineSeries(chart, {
+      const sma20 = chart.addSeries(LineSeries, {
         color: '#d29922',
         lineWidth: 2,
         title: 'SMA 20',
@@ -257,7 +256,7 @@ export function TradingViewChart({
     }
 
     if (indicators.sma50) {
-      const sma50 = addLineSeries(chart, {
+      const sma50 = chart.addSeries(LineSeries, {
         color: '#a371f7',
         lineWidth: 2,
         title: 'SMA 50',
@@ -268,7 +267,7 @@ export function TradingViewChart({
     }
 
     if (indicators.ema9) {
-      const ema9 = addLineSeries(chart, {
+      const ema9 = chart.addSeries(LineSeries, {
         color: '#58a6ff',
         lineWidth: 2,
         title: 'EMA 9',
@@ -279,7 +278,7 @@ export function TradingViewChart({
     }
 
     if (indicators.ema21) {
-      const ema21 = addLineSeries(chart, {
+      const ema21 = chart.addSeries(LineSeries, {
         color: '#ff6b6b',
         lineWidth: 2,
         title: 'EMA 21',
@@ -292,7 +291,7 @@ export function TradingViewChart({
     if (indicators.bollingerBands) {
       const bb = calculateBollingerBands(data, 20);
       
-      const upperBand = addLineSeries(chart, {
+      const upperBand = chart.addSeries(LineSeries, {
         color: '#58a6ff44',
         lineWidth: 1,
         lineStyle: 2,
@@ -301,7 +300,7 @@ export function TradingViewChart({
       });
       upperBand.setData(bb.upperBand);
 
-      const lowerBand = addLineSeries(chart, {
+      const lowerBand = chart.addSeries(LineSeries, {
         color: '#58a6ff44',
         lineWidth: 1,
         lineStyle: 2,
@@ -310,7 +309,7 @@ export function TradingViewChart({
       });
       lowerBand.setData(bb.lowerBand);
 
-      const middleBand = addLineSeries(chart, {
+      const middleBand = chart.addSeries(LineSeries, {
         color: '#58a6ff',
         lineWidth: 1,
         lastValueVisible: false,

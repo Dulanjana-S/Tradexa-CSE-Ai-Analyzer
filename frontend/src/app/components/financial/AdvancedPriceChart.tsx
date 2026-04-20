@@ -4,7 +4,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { createChart, addCandlestickSeries, addHistogramSeries, addLineSeries, type IChartApi, type ISeriesApi, type CandlestickData, type LineData, type HistogramData } from '../../../lib/charts/lightweightCompat';
+import { createChart, CandlestickSeries, HistogramSeries, LineSeries, IChartApi, ISeriesApi, CandlestickData, LineData, HistogramData } from 'lightweight-charts';
 import { Card, CardContent, CardHeader } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -185,7 +185,7 @@ export function AdvancedPriceChart({
     chartRef.current = chart;
 
     // Add Candlestick Series
-    const candlestickSeries = addCandlestickSeries(chart, {
+    const candlestickSeries = chart.addSeries(CandlestickSeries, {
       upColor: '#10b981',
       downColor: '#f85149',
       borderUpColor: '#10b981',
@@ -204,16 +204,12 @@ export function AdvancedPriceChart({
 
     // Add Volume if enabled
     if (showVolume) {
-      const volumeSeries = addHistogramSeries(chart, {
+      const volumeSeries = chart.addSeries(HistogramSeries, {
         color: '#10b98166',
         priceFormat: {
           type: 'volume',
         },
         priceScaleId: '',
-        scaleMargins: {
-          top: 0.8,
-          bottom: 0,
-        },
       });
       
       volumeSeries.setData(calculateVolume(data));
@@ -224,7 +220,7 @@ export function AdvancedPriceChart({
     if (showIndicators) {
       // SMA 20
       if (indicators.sma20) {
-        const sma20Series = addLineSeries(chart, {
+        const sma20Series = chart.addSeries(LineSeries, {
           color: '#d29922',
           lineWidth: 2,
           title: 'SMA 20',
@@ -236,7 +232,7 @@ export function AdvancedPriceChart({
 
       // SMA 50
       if (indicators.sma50) {
-        const sma50Series = addLineSeries(chart, {
+        const sma50Series = chart.addSeries(LineSeries, {
           color: '#a371f7',
           lineWidth: 2,
           title: 'SMA 50',
@@ -248,7 +244,7 @@ export function AdvancedPriceChart({
 
       // EMA 12
       if (indicators.ema12) {
-        const ema12Series = addLineSeries(chart, {
+        const ema12Series = chart.addSeries(LineSeries, {
           color: '#58a6ff',
           lineWidth: 2,
           title: 'EMA 12',
@@ -260,7 +256,7 @@ export function AdvancedPriceChart({
 
       // EMA 26
       if (indicators.ema26) {
-        const ema26Series = addLineSeries(chart, {
+        const ema26Series = chart.addSeries(LineSeries, {
           color: '#ff6b6b',
           lineWidth: 2,
           title: 'EMA 26',
@@ -274,7 +270,7 @@ export function AdvancedPriceChart({
       if (indicators.bollingerBands) {
         const bb = calculateBollingerBands(data, 20);
         
-        const upperBandSeries = addLineSeries(chart, {
+        const upperBandSeries = chart.addSeries(LineSeries, {
           color: '#58a6ff66',
           lineWidth: 1,
           lineStyle: 2,
@@ -284,7 +280,7 @@ export function AdvancedPriceChart({
         });
         upperBandSeries.setData(bb.upperBand);
 
-        const lowerBandSeries = addLineSeries(chart, {
+        const lowerBandSeries = chart.addSeries(LineSeries, {
           color: '#58a6ff66',
           lineWidth: 1,
           lineStyle: 2,
@@ -294,7 +290,7 @@ export function AdvancedPriceChart({
         });
         lowerBandSeries.setData(bb.lowerBand);
 
-        const middleBandSeries = addLineSeries(chart, {
+        const middleBandSeries = chart.addSeries(LineSeries, {
           color: '#58a6ff',
           lineWidth: 1,
           title: 'BB Middle',

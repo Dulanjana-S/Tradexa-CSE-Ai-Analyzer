@@ -340,33 +340,21 @@ export const marketApi = {
 
   getStockHistory: async (symbol: string, days = 180): Promise<HistoricalDataPoint[]> => {
     const safeDays = Math.max(20, days);
-    try {
-      const response = await api.get<any>(`/api/stock/${encodeURIComponent(symbol)}/history?days=${safeDays}`);
-      const rows = Array.isArray(response?.history) ? response.history : [];
-      return rows.map((item: any) => ({
-        date: item.date,
-        open: num(item.open),
-        high: num(item.high),
-        low: num(item.low),
-        close: num(item.close),
-        volume: num(item.volume),
-      }));
-    } catch (error: any) {
-      if (error?.status === 404) return [];
-      throw error;
-    }
+    const response = await api.get<any>(`/api/stock/${encodeURIComponent(symbol)}/history?days=${safeDays}`);
+    const rows = Array.isArray(response?.history) ? response.history : [];
+    return rows.map((item: any) => ({
+      date: item.date,
+      open: num(item.open),
+      high: num(item.high),
+      low: num(item.low),
+      close: num(item.close),
+      volume: num(item.volume),
+    }));
   },
 
   getStockPrediction: async (symbol: string, currentPrice = 0): Promise<PredictionCardData> => {
-    try {
-      const response = await api.get<any>(`/api/stock/${encodeURIComponent(symbol)}/prediction`);
-      return mapPrediction(response, currentPrice);
-    } catch (error: any) {
-      if (error?.status === 404 || error?.status === 400) {
-        return mapPrediction({ available: false, reason: error?.message || 'Prediction unavailable' }, currentPrice);
-      }
-      throw error;
-    }
+    const response = await api.get<any>(`/api/stock/${encodeURIComponent(symbol)}/prediction`);
+    return mapPrediction(response, currentPrice);
   },
 };
 
@@ -395,14 +383,9 @@ export const announcementsApi = {
     if (params?.category && params.category !== "All Categories") search.set("category", params.category);
     if (params?.symbol) search.set("symbol", params.symbol);
     if (params?.importantOnly) search.set("important_only", "true");
-    try {
-      const response = await api.get<any>(`/api/announcements${search.toString() ? `?${search.toString()}` : ""}`);
-      const rows = Array.isArray(response?.announcements) ? response.announcements : [];
-      return rows.map(mapAnnouncement);
-    } catch (error: any) {
-      if (error?.status === 404) return [];
-      throw error;
-    }
+    const response = await api.get<any>(`/api/announcements${search.toString() ? `?${search.toString()}` : ""}`);
+    const rows = Array.isArray(response?.announcements) ? response.announcements : [];
+    return rows.map(mapAnnouncement);
   },
 };
 
