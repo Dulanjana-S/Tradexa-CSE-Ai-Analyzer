@@ -1,28 +1,45 @@
-.venv/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.log
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
 
+# Environment / secrets
 .env
 .env.*
 !.env.example
 
-data/*.db
-data/*.sqlite
-data/*.sqlite3
-data/*.zip
-data/uploads/
-
-models/latest/
-models/tmp/
-*.joblib
-*.pkl
-
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.log
 .pytest_cache/
 .mypy_cache/
 .coverage
 htmlcov/
-.DS_Store
-Thumbs.db
+
+# Backend local data / artifacts
+backend/data/*.db
+backend/data/*.sqlite
+backend/data/*.sqlite3
+backend/data/*.zip
+backend/data/uploads/
+backend/models/latest/
+backend/models/tmp/
+*.joblib
+*.pkl
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+
+# Generic build/cache
+*.tmp
+*.swp
