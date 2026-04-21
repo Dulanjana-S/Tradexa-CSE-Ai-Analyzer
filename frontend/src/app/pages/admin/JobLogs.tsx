@@ -7,6 +7,21 @@ import { Search, Loader2 } from "lucide-react";
 import { adminApi } from "../../../lib/api/services";
 import type { Job } from "../../../lib/api/types";
 
+function formatJobDetails(details: unknown): string {
+  if (details == null) return "—";
+  if (typeof details === "string") return details || "—";
+  if (typeof details === "number" || typeof details === "boolean") return String(details);
+  if (Array.isArray(details)) {
+    const serialized = JSON.stringify(details);
+    return serialized.length > 140 ? `${serialized.slice(0, 137)}...` : serialized;
+  }
+  if (typeof details === "object") {
+    const serialized = JSON.stringify(details);
+    return serialized.length > 140 ? `${serialized.slice(0, 137)}...` : serialized;
+  }
+  return "—";
+}
+
 export function JobLogs() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -96,7 +111,7 @@ export function JobLogs() {
                       <TableCell className="text-[#768390]">{job.status}</TableCell>
                       <TableCell className="text-[#768390]">{job.startedAt || "—"}</TableCell>
                       <TableCell className="text-[#768390]">{job.completedAt || "—"}</TableCell>
-                      <TableCell className="max-w-sm text-[#768390]">{job.details || "—"}</TableCell>
+                      <TableCell className="max-w-sm text-[#768390]">{formatJobDetails(job.details)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

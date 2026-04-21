@@ -166,7 +166,7 @@ export interface Job {
   status: string;
   startedAt?: string;
   completedAt?: string;
-  details?: string;
+  details?: unknown;
 }
 
 export interface AdminUser {
