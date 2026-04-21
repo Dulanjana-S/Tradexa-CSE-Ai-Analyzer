@@ -105,6 +105,11 @@ class CSEProvider(MarketDataProvider):
                     time.sleep(0.5 * (2**attempt))
                     continue
                 r.raise_for_status()
+                text = (r.text or "").strip()
+                # Some CSE endpoints intermittently return HTTP 200 with an empty body.
+                # Treat that as an empty payload so higher-level code can apply fallbacks.
+                if not text:
+                    return {}
                 return r.json()
             except requests.HTTPError as e:
                 last_err = e
@@ -186,10 +191,25 @@ class CSEProvider(MarketDataProvider):
         Prefer dailyMarketSummery for marketTurnover/marketCap/marketTrades.
         """
 
-        status = self._post("marketStatus")
-        summary = self._post("marketSummery")
-        aspi = self._post("aspiData")
-        sl20 = self._post("snpData")
+        try:
+            status = self._post("marketStatus")
+        except Exception:
+            status = {"status": "Unknown"}
+
+        try:
+            summary = self._post("marketSummery")
+        except Exception:
+            summary = {}
+
+        try:
+            aspi = self._post("aspiData")
+        except Exception:
+            aspi = {}
+
+        try:
+            sl20 = self._post("snpData")
+        except Exception:
+            sl20 = {}
 
         daily_latest: Optional[Dict[str, Any]] = None
         try:
@@ -207,6 +227,19 @@ class CSEProvider(MarketDataProvider):
                         break
         except Exception:
             daily_latest = None
+
+        # Fallback for market summary when marketSummery endpoint is empty/unavailable.
+        if (not isinstance(summary, dict) or not summary) and isinstance(daily_latest, dict):
+            summary = {
+                "marketTurnover": daily_latest.get("marketTurnover"),
+                "marketCap": daily_latest.get("marketCap"),
+                "marketTrades": daily_latest.get("marketTrades"),
+            }
+
+        # Fallback for S&P SL20 snapshot when snpData endpoint is empty/unavailable.
+        if (not isinstance(sl20, dict) or not sl20) and isinstance(daily_latest, dict):
+            spp_val = _safe_float(daily_latest.get("spp"))
+            sl20 = {"value": spp_val} if spp_val is not None else {}
 
         top_gainers = self._post("topGainers") or []
         top_losers = self._post("topLooses") or []
