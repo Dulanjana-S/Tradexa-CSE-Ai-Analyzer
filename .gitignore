@@ -21,9 +21,16 @@ __pycache__/
 htmlcov/
 
 # Backend local data / artifacts
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+data/*.db-journal
+data/*.sqlite-journal
 backend/data/*.db
 backend/data/*.sqlite
 backend/data/*.sqlite3
+backend/data/*.db-journal
+backend/data/*.sqlite-journal
 backend/data/*.zip
 backend/data/uploads/
 backend/models/latest/
