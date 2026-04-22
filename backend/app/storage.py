@@ -178,6 +178,21 @@ if metadata is not None:
         Column("meta", Text, nullable=True),
     )
 
+    portfolio_transactions_t = Table(
+        "portfolio_transactions",
+        metadata,
+        Column("tx_id", String(128), primary_key=True),
+        Column("username", String(64), nullable=False, index=True),
+        Column("symbol", String(32), nullable=False, index=True),
+        Column("tx_type", String(16), nullable=False),
+        Column("quantity", Float, nullable=False),
+        Column("price", Float, nullable=False),
+        Column("fees", Float, nullable=True),
+        Column("traded_at", String(32), nullable=True),
+        Column("notes", Text, nullable=True),
+        Column("created_at", DateTime, nullable=True),
+    )
+
     announcement_meta_t = Table(
         "announcement_meta",
         metadata,
@@ -190,7 +205,7 @@ if metadata is not None:
         Column("reviewed_at", DateTime, nullable=True),
     )
 else:  # pragma: no cover
-    companies_t = prices_t = indices_t = announcements_t = meta_t = watchlists_t = preferences_t = job_runs_t = users_t = sessions_t = model_registry_t = alerts_t = notifications_t = announcement_meta_t = None  # type: ignore
+    companies_t = prices_t = indices_t = announcements_t = meta_t = watchlists_t = preferences_t = job_runs_t = users_t = sessions_t = model_registry_t = alerts_t = notifications_t = portfolio_transactions_t = announcement_meta_t = None  # type: ignore
 
 
 def _utc_now() -> str:
@@ -365,6 +380,21 @@ class Storage:
                         meta TEXT
                     );
                     CREATE INDEX IF NOT EXISTS idx_notifications_username ON notifications(username);
+                    CREATE INDEX IF NOT EXISTS idx_notifications_symbol ON notifications(symbol);
+                    CREATE TABLE IF NOT EXISTS portfolio_transactions (
+                        tx_id TEXT PRIMARY KEY,
+                        username TEXT NOT NULL,
+                        symbol TEXT NOT NULL,
+                        tx_type TEXT NOT NULL,
+                        quantity REAL NOT NULL,
+                        price REAL NOT NULL,
+                        fees REAL,
+                        traded_at TEXT,
+                        notes TEXT,
+                        created_at TEXT
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_portfolio_transactions_username ON portfolio_transactions(username);
+                    CREATE INDEX IF NOT EXISTS idx_portfolio_transactions_symbol ON portfolio_transactions(symbol);
                     CREATE TABLE IF NOT EXISTS announcement_meta (
                         ann_id TEXT PRIMARY KEY,
                         importance TEXT,
@@ -1349,6 +1379,81 @@ class Storage:
             return (res.rowcount or 0) > 0
 
     # ---- Notifications ----
+    # ---- Portfolio ----
+    def list_portfolio_transactions(self, username: str) -> List[Dict[str, Any]]:
+        uname = username.lower()
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT tx_id, username, symbol, tx_type, quantity, price, fees, traded_at, notes, created_at
+                    FROM portfolio_transactions
+                    WHERE username = ?
+                    ORDER BY COALESCE(traded_at, created_at) DESC, created_at DESC
+                    """,
+                    (uname,),
+                ).fetchall()
+            return [dict(r) for r in rows]
+        with self.engine().connect() as conn:
+            rows = conn.execute(
+                select(portfolio_transactions_t)
+                .where(portfolio_transactions_t.c.username == uname)
+                .order_by(portfolio_transactions_t.c.traded_at.desc(), portfolio_transactions_t.c.created_at.desc())
+            ).mappings().all()
+        return [dict(r) for r in rows]
+
+    def create_portfolio_transaction(
+        self,
+        username: str,
+        symbol: str,
+        tx_type: str,
+        quantity: float,
+        price: float,
+        *,
+        fees: float = 0.0,
+        traded_at: Optional[str] = None,
+        notes: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        row = {
+            "tx_id": secrets.token_hex(12),
+            "username": username.lower(),
+            "symbol": symbol.upper(),
+            "tx_type": tx_type.lower(),
+            "quantity": float(quantity),
+            "price": float(price),
+            "fees": float(fees or 0.0),
+            "traded_at": traded_at,
+            "notes": notes,
+            "created_at": _utc_now(),
+        }
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO portfolio_transactions (tx_id, username, symbol, tx_type, quantity, price, fees, traded_at, notes, created_at)
+                    VALUES (:tx_id, :username, :symbol, :tx_type, :quantity, :price, :fees, :traded_at, :notes, :created_at)
+                    """,
+                    row,
+                )
+            return row
+        with self.engine().begin() as conn:
+            conn.execute(portfolio_transactions_t.insert().values(row))
+        return row
+
+    def delete_portfolio_transaction(self, tx_id: str, username: str) -> bool:
+        uname = username.lower()
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                cur = conn.execute("DELETE FROM portfolio_transactions WHERE tx_id = ? AND username = ?", (tx_id, uname))
+                return (cur.rowcount or 0) > 0
+        with self.engine().begin() as conn:
+            res = conn.execute(
+                portfolio_transactions_t.delete().where(
+                    (portfolio_transactions_t.c.tx_id == tx_id) & (portfolio_transactions_t.c.username == uname)
+                )
+            )
+        return (res.rowcount or 0) > 0
+
     def list_notifications(self, username: Optional[str] = None, unread_only: bool = False) -> List[Dict[str, Any]]:
         if self._is_sqlite():
             with self._sqlite() as conn:

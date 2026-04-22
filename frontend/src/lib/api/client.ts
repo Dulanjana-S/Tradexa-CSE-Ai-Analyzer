@@ -53,21 +53,21 @@ export const api = {
     apiRequest<T>(endpoint, {
       ...options,
       method: "POST",
-      body: data !== undefined ? JSON.stringify(data) : undefined,
+      body: data instanceof FormData ? data : data !== undefined ? JSON.stringify(data) : undefined,
     }),
 
   patch: <T>(endpoint: string, data?: any, options?: RequestInit) =>
     apiRequest<T>(endpoint, {
       ...options,
       method: "PATCH",
-      body: data !== undefined ? JSON.stringify(data) : undefined,
+      body: data instanceof FormData ? data : data !== undefined ? JSON.stringify(data) : undefined,
     }),
 
   put: <T>(endpoint: string, data?: any, options?: RequestInit) =>
     apiRequest<T>(endpoint, {
       ...options,
       method: "PUT",
-      body: data !== undefined ? JSON.stringify(data) : undefined,
+      body: data instanceof FormData ? data : data !== undefined ? JSON.stringify(data) : undefined,
     }),
 
   delete: <T>(endpoint: string, options?: RequestInit) =>

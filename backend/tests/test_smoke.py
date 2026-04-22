@@ -1,4 +1,5 @@
 import csv
+import io
 import os
 import tempfile
 import unittest
@@ -109,6 +110,7 @@ class SmokeTest(unittest.TestCase):
             "/api/watchlist",
             "/api/preferences",
             "/api/settings",
+            "/api/portfolio",
             "/api/alerts",
             "/api/notifications",
             "/api/signals/top",
@@ -120,6 +122,17 @@ class SmokeTest(unittest.TestCase):
         resp = self.client.post("/api/watchlist", json={"symbol": self.symbol, "add": True})
         self.assertEqual(resp.status_code, 200)
         self.assertIn(self.symbol, resp.json().get("symbols") or [])
+
+    def test_portfolio_roundtrip(self):
+        resp = self.client.post("/api/portfolio/transactions", json={"symbol": self.symbol, "tx_type": "buy", "quantity": 100, "price": 10.5, "fees": 25, "traded_at": "2025-01-02"})
+        self.assertEqual(resp.status_code, 200, msg=resp.text)
+        body = resp.json()
+        self.assertTrue((body.get("positions") or []))
+        self.assertEqual((body.get("positions") or [])[0]["symbol"], self.symbol)
+        tx_id = (body.get("transactions") or [])[0]["tx_id"]
+
+        resp = self.client.delete(f"/api/portfolio/transactions/{tx_id}")
+        self.assertEqual(resp.status_code, 200)
 
     def test_alerts_settings_and_notifications(self):
         resp = self.client.post("/api/settings", json={"settings": {"default_timeframe": "1Y", "alert_notifications": True}})
@@ -143,6 +156,37 @@ class SmokeTest(unittest.TestCase):
 
         resp = self.client.patch(f"/api/alerts/{alert_id}", json={"is_enabled": False})
         self.assertEqual(resp.status_code, 200)
+
+
+    def test_admin_upload_and_triage(self):
+        payload = io.BytesIO()
+        with zipfile.ZipFile(payload, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr(
+                "UPLOAD.N0000.csv",
+                "Date,Open,High (Rs.),Low (Rs.),Close (Rs.),Share Volume\n01 Jan 2025,10,11,9,10.5,1000\n02 Jan 2025,10.5,11.2,10.1,10.9,1200\n",
+            )
+        payload.seek(0)
+        resp = self.client.post(
+            "/api/admin/data/upload",
+            files=[("files", ("dataset.zip", payload.getvalue(), "application/zip"))],
+            data={"train_after_import": "false", "horizon_days": "1"},
+        )
+        self.assertEqual(resp.status_code, 200, msg=resp.text[:300])
+        body = resp.json()
+        self.assertTrue(body.get("ok"))
+        self.assertEqual(body.get("import_job", {}).get("job_name"), "import_eod_zip")
+
+        anns = self.client.get("/api/admin/announcements/triage?include_hidden=true")
+        self.assertEqual(anns.status_code, 200)
+        rows = anns.json().get("announcements") or []
+        if rows:
+            ann_id = rows[0]["ann_id"]
+            resp = self.client.patch(f"/api/admin/announcements/{ann_id}", json={"review_status": "hidden", "tags": ["hidden"]})
+            self.assertEqual(resp.status_code, 200)
+            user_feed = self.client.get("/api/announcements")
+            self.assertEqual(user_feed.status_code, 200)
+            user_rows = user_feed.json().get("announcements") or []
+            self.assertTrue(all(item.get("ann_id") != ann_id for item in user_rows))
 
 
 if __name__ == "__main__":
