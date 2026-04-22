@@ -7,7 +7,6 @@ import { StockDetail } from "./pages/StockDetail";
 import { Screener } from "./pages/Screener";
 import { Announcements } from "./pages/Announcements";
 import { Watchlist } from "./pages/Watchlist";
-import { Portfolio } from "./pages/Portfolio";
 import { Markets } from "./pages/Markets";
 import { Alerts } from "./pages/Alerts";
 import { Settings } from "./pages/Settings";
@@ -63,14 +62,6 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <Watchlist />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: "portfolio",
-        element: (
-          <ProtectedRoute>
-            <Portfolio />
           </ProtectedRoute>
         ),
       },

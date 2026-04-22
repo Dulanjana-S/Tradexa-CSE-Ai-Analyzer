@@ -1,7 +1,7 @@
 {
   "model_version": "v5",
-  "model_id": "model_20260421080306",
-  "trained_at_utc": "2026-04-21T08:03:06+00:00",
+  "model_id": "model_20260406062658",
+  "trained_at_utc": "2026-04-06T06:26:58+00:00",
   "horizon_days": 1,
   "feature_names": [
     "ret_1d",
@@ -79,12 +79,12 @@
     "features": 43
   },
   "train_period": {
-    "start": "2025-10-08",
-    "end": "2026-03-20"
+    "start": "2025-09-23",
+    "end": "2026-03-05"
   },
   "test_period": {
-    "start": "2026-03-23",
-    "end": "2026-04-20"
+    "start": "2026-03-06",
+    "end": "2026-04-03"
   },
   "models": {
     "mean": "GradientBoostingRegressor",
@@ -105,9 +105,9 @@
   },
   "walk_forward": [
     {
-      "train_end": "2026-03-11",
-      "test_start": "2026-03-12",
-      "test_end": "2026-04-20",
+      "train_end": "2026-02-24",
+      "test_start": "2026-02-25",
+      "test_end": "2026-04-03",
       "rows_train": 1660,
       "rows_test": 420,
       "acc_up": 0.5523809523809524,

@@ -6,7 +6,6 @@ import {
   Megaphone,
   Star,
   Bell,
-  BriefcaseBusiness,
   Settings,
   Brain,
   Database,
@@ -32,7 +31,6 @@ const userNavItems = [
   { to: "/screener", label: "Screener", icon: Filter },
   { to: "/announcements", label: "Announcements", icon: Megaphone },
   { to: "/watchlist", label: "Watchlist", icon: Star },
-  { to: "/portfolio", label: "Portfolio", icon: BriefcaseBusiness },
   { to: "/alerts", label: "Alerts", icon: Bell },
 ];
 
@@ -47,7 +45,7 @@ const adminNavItems = [
   { to: "/admin/sync", label: "Sync / Training", icon: Database },
   { to: "/admin/jobs", label: "Jobs / Logs", icon: FileText },
   { to: "/admin/users", label: "Users", icon: Users },
-  { to: "/admin/announcements", label: "Announcement Triage", icon: Megaphone },
+  { to: "/admin/announcements", label: "Announcement Review", icon: Megaphone },
   { to: "/admin/alerts", label: "Alert Monitor", icon: BellRing },
   { to: "/admin/settings", label: "System Settings", icon: Shield },
 ];

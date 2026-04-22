@@ -17,10 +17,6 @@ import type {
   User,
   UserSettings,
   Watchlist,
-  PortfolioData,
-  PortfolioPosition,
-  PortfolioSummary,
-  PortfolioTransaction,
 } from "./types";
 
 function num(value: any, fallback = 0): number {
@@ -96,58 +92,6 @@ function mapAnnouncement(raw: any): Announcement {
   };
 }
 
-function mapPortfolioTransaction(raw: any): PortfolioTransaction {
-  return {
-    id: String(raw?.tx_id || raw?.id || ""),
-    symbol: String(raw?.symbol || ""),
-    type: String(raw?.tx_type || raw?.type || "buy").toLowerCase() === "sell" ? "sell" : "buy",
-    quantity: num(raw?.quantity),
-    price: num(raw?.price),
-    fees: num(raw?.fees),
-    tradedAt: raw?.traded_at || raw?.tradedAt,
-    notes: raw?.notes || undefined,
-    createdAt: raw?.created_at || raw?.createdAt,
-  };
-}
-
-function mapPortfolioPosition(raw: any): PortfolioPosition {
-  return {
-    symbol: String(raw?.symbol || ""),
-    company: String(raw?.company || raw?.name || raw?.symbol || ""),
-    sector: raw?.sector || undefined,
-    quantity: num(raw?.quantity),
-    avgCost: num(raw?.avg_cost ?? raw?.avgCost),
-    costBasis: num(raw?.cost_basis ?? raw?.costBasis),
-    currentPrice: num(raw?.current_price ?? raw?.currentPrice),
-    marketValue: num(raw?.market_value ?? raw?.marketValue),
-    unrealizedPl: num(raw?.unrealized_pl ?? raw?.unrealizedPl),
-    unrealizedPlPct: num(raw?.unrealized_pl_pct ?? raw?.unrealizedPlPct),
-    realizedPl: num(raw?.realized_pl ?? raw?.realizedPl),
-    weightPct: num(raw?.weight_pct ?? raw?.weightPct),
-  };
-}
-
-function mapPortfolioSummary(raw: any): PortfolioSummary {
-  return {
-    positionsCount: num(raw?.positions_count ?? raw?.positionsCount),
-    transactionsCount: num(raw?.transactions_count ?? raw?.transactionsCount),
-    costBasis: num(raw?.cost_basis ?? raw?.costBasis),
-    marketValue: num(raw?.market_value ?? raw?.marketValue),
-    unrealizedPl: num(raw?.unrealized_pl ?? raw?.unrealizedPl),
-    unrealizedPlPct: num(raw?.unrealized_pl_pct ?? raw?.unrealizedPlPct),
-    realizedPl: num(raw?.realized_pl ?? raw?.realizedPl),
-    totalPl: num(raw?.total_pl ?? raw?.totalPl),
-  };
-}
-
-function mapPortfolioData(raw: any): PortfolioData {
-  return {
-    summary: mapPortfolioSummary(raw?.summary || {}),
-    positions: Array.isArray(raw?.positions) ? raw.positions.map(mapPortfolioPosition) : [],
-    transactions: Array.isArray(raw?.transactions) ? raw.transactions.map(mapPortfolioTransaction) : [],
-  };
-}
-
 function mapAlert(raw: any, currentPrice = 0): Alert {
   const type = String(raw?.alert_type || raw?.condition || "above_price").toLowerCase();
   let condition: Alert["condition"] = "above";
@@ -187,18 +131,12 @@ function mapNotification(raw: any): Notification {
 function mapModel(raw: any): Model {
   const meta = raw?.meta || {};
   const metrics = meta?.metrics_holdout || {};
-  const accuracy =
-    typeof metrics?.auc_up === "number"
-      ? metrics.auc_up
-      : typeof metrics?.direction_accuracy === "number"
-      ? metrics.direction_accuracy
-      : undefined;
   return {
     id: String(raw?.model_id || raw?.id || ""),
     name: String(raw?.model_id || raw?.name || "Model"),
     status: raw?.is_active ? "active" : "inactive",
-    accuracy,
-    createdAt: raw?.created_at || meta?.trained_at_utc,
+    accuracy: typeof metrics?.auc_up === "number" ? metrics.auc_up * 100 : undefined,
+    createdAt: raw?.created_at,
     isActive: Boolean(raw?.is_active),
     meta,
     path: raw?.path,
@@ -206,12 +144,11 @@ function mapModel(raw: any): Model {
 }
 
 function mapJob(raw: any): Job {
-  const rawStatus = String(raw?.status || "unknown").toLowerCase();
   return {
     id: String(raw?.run_id || raw?.id || ""),
     name: String(raw?.job_name || raw?.name || raw?.type || "Job"),
     type: String(raw?.job_name || raw?.type || "job"),
-    status: rawStatus === "ok" ? "completed" : rawStatus,
+    status: String(raw?.status || "unknown"),
     startedAt: raw?.started_at,
     completedAt: raw?.finished_at,
     details: raw?.details,
@@ -478,34 +415,6 @@ export const watchlistApi = {
   },
 };
 
-export const portfolioApi = {
-  get: async (): Promise<PortfolioData> => mapPortfolioData(await api.get<any>("/api/portfolio")),
-
-  addTransaction: async (payload: {
-    symbol: string;
-    txType: "buy" | "sell";
-    quantity: number;
-    price: number;
-    fees?: number;
-    tradedAt?: string;
-    notes?: string;
-  }): Promise<PortfolioData> =>
-    mapPortfolioData(
-      await api.post<any>("/api/portfolio/transactions", {
-        symbol: payload.symbol,
-        tx_type: payload.txType,
-        quantity: payload.quantity,
-        price: payload.price,
-        fees: payload.fees,
-        traded_at: payload.tradedAt,
-        notes: payload.notes,
-      })
-    ),
-
-  deleteTransaction: async (transactionId: string): Promise<PortfolioData> =>
-    mapPortfolioData(await api.delete<any>(`/api/portfolio/transactions/${encodeURIComponent(transactionId)}`)),
-};
-
 export const alertsApi = {
   getAll: async (): Promise<Alert[]> => {
     const response = await api.get<any>("/api/alerts");
@@ -590,10 +499,9 @@ export const adminApi = {
 
   getModels: async (): Promise<{ models: Model[]; activeModel?: string }> => {
     const response = await api.get<any>("/api/admin/models");
-    const active = response?.active_model;
     return {
       models: Array.isArray(response?.models) ? response.models.map(mapModel) : [],
-      activeModel: typeof active === "string" ? active : active?.model_id || active?.id,
+      activeModel: response?.active_model?.model_id || response?.active_model,
     };
   },
 
@@ -604,17 +512,6 @@ export const adminApi = {
 
   triggerTraining: (payload?: { symbols?: string[]; horizon_days?: number }) =>
     api.post<any>("/api/admin/actions/train", payload || {}),
-
-  triggerSyncTraining: (payload?: { symbols?: string[]; top_n?: number; days?: number; announcements?: number; horizon_days?: number }) =>
-    api.post<any>("/api/admin/actions/sync-train", payload || {}),
-
-  uploadHistoricalData: async (files: File[], options?: { trainAfterImport?: boolean; horizonDays?: number }) => {
-    const form = new FormData();
-    files.forEach((file) => form.append("files", file));
-    form.append("train_after_import", String(Boolean(options?.trainAfterImport)));
-    form.append("horizon_days", String(options?.horizonDays || 1));
-    return api.post<any>("/api/admin/data/upload", form);
-  },
 
   getJobs: async (): Promise<Job[]> => {
     const response = await api.get<any>("/api/admin/jobs");
@@ -629,14 +526,6 @@ export const adminApi = {
   updateUserRole: async (username: string, role: "admin" | "user") => {
     const response = await api.post<any>(`/api/admin/users/${encodeURIComponent(username)}/role`, { role });
     return Array.isArray(response?.users) ? response.users.map(mapAdminUser) : [];
-  },
-
-  getAnnouncementTriage: async (params?: { includeHidden?: boolean; importantOnly?: boolean }) => {
-    const query = new URLSearchParams();
-    if (params?.includeHidden) query.set("include_hidden", "true");
-    if (params?.importantOnly) query.set("important_only", "true");
-    const response = await api.get<any>(`/api/admin/announcements/triage${query.toString() ? `?${query.toString()}` : ""}`);
-    return Array.isArray(response?.announcements) ? response.announcements.map(mapAnnouncement) : [];
   },
 
   getPendingAnnouncements: async () => {
