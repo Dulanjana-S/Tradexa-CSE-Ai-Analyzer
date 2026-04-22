@@ -28,18 +28,25 @@ export function Dashboard() {
 
   useEffect(() => {
     let alive = true;
-    dashboardApi
-      .getData()
-      .then((data) => {
-        if (!alive) return;
-        setOverview(data.overview);
-        setWatchlist(data.watchlist);
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
+    const fetchData = () => {
+      dashboardApi
+        .getData()
+        .then((data) => {
+          if (!alive) return;
+          setOverview(data.overview);
+          setWatchlist(data.watchlist);
+        })
+        .finally(() => {
+          if (alive) setLoading(false);
+        });
+    };
+
+    fetchData();
+    const intervalId = window.setInterval(fetchData, 30000);
+
     return () => {
       alive = false;
+      window.clearInterval(intervalId);
     };
   }, []);
 

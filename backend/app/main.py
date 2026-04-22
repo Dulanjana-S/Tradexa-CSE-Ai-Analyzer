@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
-from typing import Any, Dict, Optional
 
-from fastapi import Body, FastAPI, Header, HTTPException, Query, Request
+import shutil
+import tempfile
+import zipfile
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from fastapi import Body, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -117,6 +121,92 @@ def _system_settings() -> Dict[str, Any]:
     defaults.update(values)
     defaults['provider'] = values.get('provider') or defaults.get('provider')
     return defaults
+
+
+
+def _to_bool(value: Any, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _latest_job_by_name(job_name: str) -> Optional[Dict[str, Any]]:
+    jobs = data_service.admin_jobs(limit=200)
+    for job in jobs:
+        if str(job.get("job_name") or "").lower() == job_name.lower():
+            return job
+    return None
+
+
+def _normalize_uploaded_dataset(files: List[UploadFile], work_dir: Path) -> tuple[Path, Dict[str, Any]]:
+    if not files:
+        raise HTTPException(status_code=400, detail="Upload at least one CSV or ZIP file")
+
+    csv_names: List[str] = []
+    zip_names: List[str] = []
+    for upload in files:
+        name = Path(upload.filename or "upload").name
+        suffix = Path(name).suffix.lower()
+        if suffix == ".csv":
+            csv_names.append(name)
+        elif suffix == ".zip":
+            zip_names.append(name)
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported file type: {name}. Use CSV or ZIP only.")
+
+    if zip_names and csv_names:
+        raise HTTPException(status_code=400, detail="Upload either one ZIP or one or more CSV files, not both together")
+    if len(zip_names) > 1:
+        raise HTTPException(status_code=400, detail="Upload a single ZIP file at a time")
+
+    if zip_names:
+        upload = files[0]
+        zip_path = work_dir / Path(upload.filename or "dataset.zip").name
+        with zip_path.open("wb") as fh:
+            shutil.copyfileobj(upload.file, fh)
+        return zip_path, {"mode": "zip", "files": zip_names, "csv_count": 0}
+
+    zip_path = work_dir / "uploaded_dataset.zip"
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for upload in files:
+            name = Path(upload.filename or "dataset.csv").name
+            payload = upload.file.read()
+            if not payload:
+                continue
+            zf.writestr(name, payload)
+    return zip_path, {"mode": "csv_bundle", "files": csv_names, "csv_count": len(csv_names)}
+
+
+def _run_import_train_pipeline(*, zip_path: Path, train_after_import: bool, horizon_days: int = 1, symbols: Optional[List[str]] = None, sync_first: bool = False, sync_payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    summary: Dict[str, Any] = {}
+    if sync_first:
+        sync_args = argparse.Namespace(
+            symbols=(sync_payload or {}).get("symbols"),
+            top_n=int((sync_payload or {}).get("top_n") or 50),
+            days=int((sync_payload or {}).get("days") or 520),
+            announcements=int((sync_payload or {}).get("announcements") or 100),
+            skip_prices=_to_bool((sync_payload or {}).get("skip_prices"), False),
+            sleep_ms=int((sync_payload or {}).get("sleep_ms") or 250),
+        )
+        cmd_sync(sync_args)
+        summary["sync_job"] = _latest_job_by_name("sync")
+
+    cmd_import = argparse.Namespace(file=str(zip_path))
+    from .cli import cmd_import_eod_zip as _cmd_import_eod_zip
+    _cmd_import_eod_zip(cmd_import)
+    summary["import_job"] = _latest_job_by_name("import_eod_zip")
+
+    if train_after_import:
+        train_args = argparse.Namespace(symbols=symbols, horizon_days=horizon_days)
+        cmd_train(train_args)
+        summary["train_job"] = _latest_job_by_name("train")
+        summary["model"] = data_service.model_status()
+        summary["models"] = data_service.list_models()
+
+    summary["admin_status"] = data_service.admin_status()
+    return summary
 
 def _check_admin_access(request: Request, x_admin_key: Optional[str] = None) -> Dict[str, Any]:
     user = current_user_from_request(request)
@@ -317,6 +407,42 @@ def api_admin_run_train(request: Request, payload: Dict[str, Any] = Body(default
     return {"ok": True, "model": data_service.model_status(), "models": data_service.list_models()}
 
 
+@app.post("/api/admin/actions/sync-train")
+def api_admin_run_sync_train(request: Request, payload: Dict[str, Any] = Body(default={}), x_admin_key: Optional[str] = Header(default=None)):
+    _check_admin_access(request, x_admin_key)
+    sync_args = argparse.Namespace(
+        symbols=payload.get("symbols"),
+        top_n=int(payload.get("top_n") or 50),
+        days=int(payload.get("days") or 520),
+        announcements=int(payload.get("announcements") or 100),
+        skip_prices=bool(payload.get("skip_prices", False)),
+        sleep_ms=int(payload.get("sleep_ms") or 250),
+    )
+    cmd_sync(sync_args)
+    train_args = argparse.Namespace(symbols=payload.get("train_symbols") or payload.get("symbols"), horizon_days=int(payload.get("horizon_days") or 1))
+    cmd_train(train_args)
+    return {"ok": True, "sync_job": _latest_job_by_name("sync"), "train_job": _latest_job_by_name("train"), "model": data_service.model_status(), "admin_status": data_service.admin_status()}
+
+
+@app.post("/api/admin/data/upload")
+def api_admin_upload_data(
+    request: Request,
+    files: List[UploadFile] = File(...),
+    train_after_import: str = Form("false"),
+    horizon_days: str = Form("1"),
+    x_admin_key: Optional[str] = Header(default=None),
+):
+    _check_admin_access(request, x_admin_key)
+    with tempfile.TemporaryDirectory(prefix="tradexa_upload_") as td:
+        zip_path, upload_meta = _normalize_uploaded_dataset(files, Path(td))
+        result = _run_import_train_pipeline(
+            zip_path=zip_path,
+            train_after_import=_to_bool(train_after_import, False),
+            horizon_days=max(1, int(horizon_days or "1")),
+        )
+    return {"ok": True, "upload": upload_meta, **result}
+
+
 # ---- API: Market ----
 @app.get("/api/market/overview")
 def api_market_overview():
@@ -457,6 +583,24 @@ def api_settings_update(request: Request, payload: Dict[str, Any] = Body(...)):
     return data_service.update_user_settings(user['username'], values)
 
 
+@app.get("/api/portfolio")
+def api_portfolio(request: Request):
+    user = require_user(request)
+    return data_service.get_portfolio(user['username'])
+
+
+@app.post("/api/portfolio/transactions")
+def api_portfolio_create_transaction(request: Request, payload: Dict[str, Any] = Body(...)):
+    user = require_user(request)
+    return data_service.create_portfolio_transaction(user['username'], payload)
+
+
+@app.delete("/api/portfolio/transactions/{tx_id}")
+def api_portfolio_delete_transaction(tx_id: str, request: Request):
+    user = require_user(request)
+    return data_service.delete_portfolio_transaction(user['username'], tx_id)
+
+
 @app.get("/api/alerts")
 def api_alerts(request: Request):
     user = require_user(request)
@@ -532,9 +676,15 @@ def api_admin_notifications(request: Request, x_admin_key: Optional[str] = Heade
 
 
 @app.get("/api/admin/announcements/review")
-def api_admin_ann_review(request: Request, x_admin_key: Optional[str] = Header(default=None), limit: int = Query(100, ge=1, le=500), important_only: bool = Query(False)):
+def api_admin_ann_review(request: Request, x_admin_key: Optional[str] = Header(default=None), limit: int = Query(100, ge=1, le=500), important_only: bool = Query(False), include_hidden: bool = Query(False)):
     _check_admin_access(request, x_admin_key)
-    return {'announcements': data_service.announcements_filtered(None, limit, important_only=important_only)}
+    return {'announcements': data_service.announcements_filtered(None, limit, important_only=important_only, include_hidden=include_hidden)}
+
+
+@app.get("/api/admin/announcements/triage")
+def api_admin_ann_triage(request: Request, x_admin_key: Optional[str] = Header(default=None), limit: int = Query(100, ge=1, le=500), important_only: bool = Query(False), include_hidden: bool = Query(False)):
+    _check_admin_access(request, x_admin_key)
+    return {'announcements': data_service.announcements_filtered(None, limit, important_only=important_only, include_hidden=include_hidden)}
 
 
 @app.patch("/api/admin/announcements/{ann_id}")

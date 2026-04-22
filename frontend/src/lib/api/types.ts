@@ -99,6 +99,50 @@ export interface Watchlist {
   items: Stock[];
 }
 
+export interface PortfolioTransaction {
+  id: string;
+  symbol: string;
+  type: "buy" | "sell";
+  quantity: number;
+  price: number;
+  fees: number;
+  tradedAt?: string;
+  notes?: string;
+  createdAt?: string;
+}
+
+export interface PortfolioPosition {
+  symbol: string;
+  company: string;
+  sector?: string;
+  quantity: number;
+  avgCost: number;
+  costBasis: number;
+  currentPrice: number;
+  marketValue: number;
+  unrealizedPl: number;
+  unrealizedPlPct: number;
+  realizedPl: number;
+  weightPct: number;
+}
+
+export interface PortfolioSummary {
+  positionsCount: number;
+  transactionsCount: number;
+  costBasis: number;
+  marketValue: number;
+  unrealizedPl: number;
+  unrealizedPlPct: number;
+  realizedPl: number;
+  totalPl: number;
+}
+
+export interface PortfolioData {
+  summary: PortfolioSummary;
+  positions: PortfolioPosition[];
+  transactions: PortfolioTransaction[];
+}
+
 export interface Alert {
   id: string;
   username?: string;

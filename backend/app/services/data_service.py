@@ -69,12 +69,23 @@ def get_provider() -> MarketDataProvider:
         chart_period=settings.cse_chart_period,
         company_chart_period=settings.cse_company_chart_period,
     )
+    yfin_provider: Optional[YFinanceProvider] = None
+    try:
+        yfin_provider = YFinanceProvider(exchange_suffix=settings.yahoo_exchange_suffix)
+    except Exception:
+        yfin_provider = None
     if p == "cse":
         _provider = cse
     elif p == "yfinance":
-        _provider = YFinanceProvider(exchange_suffix=settings.yahoo_exchange_suffix)
+        if yfin_provider is None:
+            _provider = cse
+        else:
+            _provider = yfin_provider
     elif p == "hybrid":
-        _provider = HybridProvider(cse=cse, yfin=YFinanceProvider(exchange_suffix=settings.yahoo_exchange_suffix))
+        if yfin_provider is None:
+            _provider = cse
+        else:
+            _provider = HybridProvider(cse=cse, yfin=yfin_provider)
     else:
         _provider = DBProvider(_storage)
     return _provider
@@ -326,6 +337,7 @@ def stock(symbol: str) -> Dict[str, Any]:
 
 
 def stock_snapshots(symbols: Optional[Iterable[str]] = None, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    prov = get_provider()
     comps = companies()
     if not comps and settings.db_cache_enabled:
         _storage.ensure_price_symbols_as_companies()
@@ -342,6 +354,17 @@ def stock_snapshots(symbols: Optional[Iterable[str]] = None, limit: Optional[int
         sym = (c.get("symbol") or "").upper()
         row = dict(c)
         bar = bars.get(sym)
+
+        # When live-capable providers already supplied snapshot fields,
+        # keep those as primary and attach DB EOD context only as fallback.
+        live_last = row.get("last") if row.get("last") is not None else row.get("price")
+        if prov.name in {"cse", "hybrid", "yfinance"} and live_last is not None:
+            if bar:
+                rows.append(_merge_latest_bar(row, bar))
+            else:
+                rows.append(row)
+            continue
+
         if bar:
             prev_hist = _storage.get_price_history(sym, limit=2)
             change = None
@@ -562,15 +585,209 @@ def set_preferences(values: Dict[str, Any], profile: str = "default") -> Dict[st
     return get_preferences(profile)
 
 
+def _filesystem_models() -> List[Dict[str, Any]]:
+    model_dir = Path(settings.model_dir)
+    active_path: Optional[str] = None
+    pointer = model_dir / "active_model.json"
+    if pointer.exists():
+        try:
+            import json
+            active_path = str((model_dir / json.loads(pointer.read_text(encoding="utf-8")).get("path", "")).resolve())
+        except Exception:
+            active_path = None
+    out: List[Dict[str, Any]] = []
+    if not model_dir.exists():
+        return out
+    for run_dir in sorted([p for p in model_dir.iterdir() if p.is_dir() and p.name.startswith("model_")], reverse=True):
+        meta_path = run_dir / "metadata.json"
+        if not meta_path.exists():
+            continue
+        try:
+            import json
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except Exception:
+            meta = {}
+        created_at = meta.get("trained_at_utc")
+        if not created_at:
+            try:
+                created_at = run_dir.stat().st_mtime
+            except Exception:
+                created_at = None
+        out.append({
+            "model_id": str(meta.get("model_id") or run_dir.name),
+            "path": run_dir.name,
+            "created_at": created_at if isinstance(created_at, str) else None,
+            "is_active": bool(active_path and str(run_dir.resolve()) == active_path),
+            "meta": meta,
+        })
+    return out
+
+
 def list_models() -> List[Dict[str, Any]]:
-    return _storage.list_models()
+    db_rows = {str(item.get("model_id") or item.get("id")): dict(item) for item in _storage.list_models()}
+    for item in _filesystem_models():
+        model_id = str(item.get("model_id") or "")
+        if not model_id:
+            continue
+        existing = db_rows.get(model_id)
+        if existing:
+            merged = dict(existing)
+            if not merged.get("path"):
+                merged["path"] = item.get("path")
+            if not merged.get("meta") and item.get("meta"):
+                merged["meta"] = item.get("meta")
+            if item.get("is_active"):
+                merged["is_active"] = True
+            if not merged.get("created_at"):
+                merged["created_at"] = item.get("created_at")
+            db_rows[model_id] = merged
+        else:
+            db_rows[model_id] = item
+
+    rows = list(db_rows.values())
+    rows.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+    return rows
+
+
+def get_active_model_record() -> Optional[Dict[str, Any]]:
+    models = list_models()
+    for model in models:
+        if model.get("is_active"):
+            return model
+    return models[0] if models else None
 
 
 def activate_model(model_id: str) -> bool:
-    ok_db = _storage.activate_model(model_id)
     ok_fs = activate_bundle(Path(settings.model_dir), model_id)
-    return bool(ok_db and ok_fs)
+    ok_db = _storage.activate_model(model_id)
+    if ok_fs and not ok_db:
+        match = next((item for item in _filesystem_models() if str(item.get("model_id")) == model_id), None)
+        if match is not None:
+            _storage.register_model(model_id=model_id, path=str(match.get("path") or model_id), meta=match.get("meta") or {}, is_active=True)
+            ok_db = True
+    return bool(ok_fs and ok_db)
 
+
+
+
+def list_portfolio_transactions(username: str) -> List[Dict[str, Any]]:
+    return _storage.list_portfolio_transactions(username)
+
+
+def _portfolio_position_state(username: str) -> Dict[str, Dict[str, Any]]:
+    rows = sorted(
+        _storage.list_portfolio_transactions(username),
+        key=lambda item: (str(item.get("traded_at") or item.get("created_at") or ""), str(item.get("created_at") or "")),
+    )
+    state: Dict[str, Dict[str, Any]] = {}
+    for tx in rows:
+        symbol = str(tx.get("symbol") or "").upper()
+        if not symbol:
+            continue
+        tx_type = str(tx.get("tx_type") or "buy").lower()
+        quantity = float(tx.get("quantity") or 0.0)
+        price = float(tx.get("price") or 0.0)
+        fees = float(tx.get("fees") or 0.0)
+        info = state.setdefault(symbol, {"quantity": 0.0, "cost_total": 0.0, "realized_pl": 0.0})
+        if tx_type == "buy":
+            info["quantity"] += quantity
+            info["cost_total"] += quantity * price + fees
+        elif tx_type == "sell":
+            held_qty = float(info.get("quantity") or 0.0)
+            avg_cost = (float(info.get("cost_total") or 0.0) / held_qty) if held_qty > 0 else 0.0
+            info["realized_pl"] += quantity * (price - avg_cost) - fees
+            info["quantity"] = max(0.0, held_qty - quantity)
+            info["cost_total"] = max(0.0, float(info.get("cost_total") or 0.0) - avg_cost * quantity)
+        state[symbol] = info
+    return state
+
+
+def get_portfolio(username: str) -> Dict[str, Any]:
+    transactions = _storage.list_portfolio_transactions(username)
+    state = _portfolio_position_state(username)
+    open_symbols = [symbol for symbol, item in state.items() if float(item.get("quantity") or 0.0) > 0]
+    snapshots = {item.get("symbol"): item for item in stock_snapshots(open_symbols)} if open_symbols else {}
+    positions: List[Dict[str, Any]] = []
+    total_market_value = 0.0
+    total_cost_basis = 0.0
+    total_realized = 0.0
+    for symbol in sorted(open_symbols):
+        item = state[symbol]
+        quantity = float(item.get("quantity") or 0.0)
+        cost_basis = float(item.get("cost_total") or 0.0)
+        avg_cost = (cost_basis / quantity) if quantity > 0 else 0.0
+        snap = snapshots.get(symbol) or {}
+        current_price = _to_float(snap.get("last"))
+        if current_price is None:
+            bar = _storage.get_latest_bar(symbol)
+            current_price = _to_float((bar or {}).get("close")) or 0.0
+        market_value = quantity * float(current_price or 0.0)
+        unrealized = market_value - cost_basis
+        total_market_value += market_value
+        total_cost_basis += cost_basis
+        total_realized += float(item.get("realized_pl") or 0.0)
+        positions.append({
+            "symbol": symbol,
+            "company": snap.get("name") or symbol,
+            "sector": snap.get("sector") or "—",
+            "quantity": quantity,
+            "avg_cost": avg_cost,
+            "cost_basis": cost_basis,
+            "current_price": float(current_price or 0.0),
+            "market_value": market_value,
+            "unrealized_pl": unrealized,
+            "unrealized_pl_pct": (unrealized / cost_basis * 100.0) if cost_basis > 0 else 0.0,
+            "realized_pl": float(item.get("realized_pl") or 0.0),
+        })
+    for row in positions:
+        row["weight_pct"] = (row["market_value"] / total_market_value * 100.0) if total_market_value > 0 else 0.0
+    summary = {
+        "positions_count": len(positions),
+        "transactions_count": len(transactions),
+        "cost_basis": total_cost_basis,
+        "market_value": total_market_value,
+        "unrealized_pl": total_market_value - total_cost_basis,
+        "unrealized_pl_pct": ((total_market_value - total_cost_basis) / total_cost_basis * 100.0) if total_cost_basis > 0 else 0.0,
+        "realized_pl": total_realized,
+        "total_pl": (total_market_value - total_cost_basis) + total_realized,
+    }
+    transactions_sorted = sorted(
+        transactions,
+        key=lambda item: (str(item.get("traded_at") or item.get("created_at") or ""), str(item.get("created_at") or "")),
+        reverse=True,
+    )
+    return {"summary": summary, "positions": positions, "transactions": transactions_sorted}
+
+
+def create_portfolio_transaction(username: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    symbol = str(payload.get("symbol") or "").upper().strip()
+    tx_type = str(payload.get("tx_type") or payload.get("type") or "buy").lower().strip()
+    quantity = _to_float(payload.get("quantity"))
+    price = _to_float(payload.get("price"))
+    fees = _to_float(payload.get("fees")) or 0.0
+    traded_at = str(payload.get("traded_at") or payload.get("date") or "").strip() or None
+    notes = str(payload.get("notes") or "").strip() or None
+    if not symbol:
+        raise HTTPException(status_code=400, detail="Symbol is required")
+    if tx_type not in {"buy", "sell"}:
+        raise HTTPException(status_code=400, detail="Transaction type must be buy or sell")
+    if quantity is None or quantity <= 0:
+        raise HTTPException(status_code=400, detail="Quantity must be greater than zero")
+    if price is None or price <= 0:
+        raise HTTPException(status_code=400, detail="Price must be greater than zero")
+    if tx_type == "sell":
+        state = _portfolio_position_state(username)
+        held_qty = float((state.get(symbol) or {}).get("quantity") or 0.0)
+        if held_qty + 1e-9 < float(quantity):
+            raise HTTPException(status_code=400, detail=f"Cannot sell {quantity:.4f} shares of {symbol}; current holding is {held_qty:.4f}")
+    _storage.create_portfolio_transaction(username, symbol, tx_type, float(quantity), float(price), fees=float(fees), traded_at=traded_at, notes=notes)
+    return get_portfolio(username)
+
+
+def delete_portfolio_transaction(username: str, tx_id: str) -> Dict[str, Any]:
+    if not _storage.delete_portfolio_transaction(tx_id, username):
+        raise HTTPException(status_code=404, detail="Portfolio transaction not found")
+    return get_portfolio(username)
 
 
 
@@ -717,8 +934,10 @@ def update_user_settings(username: str, values: Dict[str, Any]) -> Dict[str, Any
     return get_user_settings(username)
 
 
-def announcements_filtered(symbol: Optional[str], limit: int = 50, important_only: bool = False, categories: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+def announcements_filtered(symbol: Optional[str], limit: int = 50, important_only: bool = False, categories: Optional[List[str]] = None, include_hidden: bool = False) -> List[Dict[str, Any]]:
     rows = announcements(symbol, limit)
+    if not include_hidden:
+        rows = [r for r in rows if str(r.get('review_status') or '').lower() != "hidden"]
     if important_only:
         rows = [r for r in rows if r.get('is_important')]
     if categories:
@@ -728,11 +947,14 @@ def announcements_filtered(symbol: Optional[str], limit: int = 50, important_onl
 
 
 def review_announcement(ann_id: str, *, importance: Optional[str], review_status: Optional[str], tags: Optional[List[str]], review_notes: Optional[str], reviewed_by: str) -> Dict[str, Any]:
-    _storage.set_announcement_meta(ann_id, importance=importance, review_status=review_status, tags=tags or [], review_notes=review_notes, reviewed_by=reviewed_by)
+    normalized_status = (str(review_status or "").strip().lower() or None)
+    if normalized_status in {"approved", "rejected"}:
+        normalized_status = "reviewed"
+    _storage.set_announcement_meta(ann_id, importance=importance, review_status=normalized_status, tags=tags or [], review_notes=review_notes, reviewed_by=reviewed_by)
     # notify users who watch the symbol if the announcement became important
     anns = _storage.get_announcements(None, limit=500)
     ann = next((a for a in anns if str(a.get('ann_id')) == ann_id), None)
-    if ann and ann.get('is_important') and ann.get('symbol'):
+    if ann and ann.get('is_important') and ann.get('symbol') and normalized_status != "hidden":
         sym = str(ann['symbol']).upper()
         for user in _storage.list_users():
             uname = str(user.get('username'))
@@ -765,6 +987,8 @@ def admin_status() -> Dict[str, Any]:
     last_sync = _storage.get_meta("last_sync_utc")
     meta = _storage.list_meta(prefix="last_")
     health = provider_health()
+    models = list_models()
+    active_model = get_active_model_record()
     status = {
         "provider": health,
         "database": {"url": settings.database_url, "enabled": settings.db_cache_enabled, "reachable": True},
@@ -781,13 +1005,13 @@ def admin_status() -> Dict[str, Any]:
             "watchlist_symbols": len(_storage.list_watchlist()),
             "job_runs": len(_storage.list_job_runs(limit=20)),
             "users": len(_storage.list_users()),
-            "models": len(_storage.list_models()),
+            "models": len(models),
             "alerts": len(_storage.list_alerts()),
             "notifications": len(_storage.list_notifications(None)),
         },
         "model": model_status(),
-        "models": _storage.list_models(),
-        "active_model": _storage.get_active_model(),
+        "models": models,
+        "active_model": active_model,
         "users": _storage.list_users(),
         "jobs": _storage.list_job_runs(limit=20),
         "provider_settings": get_provider_settings(),
