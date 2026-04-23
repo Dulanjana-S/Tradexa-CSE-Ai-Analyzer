@@ -15,8 +15,9 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .cli import cmd_sync, cmd_train
 from .config import settings
+from .import_tools import persist_upload_zip, preview_dataset
+from .jobs import enqueue_daily_pipeline, enqueue_import, enqueue_sync, enqueue_sync_train, enqueue_train, start_job_system
 from .services import data_service
 from .services.auth_service import SESSION_COOKIE, change_password, create_user, current_user_from_request, ensure_bootstrap_admin, list_users, login, logout, require_admin, require_user, set_role, update_profile
 
@@ -48,6 +49,7 @@ app.openapi = _custom_openapi
 app.mount("/static", StaticFiles(directory=Path(__file__).resolve().parent / "static"), name="static")
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent / "templates"))
 ensure_bootstrap_admin()
+start_job_system()
 
 
 def _render(request: Request, template: str, context: Optional[Dict[str, Any]] = None, status_code: int = 200):
@@ -102,6 +104,14 @@ def _system_settings_defaults() -> Dict[str, Any]:
         'autoSync': True,
         'syncInterval': '60',
         'maxRetries': '3',
+        'dailyPipelineEnabled': True,
+        'dailyPipelineTime': '18:10',
+        'dailyPipelineTrain': True,
+        'dailyPipelineTopN': '80',
+        'dailyPipelineDays': '520',
+        'dailyPipelineAnnouncements': '100',
+        'dailyPipelineHorizonDays': '1',
+        'dailyPipelineSleepMs': '250',
         'syncNotifications': True,
         'emailNotifications': True,
         'pushNotifications': False,
@@ -179,44 +189,10 @@ def _normalize_uploaded_dataset(files: List[UploadFile], work_dir: Path) -> tupl
     return zip_path, {"mode": "csv_bundle", "files": csv_names, "csv_count": len(csv_names)}
 
 
-def _run_import_train_pipeline(*, zip_path: Path, train_after_import: bool, horizon_days: int = 1, symbols: Optional[List[str]] = None, sync_first: bool = False, sync_payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    summary: Dict[str, Any] = {}
-    if sync_first:
-        sync_args = argparse.Namespace(
-            symbols=(sync_payload or {}).get("symbols"),
-            top_n=int((sync_payload or {}).get("top_n") or 50),
-            days=int((sync_payload or {}).get("days") or 520),
-            announcements=int((sync_payload or {}).get("announcements") or 100),
-            skip_prices=_to_bool((sync_payload or {}).get("skip_prices"), False),
-            sleep_ms=int((sync_payload or {}).get("sleep_ms") or 250),
-        )
-        cmd_sync(sync_args)
-        summary["sync_job"] = _latest_job_by_name("sync")
-
-    cmd_import = argparse.Namespace(file=str(zip_path))
-    from .cli import cmd_import_eod_zip as _cmd_import_eod_zip
-    _cmd_import_eod_zip(cmd_import)
-    summary["import_job"] = _latest_job_by_name("import_eod_zip")
-
-    if train_after_import:
-        train_args = argparse.Namespace(symbols=symbols, horizon_days=horizon_days)
-        cmd_train(train_args)
-        summary["train_job"] = _latest_job_by_name("train")
-        summary["model"] = data_service.model_status()
-        summary["models"] = data_service.list_models()
-
-    summary["admin_status"] = data_service.admin_status()
-    return summary
-
-def _check_admin_access(request: Request, x_admin_key: Optional[str] = None) -> Dict[str, Any]:
-    user = current_user_from_request(request)
-    if user and user.get("role") == "admin":
-        return user
-    required = settings.admin_api_key
-    provided = x_admin_key or request.headers.get("X-Admin-Key") or request.query_params.get("admin_key")
-    if required and provided == required:
-        return {"username": "api-key-admin", "role": "admin"}
-    raise HTTPException(status_code=401, detail="Admin access required")
+def _uploads_dir() -> Path:
+    uploads = BASE_DIR / "data" / "uploads"
+    uploads.mkdir(parents=True, exist_ok=True)
+    return uploads
 
 
 # ---- Pages ----
@@ -394,34 +370,67 @@ def api_admin_set_role(username: str, request: Request, payload: Dict[str, Any] 
 @app.post("/api/admin/actions/sync")
 def api_admin_run_sync(request: Request, payload: Dict[str, Any] = Body(default={}), x_admin_key: Optional[str] = Header(default=None)):
     _check_admin_access(request, x_admin_key)
-    args = argparse.Namespace(symbols=payload.get("symbols"), top_n=int(payload.get("top_n") or 50), days=int(payload.get("days") or 520), announcements=int(payload.get("announcements") or 100), skip_prices=bool(payload.get("skip_prices", False)), sleep_ms=int(payload.get("sleep_ms") or 250))
-    cmd_sync(args)
-    return {"ok": True, "admin_status": data_service.admin_status()}
+    job = enqueue_sync({
+        "symbols": payload.get("symbols"),
+        "top_n": int(payload.get("top_n") or 50),
+        "days": int(payload.get("days") or 520),
+        "announcements": int(payload.get("announcements") or 100),
+        "skip_prices": bool(payload.get("skip_prices", False)),
+        "sleep_ms": int(payload.get("sleep_ms") or 250),
+    })
+    return {"ok": True, "job": job}
 
 
 @app.post("/api/admin/actions/train")
 def api_admin_run_train(request: Request, payload: Dict[str, Any] = Body(default={}), x_admin_key: Optional[str] = Header(default=None)):
     _check_admin_access(request, x_admin_key)
-    args = argparse.Namespace(symbols=payload.get("symbols"), horizon_days=int(payload.get("horizon_days") or 1))
-    cmd_train(args)
-    return {"ok": True, "model": data_service.model_status(), "models": data_service.list_models()}
+    job = enqueue_train({"symbols": payload.get("symbols"), "horizon_days": int(payload.get("horizon_days") or 1)})
+    return {"ok": True, "job": job}
 
 
 @app.post("/api/admin/actions/sync-train")
 def api_admin_run_sync_train(request: Request, payload: Dict[str, Any] = Body(default={}), x_admin_key: Optional[str] = Header(default=None)):
     _check_admin_access(request, x_admin_key)
-    sync_args = argparse.Namespace(
-        symbols=payload.get("symbols"),
-        top_n=int(payload.get("top_n") or 50),
-        days=int(payload.get("days") or 520),
-        announcements=int(payload.get("announcements") or 100),
-        skip_prices=bool(payload.get("skip_prices", False)),
-        sleep_ms=int(payload.get("sleep_ms") or 250),
-    )
-    cmd_sync(sync_args)
-    train_args = argparse.Namespace(symbols=payload.get("train_symbols") or payload.get("symbols"), horizon_days=int(payload.get("horizon_days") or 1))
-    cmd_train(train_args)
-    return {"ok": True, "sync_job": _latest_job_by_name("sync"), "train_job": _latest_job_by_name("train"), "model": data_service.model_status(), "admin_status": data_service.admin_status()}
+    job = enqueue_sync_train({
+        "symbols": payload.get("symbols"),
+        "top_n": int(payload.get("top_n") or 50),
+        "days": int(payload.get("days") or 520),
+        "announcements": int(payload.get("announcements") or 100),
+        "skip_prices": bool(payload.get("skip_prices", False)),
+        "sleep_ms": int(payload.get("sleep_ms") or 250),
+        "train_symbols": payload.get("train_symbols") or payload.get("symbols"),
+        "horizon_days": int(payload.get("horizon_days") or 1),
+        "train_after_sync": True,
+    })
+    return {"ok": True, "job": job}
+
+
+@app.post("/api/admin/actions/daily-pipeline")
+def api_admin_run_daily_pipeline(request: Request, payload: Dict[str, Any] = Body(default={}), x_admin_key: Optional[str] = Header(default=None)):
+    _check_admin_access(request, x_admin_key)
+    job = enqueue_daily_pipeline({
+        "symbols": payload.get("symbols"),
+        "top_n": int(payload.get("top_n") or 80),
+        "days": int(payload.get("days") or 520),
+        "announcements": int(payload.get("announcements") or 100),
+        "sleep_ms": int(payload.get("sleep_ms") or 250),
+        "horizon_days": int(payload.get("horizon_days") or 1),
+        "train_after_sync": _to_bool(payload.get("train_after_sync"), True),
+    })
+    return {"ok": True, "job": job}
+
+
+@app.post("/api/admin/data/preview")
+def api_admin_preview_data(
+    request: Request,
+    files: List[UploadFile] = File(...),
+    x_admin_key: Optional[str] = Header(default=None),
+):
+    _check_admin_access(request, x_admin_key)
+    with tempfile.TemporaryDirectory(prefix="tradexa_preview_") as td:
+        zip_path, upload_meta = _normalize_uploaded_dataset(files, Path(td))
+        preview = preview_dataset(zip_path)
+    return {"ok": True, "upload": upload_meta, "preview": preview}
 
 
 @app.post("/api/admin/data/upload")
@@ -435,12 +444,14 @@ def api_admin_upload_data(
     _check_admin_access(request, x_admin_key)
     with tempfile.TemporaryDirectory(prefix="tradexa_upload_") as td:
         zip_path, upload_meta = _normalize_uploaded_dataset(files, Path(td))
-        result = _run_import_train_pipeline(
-            zip_path=zip_path,
-            train_after_import=_to_bool(train_after_import, False),
-            horizon_days=max(1, int(horizon_days or "1")),
-        )
-    return {"ok": True, "upload": upload_meta, **result}
+        preview = preview_dataset(zip_path)
+        persisted_zip = persist_upload_zip(zip_path, _uploads_dir())
+    job = enqueue_import({
+        "zip_path": str(persisted_zip),
+        "train_after_import": _to_bool(train_after_import, False),
+        "horizon_days": max(1, int(horizon_days or "1")),
+    }, preview=preview)
+    return {"ok": True, "upload": upload_meta, "preview": preview, "job": job}
 
 
 # ---- API: Market ----
@@ -611,6 +622,24 @@ def api_portfolio_update_transaction(tx_id: str, request: Request, payload: Dict
 def api_portfolio_delete_transaction(tx_id: str, request: Request):
     user = require_user(request)
     return data_service.delete_portfolio_transaction(user['username'], tx_id)
+
+
+@app.post("/api/portfolio/import/preview")
+def api_portfolio_import_preview(request: Request, file: UploadFile = File(...)):
+    user = require_user(request)
+    _ = user
+    return data_service.preview_portfolio_import(file)
+
+
+@app.post("/api/portfolio/import")
+def api_portfolio_import(request: Request, file: UploadFile = File(...)):
+    user = require_user(request)
+    return data_service.import_portfolio_transactions(user['username'], file)
+
+
+@app.get("/api/corporate-actions")
+def api_corporate_actions(symbol: Optional[str] = Query(None), limit: int = Query(100, ge=1, le=500)):
+    return {"actions": data_service.corporate_actions(symbol=symbol, limit=limit)}
 
 
 @app.get("/api/alerts")

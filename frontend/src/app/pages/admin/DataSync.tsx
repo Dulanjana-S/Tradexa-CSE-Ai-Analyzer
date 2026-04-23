@@ -22,15 +22,18 @@ export function DataSync() {
   const [horizonDays, setHorizonDays] = useState(1);
   const [trainAfterImport, setTrainAfterImport] = useState(true);
   const [lastImport, setLastImport] = useState<any>(null);
+  const [uploadPreview, setUploadPreview] = useState<any>(null);
+  const [schedulerSettings, setSchedulerSettings] = useState<any>(null);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const load = async () => {
     setLoading(true);
     try {
-      const [jobsData, statusData] = await Promise.all([adminApi.getJobs(), adminApi.getStatus()]);
+      const [jobsData, statusData, systemSettings] = await Promise.all([adminApi.getJobs(), adminApi.getStatus(), adminApi.getSystemSettings()]);
       setJobs(jobsData);
       setStatus(statusData);
+      setSchedulerSettings(systemSettings?.settings || null);
     } finally {
       setLoading(false);
     }
@@ -83,6 +86,7 @@ export function DataSync() {
       const response = await adminApi.uploadHistoricalData(files, { trainAfterImport, horizonDays });
       setLastImport(response);
       setFiles([]);
+      setUploadPreview(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       await load();
     } finally {
@@ -90,13 +94,19 @@ export function DataSync() {
     }
   };
 
-  const mergeFiles = (incoming: File[]) => {
+  const mergeFiles = async (incoming: File[]) => {
     if (!incoming.length) return;
     setFiles(incoming);
+    try {
+      const preview = await adminApi.previewHistoricalData(incoming);
+      setUploadPreview(preview?.preview || null);
+    } catch {
+      setUploadPreview(null);
+    }
   };
 
-  const onFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    mergeFiles(Array.from(event.target.files || []));
+  const onFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    await mergeFiles(Array.from(event.target.files || []));
   };
 
   const onDragOver = (event: DragEvent<HTMLLabelElement>) => {
@@ -109,10 +119,21 @@ export function DataSync() {
     setDragActive(false);
   };
 
-  const onDrop = (event: DragEvent<HTMLLabelElement>) => {
+  const onDrop = async (event: DragEvent<HTMLLabelElement>) => {
     event.preventDefault();
     setDragActive(false);
-    mergeFiles(Array.from(event.dataTransfer.files || []));
+    await mergeFiles(Array.from(event.dataTransfer.files || []));
+  };
+
+  const saveScheduler = async () => {
+    if (!schedulerSettings) return;
+    setBusyAction("scheduler");
+    try {
+      await adminApi.saveSystemSettings(schedulerSettings);
+      await load();
+    } finally {
+      setBusyAction(null);
+    }
   };
 
   return (
@@ -178,6 +199,14 @@ export function DataSync() {
                 <div className="mt-2 text-[12px] text-[#768390]">{files.length ? files.map((file) => file.name).join(", ") : "No files selected yet."}</div>
               </div>
 
+              {uploadPreview && (
+                <div className="rounded-md border border-[#30363d] bg-[#0d1117] p-4 text-[12px] text-[#e6edf3]">
+                  <div>Detected files: {uploadPreview.totals?.files || 0}</div>
+                  <div className="mt-1 text-[#768390]">Price symbols: {uploadPreview.totals?.price_symbols || 0} • Price rows: {uploadPreview.totals?.price_rows || 0} • Corporate actions: {uploadPreview.totals?.corporate_actions || 0}</div>
+                  {!!uploadPreview.warnings?.length && <div className="mt-2 text-amber-300">Warnings: {uploadPreview.warnings.slice(0, 3).join(" | ")}</div>}
+                </div>
+              )}
+
               <Button onClick={uploadDataset} disabled={busyAction !== null || files.length === 0} className="bg-blue-600 text-white hover:bg-blue-700">
                 {busyAction === "upload" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />} Import Dataset
               </Button>
@@ -186,7 +215,7 @@ export function DataSync() {
                 <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-4 text-[13px] text-emerald-200">
                   <div className="font-semibold">Last import finished successfully.</div>
                   <div className="mt-1">Mode: {lastImport.upload?.mode} • Files: {(lastImport.upload?.files || []).join(", ")}</div>
-                  <div className="mt-1">Imported symbols: {lastImport.import_job?.details?.symbols ?? "—"} • Rows: {lastImport.import_job?.details?.rows ?? "—"}</div>
+                  <div className="mt-1">Queued job: {lastImport.job?.name || lastImport.job?.job_name || lastImport.job?.id || "—"} • Status: {lastImport.job?.status || "queued"}</div>
                 </div>
               )}
             </CardContent>
@@ -247,6 +276,38 @@ export function DataSync() {
             </CardContent>
           </Card>
         </div>
+
+        <Card className="border-[#30363d] bg-[#161b22]">
+          <CardHeader>
+            <CardTitle className="text-[18px] text-[#e6edf3]">Daily scheduler pipeline</CardTitle>
+            <CardDescription className="text-[13px] text-[#768390]">Automatically sync end-of-day data and retrain after market close.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <div className="flex items-center justify-between rounded-md border border-[#30363d] bg-[#0d1117] px-4 py-3 xl:col-span-1">
+                <div>
+                  <div className="text-[13px] font-medium text-[#e6edf3]">Enable daily pipeline</div>
+                  <div className="text-[12px] text-[#768390]">Runs in backend scheduler thread</div>
+                </div>
+                <Switch checked={Boolean(schedulerSettings?.dailyPipelineEnabled)} onCheckedChange={(checked) => setSchedulerSettings((prev: any) => ({ ...(prev || {}), dailyPipelineEnabled: checked }))} />
+              </div>
+              <div className="space-y-2 xl:col-span-1"><Label className="text-[#768390]">Run time</Label><Input value={schedulerSettings?.dailyPipelineTime || "18:10"} onChange={(e) => setSchedulerSettings((prev: any) => ({ ...(prev || {}), dailyPipelineTime: e.target.value }))} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" /></div>
+              <div className="space-y-2 xl:col-span-1"><Label className="text-[#768390]">Top N</Label><Input type="number" value={schedulerSettings?.dailyPipelineTopN || 80} onChange={(e) => setSchedulerSettings((prev: any) => ({ ...(prev || {}), dailyPipelineTopN: e.target.value }))} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" /></div>
+              <div className="space-y-2 xl:col-span-1"><Label className="text-[#768390]">History days</Label><Input type="number" value={schedulerSettings?.dailyPipelineDays || 520} onChange={(e) => setSchedulerSettings((prev: any) => ({ ...(prev || {}), dailyPipelineDays: e.target.value }))} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" /></div>
+              <div className="flex items-center justify-between rounded-md border border-[#30363d] bg-[#0d1117] px-4 py-3 xl:col-span-1">
+                <div>
+                  <div className="text-[13px] font-medium text-[#e6edf3]">Retrain after sync</div>
+                  <div className="text-[12px] text-[#768390]">Keeps tomorrow’s model current</div>
+                </div>
+                <Switch checked={Boolean(schedulerSettings?.dailyPipelineTrain)} onCheckedChange={(checked) => setSchedulerSettings((prev: any) => ({ ...(prev || {}), dailyPipelineTrain: checked }))} />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <Button onClick={saveScheduler} disabled={busyAction !== null} className="bg-blue-600 text-white hover:bg-blue-700">{busyAction === "scheduler" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Clock className="mr-2 h-4 w-4" />} Save Scheduler</Button>
+              <Button onClick={async () => { setBusyAction("daily-pipeline"); try { await adminApi.triggerDailyPipeline({ top_n: topN, days, announcements, horizon_days: horizonDays, train_after_sync: true }); await load(); } finally { setBusyAction(null); } }} disabled={busyAction !== null} variant="outline" className="border-[#30363d] text-[#e6edf3] hover:bg-[#1c2128]">{busyAction === "daily-pipeline" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />} Run Daily Pipeline Now</Button>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card className="border-[#30363d] bg-[#161b22]">
           <CardHeader>

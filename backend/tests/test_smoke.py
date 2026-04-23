@@ -171,6 +171,24 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
 
 
+    def test_portfolio_csv_import_preview(self):
+        csv_payload = (
+            "Symbol,Type,Quantity,Price,Fees,Date
+"
+            f"{self.symbol},buy,10,12.50,5,2025-01-03
+"
+            f"{self.symbol},sell,2,13.25,2,2025-01-10
+"
+        )
+        resp = self.client.post(
+            "/api/portfolio/import/preview",
+            files={"file": ("portfolio.csv", csv_payload, "text/csv")},
+        )
+        self.assertEqual(resp.status_code, 200, msg=resp.text[:300])
+        preview = resp.json().get("preview") or {}
+        self.assertEqual(preview.get("valid_rows"), 2)
+
+
     def test_admin_upload_and_triage(self):
         payload = io.BytesIO()
         with zipfile.ZipFile(payload, "w", compression=zipfile.ZIP_DEFLATED) as zf:
@@ -187,7 +205,8 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(resp.status_code, 200, msg=resp.text[:300])
         body = resp.json()
         self.assertTrue(body.get("ok"))
-        self.assertEqual(body.get("import_job", {}).get("job_name"), "import_eod_zip")
+        self.assertEqual(body.get("job", {}).get("job_name"), "import_dataset")
+        self.assertTrue(body.get("preview", {}).get("ok"))
 
         anns = self.client.get("/api/admin/announcements/triage?include_hidden=true")
         self.assertEqual(anns.status_code, 200)

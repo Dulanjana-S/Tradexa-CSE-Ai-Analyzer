@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import csv
+import io
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile
 
 from ..config import settings
 from ..mock_data import DEMO_SYMBOLS, demo_prediction
@@ -675,6 +677,10 @@ def list_portfolio_transactions(username: str) -> List[Dict[str, Any]]:
     return _storage.list_portfolio_transactions(username)
 
 
+def corporate_actions(symbol: Optional[str] = None, limit: int = 100) -> List[Dict[str, Any]]:
+    return _storage.list_corporate_actions(symbol=symbol, limit=limit)
+
+
 def _portfolio_sort_key(item: Dict[str, Any]) -> Tuple[str, str, str]:
     return (
         str(item.get("traded_at") or item.get("created_at") or ""),
@@ -683,33 +689,76 @@ def _portfolio_sort_key(item: Dict[str, Any]) -> Tuple[str, str, str]:
     )
 
 
-def _portfolio_position_state_from_rows(rows: List[Dict[str, Any]], *, strict: bool = False) -> Dict[str, Dict[str, Any]]:
+def _action_ratio(action: Dict[str, Any]) -> float:
+    numerator = _to_float(action.get("ratio_numerator"))
+    denominator = _to_float(action.get("ratio_denominator"))
+    if numerator and denominator and denominator != 0:
+        return float(numerator / denominator)
+    return 1.0
+
+
+def _load_actions_by_symbol(symbols: List[str]) -> Dict[str, List[Dict[str, Any]]]:
+    grouped: Dict[str, List[Dict[str, Any]]] = {}
+    if not symbols:
+        return grouped
+    for symbol in sorted({s.upper() for s in symbols if s}):
+        grouped[symbol] = sorted(_storage.list_corporate_actions(symbol=symbol, limit=500), key=lambda item: (str(item.get("ex_date") or ""), str(item.get("action_id") or "")))
+    return grouped
+
+
+def _state_event_key(item: Dict[str, Any], kind: str) -> Tuple[str, int, str]:
+    if kind == "action":
+        return (str(item.get("ex_date") or item.get("date") or ""), 0, str(item.get("action_id") or ""))
+    return (str(item.get("traded_at") or item.get("created_at") or ""), 1, str(item.get("tx_id") or item.get("id") or ""))
+
+
+def _portfolio_position_state_from_rows(rows: List[Dict[str, Any]], *, strict: bool = False, actions_by_symbol: Optional[Dict[str, List[Dict[str, Any]]]] = None) -> Dict[str, Dict[str, Any]]:
     ordered = sorted(rows, key=_portfolio_sort_key)
+    symbols = sorted({str(tx.get("symbol") or "").upper().strip() for tx in ordered if tx.get("symbol")})
+    action_map = actions_by_symbol if actions_by_symbol is not None else _load_actions_by_symbol(symbols)
     state: Dict[str, Dict[str, Any]] = {}
-    for tx in ordered:
-        symbol = str(tx.get("symbol") or "").upper().strip()
-        if not symbol:
-            continue
-        tx_type = str(tx.get("tx_type") or tx.get("type") or "buy").lower().strip()
-        quantity = float(tx.get("quantity") or 0.0)
-        price = float(tx.get("price") or 0.0)
-        fees = float(tx.get("fees") or 0.0)
-        info = state.setdefault(symbol, {"quantity": 0.0, "cost_total": 0.0, "realized_pl": 0.0})
-        if tx_type == "buy":
-            info["quantity"] += quantity
-            info["cost_total"] += quantity * price + fees
-        elif tx_type == "sell":
-            held_qty = float(info.get("quantity") or 0.0)
-            if strict and held_qty + 1e-9 < quantity:
-                tx_label = tx.get("traded_at") or tx.get("created_at") or "this transaction"
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Cannot sell {quantity:.4f} shares of {symbol} on {tx_label}; current holding is {held_qty:.4f}",
-                )
-            avg_cost = (float(info.get("cost_total") or 0.0) / held_qty) if held_qty > 0 else 0.0
-            info["realized_pl"] += quantity * (price - avg_cost) - fees
-            info["quantity"] = max(0.0, held_qty - quantity)
-            info["cost_total"] = max(0.0, float(info.get("cost_total") or 0.0) - avg_cost * quantity)
+    for symbol in symbols:
+        events: List[Tuple[str, Dict[str, Any]]] = []
+        for action in action_map.get(symbol, []):
+            events.append(("action", action))
+        for tx in [item for item in ordered if str(item.get("symbol") or "").upper().strip() == symbol]:
+            events.append(("tx", tx))
+        events.sort(key=lambda pair: _state_event_key(pair[1], pair[0]))
+        info = state.setdefault(symbol, {"quantity": 0.0, "cost_total": 0.0, "realized_pl": 0.0, "dividend_income": 0.0})
+        for kind, item in events:
+            if kind == "action":
+                action_type = str(item.get("action_type") or "").lower().strip()
+                quantity = float(info.get("quantity") or 0.0)
+                if quantity <= 0:
+                    continue
+                if action_type == "dividend":
+                    amount = float(_to_float(item.get("amount")) or 0.0)
+                    if amount:
+                        info["dividend_income"] += quantity * amount
+                elif action_type in {"split", "bonus"}:
+                    ratio = _action_ratio(item)
+                    if ratio > 0 and abs(ratio - 1.0) > 1e-9:
+                        info["quantity"] = quantity * ratio
+                continue
+            tx_type = str(item.get("tx_type") or item.get("type") or "buy").lower().strip()
+            quantity = float(item.get("quantity") or 0.0)
+            price = float(item.get("price") or 0.0)
+            fees = float(item.get("fees") or 0.0)
+            if tx_type == "buy":
+                info["quantity"] += quantity
+                info["cost_total"] += quantity * price + fees
+            elif tx_type == "sell":
+                held_qty = float(info.get("quantity") or 0.0)
+                if strict and held_qty + 1e-9 < quantity:
+                    tx_label = item.get("traded_at") or item.get("created_at") or "this transaction"
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Cannot sell {quantity:.4f} shares of {symbol} on {tx_label}; current holding is {held_qty:.4f}",
+                    )
+                avg_cost = (float(info.get("cost_total") or 0.0) / held_qty) if held_qty > 0 else 0.0
+                info["realized_pl"] += quantity * (price - avg_cost) - fees
+                info["quantity"] = max(0.0, held_qty - quantity)
+                info["cost_total"] = max(0.0, float(info.get("cost_total") or 0.0) - avg_cost * quantity)
         state[symbol] = info
     return state
 
@@ -734,6 +783,11 @@ def _validate_portfolio_transaction_payload(payload: Dict[str, Any]) -> Dict[str
         raise HTTPException(status_code=400, detail="Quantity must be greater than zero")
     if price is None or price <= 0:
         raise HTTPException(status_code=400, detail="Price must be greater than zero")
+    if traded_at:
+        try:
+            date.fromisoformat(traded_at[:10])
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail="Trade date must be in YYYY-MM-DD format") from exc
     return {
         "symbol": symbol,
         "tx_type": tx_type,
@@ -746,7 +800,8 @@ def _validate_portfolio_transaction_payload(payload: Dict[str, Any]) -> Dict[str
 
 
 def _validate_portfolio_sequence(next_rows: List[Dict[str, Any]]) -> None:
-    _portfolio_position_state_from_rows(next_rows, strict=True)
+    actions = _load_actions_by_symbol([str(item.get("symbol") or "") for item in next_rows])
+    _portfolio_position_state_from_rows(next_rows, strict=True, actions_by_symbol=actions)
 
 
 def get_portfolio(username: str) -> Dict[str, Any]:
@@ -754,10 +809,12 @@ def get_portfolio(username: str) -> Dict[str, Any]:
     state = _portfolio_position_state_from_rows(transactions)
     open_symbols = [symbol for symbol, item in state.items() if float(item.get("quantity") or 0.0) > 0]
     snapshots = {item.get("symbol"): item for item in stock_snapshots(open_symbols)} if open_symbols else {}
+    recent_actions = _storage.list_corporate_actions(limit=100)
     positions: List[Dict[str, Any]] = []
     total_market_value = 0.0
     total_cost_basis = 0.0
     total_realized = 0.0
+    total_dividend_income = 0.0
     for symbol in sorted(open_symbols):
         item = state[symbol]
         quantity = float(item.get("quantity") or 0.0)
@@ -770,9 +827,11 @@ def get_portfolio(username: str) -> Dict[str, Any]:
             current_price = _to_float((bar or {}).get("close")) or 0.0
         market_value = quantity * float(current_price or 0.0)
         unrealized = market_value - cost_basis
+        dividend_income = float(item.get("dividend_income") or 0.0)
         total_market_value += market_value
         total_cost_basis += cost_basis
         total_realized += float(item.get("realized_pl") or 0.0)
+        total_dividend_income += dividend_income
         positions.append({
             "symbol": symbol,
             "company": snap.get("name") or symbol,
@@ -785,6 +844,7 @@ def get_portfolio(username: str) -> Dict[str, Any]:
             "unrealized_pl": unrealized,
             "unrealized_pl_pct": (unrealized / cost_basis * 100.0) if cost_basis > 0 else 0.0,
             "realized_pl": float(item.get("realized_pl") or 0.0),
+            "dividend_income": dividend_income,
         })
     for row in positions:
         row["weight_pct"] = (row["market_value"] / total_market_value * 100.0) if total_market_value > 0 else 0.0
@@ -796,10 +856,17 @@ def get_portfolio(username: str) -> Dict[str, Any]:
         "unrealized_pl": total_market_value - total_cost_basis,
         "unrealized_pl_pct": ((total_market_value - total_cost_basis) / total_cost_basis * 100.0) if total_cost_basis > 0 else 0.0,
         "realized_pl": total_realized,
+        "dividend_income": total_dividend_income,
         "total_pl": (total_market_value - total_cost_basis) + total_realized,
+        "total_return": (total_market_value - total_cost_basis) + total_realized + total_dividend_income,
     }
     transactions_sorted = sorted(transactions, key=_portfolio_sort_key, reverse=True)
-    return {"summary": summary, "positions": positions, "transactions": transactions_sorted}
+    return {
+        "summary": summary,
+        "positions": positions,
+        "transactions": transactions_sorted,
+        "recent_actions": recent_actions,
+    }
 
 
 def get_portfolio_performance(username: str, days: int = 365) -> Dict[str, Any]:
@@ -809,6 +876,7 @@ def get_portfolio_performance(username: str, days: int = 365) -> Dict[str, Any]:
 
     ordered_txs = sorted(transactions, key=_portfolio_sort_key)
     symbols = sorted({str(item.get("symbol") or "").upper() for item in ordered_txs if item.get("symbol")})
+    action_map = _load_actions_by_symbol(symbols)
     histories: Dict[str, Dict[str, float]] = {}
     history_dates: List[date] = []
     for symbol in symbols:
@@ -822,16 +890,17 @@ def get_portfolio_performance(username: str, days: int = 365) -> Dict[str, Any]:
                 history_dates.append(date.fromisoformat(date_key))
         if price_map:
             histories[symbol] = price_map
-
     if not histories:
         return {"days": days, "series": []}
 
     tx_dates = [date.fromisoformat(str(item.get("traded_at") or item.get("created_at") or "")[:10]) for item in ordered_txs if str(item.get("traded_at") or item.get("created_at") or "")[:10]]
     if not tx_dates:
         return {"days": days, "series": []}
+    action_dates = [date.fromisoformat(str(item.get("ex_date") or "")[:10]) for rows in action_map.values() for item in rows if str(item.get("ex_date") or "")[:10]]
 
     latest_history_date = max(history_dates)
-    start_date = max(min(tx_dates), latest_history_date - timedelta(days=max(days - 1, 0)))
+    earliest_event_date = min(tx_dates + action_dates) if action_dates else min(tx_dates)
+    start_date = max(earliest_event_date, latest_history_date - timedelta(days=max(days - 1, 0)))
     market_dates = sorted({d for d in history_dates if d >= start_date})
     if not market_dates:
         return {"days": days, "series": []}
@@ -839,16 +908,34 @@ def get_portfolio_performance(username: str, days: int = 365) -> Dict[str, Any]:
     tx_by_date: Dict[date, List[Dict[str, Any]]] = {}
     for tx in ordered_txs:
         raw_day = str(tx.get("traded_at") or tx.get("created_at") or "")[:10]
-        if not raw_day:
-            continue
-        tx_day = date.fromisoformat(raw_day)
-        tx_by_date.setdefault(tx_day, []).append(tx)
+        if raw_day:
+            tx_by_date.setdefault(date.fromisoformat(raw_day), []).append(tx)
+    actions_by_date: Dict[date, List[Dict[str, Any]]] = {}
+    for rows in action_map.values():
+        for action in rows:
+            raw_day = str(action.get("ex_date") or "")[:10]
+            if raw_day:
+                actions_by_date.setdefault(date.fromisoformat(raw_day), []).append(action)
 
     positions: Dict[str, Dict[str, float]] = {}
     last_close: Dict[str, float] = {}
     series: List[Dict[str, Any]] = []
     for market_day in market_dates:
-        for tx in tx_by_date.get(market_day, []):
+        for action in sorted(actions_by_date.get(market_day, []), key=lambda item: (str(item.get("symbol") or ""), str(item.get("action_id") or ""))):
+            symbol = str(action.get("symbol") or "").upper().strip()
+            pos = positions.setdefault(symbol, {"quantity": 0.0, "cost_total": 0.0, "realized_pl": 0.0, "dividend_income": 0.0})
+            held_qty = float(pos.get("quantity") or 0.0)
+            if held_qty <= 0:
+                continue
+            action_type = str(action.get("action_type") or "").lower().strip()
+            if action_type == "dividend":
+                amount = float(_to_float(action.get("amount")) or 0.0)
+                pos["dividend_income"] += held_qty * amount
+            elif action_type in {"split", "bonus"}:
+                ratio = _action_ratio(action)
+                if ratio > 0 and abs(ratio - 1.0) > 1e-9:
+                    pos["quantity"] = held_qty * ratio
+        for tx in sorted(tx_by_date.get(market_day, []), key=_portfolio_sort_key):
             symbol = str(tx.get("symbol") or "").upper().strip()
             if not symbol:
                 continue
@@ -856,7 +943,7 @@ def get_portfolio_performance(username: str, days: int = 365) -> Dict[str, Any]:
             quantity = float(tx.get("quantity") or 0.0)
             price = float(tx.get("price") or 0.0)
             fees = float(tx.get("fees") or 0.0)
-            pos = positions.setdefault(symbol, {"quantity": 0.0, "cost_total": 0.0, "realized_pl": 0.0})
+            pos = positions.setdefault(symbol, {"quantity": 0.0, "cost_total": 0.0, "realized_pl": 0.0, "dividend_income": 0.0})
             if tx_type == "buy":
                 pos["quantity"] += quantity
                 pos["cost_total"] += quantity * price + fees
@@ -870,6 +957,7 @@ def get_portfolio_performance(username: str, days: int = 365) -> Dict[str, Any]:
         total_market_value = 0.0
         total_cost_basis = 0.0
         total_realized = 0.0
+        total_dividends = 0.0
         for symbol, price_map in histories.items():
             date_key = market_day.isoformat()
             if date_key in price_map:
@@ -878,13 +966,13 @@ def get_portfolio_performance(username: str, days: int = 365) -> Dict[str, Any]:
             if not pos:
                 continue
             quantity = float(pos.get("quantity") or 0.0)
+            total_realized += float(pos.get("realized_pl") or 0.0)
+            total_dividends += float(pos.get("dividend_income") or 0.0)
             if quantity <= 0:
-                total_realized += float(pos.get("realized_pl") or 0.0)
                 continue
             close_value = float(last_close.get(symbol) or 0.0)
             total_market_value += quantity * close_value
             total_cost_basis += float(pos.get("cost_total") or 0.0)
-            total_realized += float(pos.get("realized_pl") or 0.0)
         unrealized = total_market_value - total_cost_basis
         series.append({
             "date": market_day.isoformat(),
@@ -892,7 +980,9 @@ def get_portfolio_performance(username: str, days: int = 365) -> Dict[str, Any]:
             "cost_basis": round(total_cost_basis, 4),
             "realized_pl": round(total_realized, 4),
             "unrealized_pl": round(unrealized, 4),
+            "dividend_income": round(total_dividends, 4),
             "total_pl": round(unrealized + total_realized, 4),
+            "total_return": round(unrealized + total_realized + total_dividends, 4),
         })
     return {"days": days, "series": series}
 
@@ -920,7 +1010,7 @@ def update_portfolio_transaction(username: str, tx_id: str, payload: Dict[str, A
             replacement["tx_id"] = tx_id
             next_rows.append(replacement)
         else:
-            next_rows.append(row)
+            next_rows.append(dict(row))
     if not found:
         raise HTTPException(status_code=404, detail="Portfolio transaction not found")
     _validate_portfolio_sequence(next_rows)
@@ -936,93 +1026,77 @@ def delete_portfolio_transaction(username: str, tx_id: str) -> Dict[str, Any]:
     return get_portfolio(username)
 
 
-# ---- Alerts / Notifications / Announcement logic ----
-def _ensure_notification(username: str, category: str, title: str, message: str, *, symbol: Optional[str] = None, severity: str = 'info', link: Optional[str] = None, dedupe_key: Optional[str] = None, meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    existing = _storage.list_notifications(username)
-    if dedupe_key:
-        for n in existing:
-            n_meta = n.get('meta') or {}
-            if n_meta.get('dedupe_key') == dedupe_key:
-                return n
-    payload = dict(meta or {})
-    if dedupe_key:
-        payload['dedupe_key'] = dedupe_key
-    return _storage.create_notification(username, category, title, message, symbol=symbol, severity=severity, link=link, meta=payload)
+def _parse_portfolio_csv(file: UploadFile) -> List[Dict[str, Any]]:
+    if hasattr(file.file, "seek"):
+        file.file.seek(0)
+    payload = file.file.read()
+    text = payload.decode("utf-8", errors="replace") if isinstance(payload, (bytes, bytearray)) else str(payload)
+    reader = csv.DictReader(io.StringIO(text))
+    rows: List[Dict[str, Any]] = []
+    for row in reader:
+        symbol = str(row.get("symbol") or row.get("Symbol") or row.get("ticker") or row.get("Ticker") or "").upper().strip()
+        tx_type = str(row.get("tx_type") or row.get("type") or row.get("Type") or row.get("side") or row.get("Side") or "buy").lower().strip()
+        if tx_type in {"b", "buy"}:
+            tx_type = "buy"
+        elif tx_type in {"s", "sell"}:
+            tx_type = "sell"
+        rows.append({
+            "symbol": symbol,
+            "tx_type": tx_type,
+            "quantity": _to_float(row.get("quantity") or row.get("Quantity") or row.get("qty") or row.get("Qty")),
+            "price": _to_float(row.get("price") or row.get("Price") or row.get("rate") or row.get("Rate")),
+            "fees": _to_float(row.get("fees") or row.get("Fees") or row.get("commission") or row.get("Commission") or 0),
+            "traded_at": str(row.get("traded_at") or row.get("trade_date") or row.get("Trade Date") or row.get("date") or row.get("Date") or "").strip() or None,
+            "notes": str(row.get("notes") or row.get("Notes") or "").strip() or None,
+        })
+    return rows
 
 
-def _latest_close_and_prev(symbol: str) -> Tuple[Optional[float], Optional[float], Optional[float]]:
-    hist = _storage.get_price_history(symbol.upper(), limit=21)
-    if not hist:
-        return None, None, None
-    latest = _to_float(hist[-1].get('close'))
-    prev = _to_float(hist[-2].get('close')) if len(hist) >= 2 else None
-    avg_vol = None
-    vols = [_to_float(r.get('volume')) for r in hist[-20:] if _to_float(r.get('volume')) is not None]
-    if vols:
-        avg_vol = sum(vols) / len(vols)
-    return latest, prev, avg_vol
+def preview_portfolio_import(file: UploadFile) -> Dict[str, Any]:
+    rows = _parse_portfolio_csv(file)
+    valid_rows: List[Dict[str, Any]] = []
+    errors: List[Dict[str, Any]] = []
+    for idx, row in enumerate(rows, start=2):
+        try:
+            clean = _validate_portfolio_transaction_payload(row)
+            valid_rows.append(clean)
+        except HTTPException as exc:
+            errors.append({"row": idx, "error": exc.detail, "symbol": row.get("symbol")})
+    preview = {
+        "file": file.filename,
+        "rows": len(rows),
+        "valid_rows": len(valid_rows),
+        "invalid_rows": len(errors),
+        "symbols": sorted({str(item.get("symbol") or "") for item in valid_rows if item.get("symbol")}),
+        "sample": valid_rows[:20],
+        "errors": errors[:50],
+    }
+    return {"ok": len(errors) == 0, "preview": preview}
 
 
-def _sync_important_announcement_notifications(username: str) -> None:
-    watched = set(_storage.list_watchlist(profile=username))
-    for a in _storage.list_alerts(username):
-        if a.get('alert_type') == 'important_announcement' and a.get('symbol'):
-            watched.add(str(a['symbol']).upper())
-    if not watched:
-        return
-    recent = announcements(None, limit=100)
-    for ann in recent:
-        sym = (ann.get('symbol') or '').upper()
-        if sym not in watched:
-            continue
-        if not ann.get('is_important'):
-            continue
-        dedupe_key = f"important-ann:{ann.get('ann_id')}:{sym}"
-        _ensure_notification(username, 'announcement', f"Important announcement for {sym}", ann.get('title') or 'Important announcement', symbol=sym, severity='warning', link=ann.get('url'), dedupe_key=dedupe_key, meta={'ann_id': ann.get('ann_id'), 'importance': ann.get('importance')})
-
-
-def evaluate_alerts(username: str) -> List[Dict[str, Any]]:
-    alerts = _storage.list_alerts(username)
-    triggered = []
-    for alert in alerts:
-        if not alert.get('is_enabled'):
-            continue
-        symbol = (alert.get('symbol') or '').upper()
-        latest, prev, avg_vol = _latest_close_and_prev(symbol) if symbol else (None, None, None)
-        fire = False
-        message = None
-        if alert.get('alert_type') == 'above_price' and latest is not None and alert.get('target_value') is not None:
-            if latest >= float(alert['target_value']):
-                fire = True
-                message = f"{symbol} moved above {float(alert['target_value']):.2f}. Latest price is {latest:.2f}."
-        elif alert.get('alert_type') == 'below_price' and latest is not None and alert.get('target_value') is not None:
-            if latest <= float(alert['target_value']):
-                fire = True
-                message = f"{symbol} moved below {float(alert['target_value']):.2f}. Latest price is {latest:.2f}."
-        elif alert.get('alert_type') == 'pct_move' and latest is not None and prev not in (None, 0) and alert.get('target_value') is not None:
-            pct = abs((latest / prev - 1.0) * 100.0)
-            if pct >= float(alert['target_value']):
-                fire = True
-                message = f"{symbol} moved {pct:.2f}% today."
-        elif alert.get('alert_type') == 'volume_spike' and symbol:
-            bar = _storage.get_latest_bar(symbol)
-            vol = _to_float((bar or {}).get('volume'))
-            multiple = float(alert.get('target_value') or 2.0)
-            if vol is not None and avg_vol not in (None, 0) and vol >= avg_vol * multiple:
-                fire = True
-                message = f"{symbol} volume spiked to {int(vol)} against a recent average of {int(avg_vol or 0)}."
-        if fire:
-            _storage.mark_alert_triggered(str(alert['alert_id']))
-            dedupe_key = f"alert:{alert.get('alert_id')}:{alert.get('last_triggered_at') or ''}"
-            _ensure_notification(username, 'alert', f"Alert triggered for {symbol or 'market'}", message or 'Alert triggered', symbol=symbol or None, severity='info', dedupe_key=f"alert:{alert.get('alert_id')}", meta={'alert_id': alert.get('alert_id')})
-            triggered.append(alert)
-    _sync_important_announcement_notifications(username)
-    return triggered
-
-
-def list_alerts(username: str) -> List[Dict[str, Any]]:
-    evaluate_alerts(username)
-    return _storage.list_alerts(username)
+def import_portfolio_transactions(username: str, file: UploadFile) -> Dict[str, Any]:
+    preview = preview_portfolio_import(file)
+    valid_rows = list(preview.get("preview", {}).get("sample") or [])
+    if preview.get("preview", {}).get("valid_rows") != len(valid_rows):
+        rows = _parse_portfolio_csv(file)
+        valid_rows = []
+        for row in rows:
+            try:
+                valid_rows.append(_validate_portfolio_transaction_payload(row))
+            except HTTPException:
+                pass
+    if preview.get("preview", {}).get("invalid_rows"):
+        raise HTTPException(status_code=400, detail="Fix invalid rows before importing portfolio transactions")
+    existing = _storage.list_portfolio_transactions(username)
+    next_rows = list(existing) + valid_rows
+    _validate_portfolio_sequence(next_rows)
+    imported = 0
+    for row in valid_rows:
+        _storage.create_portfolio_transaction(username, row["symbol"], row["tx_type"], row["quantity"], row["price"], fees=row["fees"], traded_at=row["traded_at"], notes=row["notes"])
+        imported += 1
+    result = get_portfolio(username)
+    result["imported_rows"] = imported
+    return result
 
 
 def create_alert(username: str, payload: Dict[str, Any]) -> Dict[str, Any]:

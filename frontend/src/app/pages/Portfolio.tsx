@@ -11,7 +11,7 @@ import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Textarea } from "../components/ui/textarea";
-import { BriefcaseBusiness, Landmark, Loader2, Pencil, Plus, ShoppingBag, Trash2, TrendingDown, TrendingUp } from "lucide-react";
+import { BriefcaseBusiness, FileUp, Landmark, Loader2, Pencil, Plus, ShoppingBag, Trash2, TrendingDown, TrendingUp } from "lucide-react";
 
 const emptyPortfolio: PortfolioData = {
   summary: {
@@ -26,6 +26,7 @@ const emptyPortfolio: PortfolioData = {
   },
   positions: [],
   transactions: [],
+  recentActions: [],
 };
 
 const emptyWatchlist: Watchlist = { symbols: [], items: [] };
@@ -66,6 +67,10 @@ export function Portfolio() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [chartDays, setChartDays] = useState(365);
   const [error, setError] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importingCsv, setImportingCsv] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvPreview, setCsvPreview] = useState<any | null>(null);
   const [form, setForm] = useState(defaultForm());
 
   const loadPortfolio = async () => {
@@ -159,6 +164,34 @@ export function Portfolio() {
     const updated = await portfolioApi.deleteTransaction(transactionId);
     setPortfolio(updated);
     await loadPerformance(chartDays);
+  };
+
+  const previewCsvImport = async (file: File) => {
+    setImportError(null);
+    try {
+      const response = await portfolioApi.previewImport(file);
+      setCsvPreview(response?.preview || null);
+    } catch (err: any) {
+      setImportError(err?.message || "Could not preview transaction CSV");
+      setCsvPreview(null);
+    }
+  };
+
+  const importCsvTransactions = async () => {
+    if (!csvFile) return;
+    setImportingCsv(true);
+    setImportError(null);
+    try {
+      const updated = await portfolioApi.importTransactions(csvFile);
+      setPortfolio(updated);
+      await loadPerformance(chartDays);
+      setCsvFile(null);
+      setCsvPreview(null);
+    } catch (err: any) {
+      setImportError(err?.message || "Could not import transaction CSV");
+    } finally {
+      setImportingCsv(false);
+    }
   };
 
   return (
@@ -339,6 +372,36 @@ export function Portfolio() {
                   </TableRow>
                 ))}
                 {!loading && portfolio.positions.length === 0 && <TableRow><TableCell colSpan={7} className="py-8 text-center text-[#768390]">No holdings yet. Add your first buy transaction to start tracking your portfolio.</TableCell></TableRow>}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card className="border-[#30363d] bg-[#161b22]">
+          <CardHeader>
+            <CardTitle className="text-[18px] text-[#e6edf3]">Recent corporate actions</CardTitle>
+            <CardDescription className="text-[13px] text-[#768390]">Dividends, splits, and bonus issues stored in the system and used in portfolio calculations.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow className="border-[#30363d] hover:bg-transparent">
+                  <TableHead className="text-[#768390]">Ex date</TableHead>
+                  <TableHead className="text-[#768390]">Symbol</TableHead>
+                  <TableHead className="text-[#768390]">Type</TableHead>
+                  <TableHead className="text-[#768390]">Details</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(portfolio.recentActions || []).slice(0, 8).map((action) => (
+                  <TableRow key={action.id} className="border-[#30363d] hover:bg-[#1c2128]">
+                    <TableCell className="text-[#e6edf3]">{compactDate(action.exDate)}</TableCell>
+                    <TableCell className="font-medium text-[#e6edf3]">{action.symbol}</TableCell>
+                    <TableCell className="text-[#e6edf3]">{action.actionType}</TableCell>
+                    <TableCell className="text-[#768390]">{action.amount ? money(action.amount) : action.ratioNumerator && action.ratioDenominator ? `${action.ratioNumerator}:${action.ratioDenominator}` : action.description || "—"}</TableCell>
+                  </TableRow>
+                ))}
+                {!(portfolio.recentActions || []).length && <TableRow><TableCell colSpan={4} className="py-8 text-center text-[#768390]">No corporate actions stored yet.</TableCell></TableRow>}
               </TableBody>
             </Table>
           </CardContent>

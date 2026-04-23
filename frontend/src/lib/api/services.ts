@@ -20,6 +20,7 @@ import type {
   PortfolioData,
   PortfolioPerformancePoint,
   PortfolioPosition,
+  CorporateAction,
   PortfolioSummary,
   PortfolioTransaction,
 } from "./types";
@@ -97,6 +98,20 @@ function mapAnnouncement(raw: any): Announcement {
   };
 }
 
+function mapCorporateAction(raw: any): CorporateAction {
+  return {
+    id: String(raw?.action_id || raw?.id || ""),
+    symbol: String(raw?.symbol || ""),
+    exDate: String(raw?.ex_date || raw?.exDate || ""),
+    actionType: String(raw?.action_type || raw?.actionType || "corporate_action"),
+    amount: raw?.amount !== undefined ? num(raw?.amount) : undefined,
+    ratioNumerator: raw?.ratio_numerator !== undefined ? num(raw?.ratio_numerator) : undefined,
+    ratioDenominator: raw?.ratio_denominator !== undefined ? num(raw?.ratio_denominator) : undefined,
+    description: raw?.description || undefined,
+    source: raw?.source || undefined,
+  };
+}
+
 function mapPortfolioTransaction(raw: any): PortfolioTransaction {
   return {
     id: String(raw?.tx_id || raw?.id || ""),
@@ -124,6 +139,7 @@ function mapPortfolioPosition(raw: any): PortfolioPosition {
     unrealizedPl: num(raw?.unrealized_pl ?? raw?.unrealizedPl),
     unrealizedPlPct: num(raw?.unrealized_pl_pct ?? raw?.unrealizedPlPct),
     realizedPl: num(raw?.realized_pl ?? raw?.realizedPl),
+    dividendIncome: raw?.dividend_income !== undefined ? num(raw?.dividend_income) : undefined,
     weightPct: num(raw?.weight_pct ?? raw?.weightPct),
   };
 }
@@ -137,7 +153,9 @@ function mapPortfolioSummary(raw: any): PortfolioSummary {
     unrealizedPl: num(raw?.unrealized_pl ?? raw?.unrealizedPl),
     unrealizedPlPct: num(raw?.unrealized_pl_pct ?? raw?.unrealizedPlPct),
     realizedPl: num(raw?.realized_pl ?? raw?.realizedPl),
+    dividendIncome: raw?.dividend_income !== undefined ? num(raw?.dividend_income) : undefined,
     totalPl: num(raw?.total_pl ?? raw?.totalPl),
+    totalReturn: raw?.total_return !== undefined ? num(raw?.total_return) : undefined,
   };
 }
 
@@ -146,6 +164,7 @@ function mapPortfolioData(raw: any): PortfolioData {
     summary: mapPortfolioSummary(raw?.summary || {}),
     positions: Array.isArray(raw?.positions) ? raw.positions.map(mapPortfolioPosition) : [],
     transactions: Array.isArray(raw?.transactions) ? raw.transactions.map(mapPortfolioTransaction) : [],
+    recentActions: Array.isArray(raw?.recent_actions) ? raw.recent_actions.map(mapCorporateAction) : [],
   };
 }
 
@@ -156,7 +175,9 @@ function mapPortfolioPerformancePoint(raw: any): PortfolioPerformancePoint {
     costBasis: num(raw?.cost_basis ?? raw?.costBasis),
     realizedPl: num(raw?.realized_pl ?? raw?.realizedPl),
     unrealizedPl: num(raw?.unrealized_pl ?? raw?.unrealizedPl),
+    dividendIncome: raw?.dividend_income !== undefined ? num(raw?.dividend_income) : undefined,
     totalPl: num(raw?.total_pl ?? raw?.totalPl),
+    totalReturn: raw?.total_return !== undefined ? num(raw?.total_return) : undefined,
   };
 }
 
@@ -542,6 +563,29 @@ export const portfolioApi = {
 
   deleteTransaction: async (transactionId: string): Promise<PortfolioData> =>
     mapPortfolioData(await api.delete<any>(`/api/portfolio/transactions/${encodeURIComponent(transactionId)}`)),
+
+  previewImport: async (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return api.post<any>("/api/portfolio/import/preview", form);
+  },
+
+  importTransactions: async (file: File): Promise<PortfolioData & { importedRows?: number }> => {
+    const form = new FormData();
+    form.append("file", file);
+    const response = await api.post<any>("/api/portfolio/import", form);
+    const mapped = mapPortfolioData(response) as PortfolioData & { importedRows?: number };
+    mapped.importedRows = response?.imported_rows;
+    return mapped;
+  },
+};
+
+export const corporateActionsApi = {
+  getAll: async (symbol?: string): Promise<CorporateAction[]> => {
+    const query = symbol ? `?symbol=${encodeURIComponent(symbol)}` : "";
+    const response = await api.get<any>(`/api/corporate-actions${query}`);
+    return Array.isArray(response?.actions) ? response.actions.map(mapCorporateAction) : [];
+  },
 };
 
 export const alertsApi = {
@@ -645,6 +689,15 @@ export const adminApi = {
 
   triggerSyncTraining: (payload?: { symbols?: string[]; top_n?: number; days?: number; announcements?: number; horizon_days?: number }) =>
     api.post<any>("/api/admin/actions/sync-train", payload || {}),
+
+  triggerDailyPipeline: (payload?: { symbols?: string[]; top_n?: number; days?: number; announcements?: number; horizon_days?: number; train_after_sync?: boolean }) =>
+    api.post<any>("/api/admin/actions/daily-pipeline", payload || {}),
+
+  previewHistoricalData: async (files: File[]) => {
+    const form = new FormData();
+    files.forEach((file) => form.append("files", file));
+    return api.post<any>("/api/admin/data/preview", form);
+  },
 
   uploadHistoricalData: async (files: File[], options?: { trainAfterImport?: boolean; horizonDays?: number }) => {
     const form = new FormData();

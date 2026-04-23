@@ -123,6 +123,7 @@ export interface PortfolioPosition {
   unrealizedPl: number;
   unrealizedPlPct: number;
   realizedPl: number;
+  dividendIncome?: number;
   weightPct: number;
 }
 
@@ -134,13 +135,28 @@ export interface PortfolioSummary {
   unrealizedPl: number;
   unrealizedPlPct: number;
   realizedPl: number;
+  dividendIncome?: number;
   totalPl: number;
+  totalReturn?: number;
+}
+
+export interface CorporateAction {
+  id: string;
+  symbol: string;
+  exDate: string;
+  actionType: string;
+  amount?: number;
+  ratioNumerator?: number;
+  ratioDenominator?: number;
+  description?: string;
+  source?: string;
 }
 
 export interface PortfolioData {
   summary: PortfolioSummary;
   positions: PortfolioPosition[];
   transactions: PortfolioTransaction[];
+  recentActions?: CorporateAction[];
 }
 
 export interface PortfolioPerformancePoint {
@@ -149,7 +165,9 @@ export interface PortfolioPerformancePoint {
   costBasis: number;
   realizedPl: number;
   unrealizedPl: number;
+  dividendIncome?: number;
   totalPl: number;
+  totalReturn?: number;
 }
 
 export interface Alert {

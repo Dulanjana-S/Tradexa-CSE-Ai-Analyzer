@@ -114,7 +114,9 @@ def cmd_sync(args: argparse.Namespace) -> None:
     st.init()
     prov = data_service.get_provider()
     started = _utc_now()
-    run_id = st.record_job_run(job_name="sync", status="running", details={"provider": prov.name}, started_at=started)
+    run_id = getattr(args, "run_id", None) or st.record_job_run(job_name="sync", status="running", details={"provider": prov.name}, started_at=started)
+    if getattr(args, "run_id", None):
+        st.record_job_run(job_name="sync", status="running", details={"provider": prov.name}, run_id=run_id, started_at=started, finished_at=None)
     details = {"provider": prov.name, "companies": 0, "indices": {}, "announcements": 0, "price_symbols": 0, "price_rows": 0, "failed_symbols": []}
     try:
         print(f"Provider: {prov.name}")
@@ -185,7 +187,7 @@ def cmd_sync(args: argparse.Namespace) -> None:
         st.ensure_price_symbols_as_companies()
         st.set_meta("last_sync_utc", _utc_now())
         data_service.clear_runtime_cache()
-        st.record_job_run(job_name="sync", status="ok", details=details, run_id=run_id, started_at=started, finished_at=_utc_now())
+        st.record_job_run(job_name="sync", status="completed", details=details, run_id=run_id, started_at=started, finished_at=_utc_now())
         print("Sync complete.")
         if details["failed_symbols"]:
             print("Failed symbols:")
@@ -222,7 +224,9 @@ def cmd_train(args: argparse.Namespace) -> None:
     st = Storage(settings.database_url)
     st.init()
     started = _utc_now()
-    run_id = st.record_job_run(job_name="train", status="running", details={}, started_at=started)
+    run_id = getattr(args, "run_id", None) or st.record_job_run(job_name="train", status="running", details={}, started_at=started)
+    if getattr(args, "run_id", None):
+        st.record_job_run(job_name="train", status="running", details={}, run_id=run_id, started_at=started, finished_at=None)
     details = {"symbols": args.symbols or None, "horizon_days": args.horizon_days}
     try:
         res = train_from_db(database_url=settings.database_url, model_dir=settings.model_dir, symbols=[s.upper() for s in args.symbols] if args.symbols else None, horizon_days=args.horizon_days)
@@ -234,7 +238,7 @@ def cmd_train(args: argparse.Namespace) -> None:
         model_id = meta.get("model_id") or Path(res.model_path).name
         st.register_model(model_id=model_id, path=Path(res.model_path).name, meta=meta, is_active=True)
         details.update({"rows": res.rows, "symbols_count": res.symbols, "metrics": res.metrics, "model_path": str(res.model_path), "model_id": model_id})
-        st.record_job_run(job_name="train", status="ok", details=details, run_id=run_id, started_at=started, finished_at=_utc_now())
+        st.record_job_run(job_name="train", status="completed", details=details, run_id=run_id, started_at=started, finished_at=_utc_now())
         print("Training complete")
         print(f"Rows: {res.rows} | Symbols: {res.symbols}")
         print(f"Metrics: {res.metrics}")
@@ -319,7 +323,9 @@ def cmd_import_eod_zip(args: argparse.Namespace) -> None:
     if not os.path.exists(zpath):
         raise SystemExit(f"File not found: {zpath}")
     started = _utc_now()
-    run_id = st.record_job_run(job_name="import_eod_zip", status="running", details={"file": zpath}, started_at=started)
+    run_id = getattr(args, "run_id", None) or st.record_job_run(job_name="import_eod_zip", status="running", details={"file": zpath}, started_at=started)
+    if getattr(args, "run_id", None):
+        st.record_job_run(job_name="import_eod_zip", status="running", details={"file": zpath}, run_id=run_id, started_at=started, finished_at=None)
 
     total_rows = 0
     symbols = 0
@@ -360,7 +366,7 @@ def cmd_import_eod_zip(args: argparse.Namespace) -> None:
     data_service.clear_runtime_cache()
     st.record_job_run(
         job_name="import_eod_zip",
-        status="ok",
+        status="completed",
         details={"file": zpath, "symbols": symbols, "rows": total_rows, "indices": indices, "auto_companies": auto_companies},
         run_id=run_id,
         started_at=started,

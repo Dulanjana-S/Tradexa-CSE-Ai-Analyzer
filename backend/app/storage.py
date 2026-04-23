@@ -204,8 +204,23 @@ if metadata is not None:
         Column("reviewed_by", String(64), nullable=True),
         Column("reviewed_at", DateTime, nullable=True),
     )
+
+    corporate_actions_t = Table(
+        "corporate_actions",
+        metadata,
+        Column("action_id", String(128), primary_key=True),
+        Column("symbol", String(32), nullable=False, index=True),
+        Column("ex_date", String(32), nullable=False, index=True),
+        Column("action_type", String(64), nullable=False),
+        Column("amount", Float, nullable=True),
+        Column("ratio_numerator", Float, nullable=True),
+        Column("ratio_denominator", Float, nullable=True),
+        Column("description", Text, nullable=True),
+        Column("source", Text, nullable=True),
+        Column("created_at", DateTime, nullable=True),
+    )
 else:  # pragma: no cover
-    companies_t = prices_t = indices_t = announcements_t = meta_t = watchlists_t = preferences_t = job_runs_t = users_t = sessions_t = model_registry_t = alerts_t = notifications_t = portfolio_transactions_t = announcement_meta_t = None  # type: ignore
+    companies_t = prices_t = indices_t = announcements_t = meta_t = watchlists_t = preferences_t = job_runs_t = users_t = sessions_t = model_registry_t = alerts_t = notifications_t = portfolio_transactions_t = announcement_meta_t = corporate_actions_t = None  # type: ignore
 
 
 def _utc_now() -> str:
@@ -404,6 +419,19 @@ class Storage:
                         reviewed_by TEXT,
                         reviewed_at TEXT
                     );
+                    CREATE TABLE IF NOT EXISTS corporate_actions (
+                        action_id TEXT PRIMARY KEY,
+                        symbol TEXT NOT NULL,
+                        ex_date TEXT NOT NULL,
+                        action_type TEXT NOT NULL,
+                        amount REAL,
+                        ratio_numerator REAL,
+                        ratio_denominator REAL,
+                        description TEXT,
+                        source TEXT,
+                        created_at TEXT
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_corporate_actions_symbol ON corporate_actions(symbol, ex_date DESC);
                     CREATE INDEX IF NOT EXISTS idx_prices_symbol_date ON prices(symbol, date DESC);
                     CREATE INDEX IF NOT EXISTS idx_indices_name_date ON indices(name, date DESC);
                     CREATE INDEX IF NOT EXISTS idx_job_runs_job_name ON job_runs(job_name, started_at DESC);
@@ -918,11 +946,13 @@ class Storage:
         finished_at: Optional[str] = None,
     ) -> str:
         rid = run_id or f"{job_name}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+        normalized_status = str(status or "").lower()
+        terminal = normalized_status in {"completed", "failed", "ok"}
         row = {
             "run_id": rid,
             "job_name": job_name,
             "started_at": started_at or _utc_now(),
-            "finished_at": finished_at or _utc_now(),
+            "finished_at": finished_at if finished_at is not None else (_utc_now() if terminal else None),
             "status": status,
             "details": _json_dumps(details or {}),
         }
@@ -985,6 +1015,13 @@ class Storage:
             except Exception:
                 r["details"] = {"raw": r.get("details")}
         return out
+
+    def get_job_run(self, run_id: str) -> Optional[Dict[str, Any]]:
+        rows = self.list_job_runs(limit=500)
+        for row in rows:
+            if str(row.get("run_id") or row.get("id") or "") == run_id:
+                return row
+        return None
 
     # ---- Meta ----
     def set_meta(self, key: str, value: str) -> None:
@@ -1218,6 +1255,77 @@ class Storage:
             res = conn.execute(model_registry_t.update().where(model_registry_t.c.model_id == model_id).values(is_active=1))
             found = (res.rowcount or 0) > 0
         return found
+
+
+    # ---- Corporate actions ----
+    def upsert_corporate_actions(self, rows: Iterable[Dict[str, Any]]) -> int:
+        payload = []
+        for row in rows:
+            symbol = str(row.get("symbol") or "").upper().strip()
+            ex_date = str(row.get("ex_date") or "").strip()
+            action_type = str(row.get("action_type") or "").strip().lower()
+            if not symbol or not ex_date or not action_type:
+                continue
+            payload.append({
+                "action_id": str(row.get("action_id") or f"{symbol}:{ex_date}:{action_type}"),
+                "symbol": symbol,
+                "ex_date": ex_date,
+                "action_type": action_type,
+                "amount": row.get("amount"),
+                "ratio_numerator": row.get("ratio_numerator"),
+                "ratio_denominator": row.get("ratio_denominator"),
+                "description": row.get("description"),
+                "source": row.get("source"),
+                "created_at": _utc_now(),
+            })
+        if not payload:
+            return 0
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.executemany(
+                    """
+                    INSERT OR REPLACE INTO corporate_actions
+                    (action_id, symbol, ex_date, action_type, amount, ratio_numerator, ratio_denominator, description, source, created_at)
+                    VALUES (:action_id, :symbol, :ex_date, :action_type, :amount, :ratio_numerator, :ratio_denominator, :description, :source, COALESCE((SELECT created_at FROM corporate_actions WHERE action_id=:action_id), :created_at))
+                    """,
+                    payload,
+                )
+            return len(payload)
+        with self.engine().begin() as conn:
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+            stmt = pg_insert(corporate_actions_t).values(payload)
+            conn.execute(stmt.on_conflict_do_update(index_elements=[corporate_actions_t.c.action_id], set_={
+                "symbol": stmt.excluded.symbol,
+                "ex_date": stmt.excluded.ex_date,
+                "action_type": stmt.excluded.action_type,
+                "amount": stmt.excluded.amount,
+                "ratio_numerator": stmt.excluded.ratio_numerator,
+                "ratio_denominator": stmt.excluded.ratio_denominator,
+                "description": stmt.excluded.description,
+                "source": stmt.excluded.source,
+            }))
+        return len(payload)
+
+    def list_corporate_actions(self, symbol: Optional[str] = None, limit: int = 200) -> List[Dict[str, Any]]:
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                if symbol:
+                    rows = conn.execute(
+                        "SELECT action_id, symbol, ex_date, action_type, amount, ratio_numerator, ratio_denominator, description, source, created_at FROM corporate_actions WHERE symbol = ? ORDER BY ex_date DESC, action_type ASC LIMIT ?",
+                        (symbol.upper(), limit),
+                    ).fetchall()
+                else:
+                    rows = conn.execute(
+                        "SELECT action_id, symbol, ex_date, action_type, amount, ratio_numerator, ratio_denominator, description, source, created_at FROM corporate_actions ORDER BY ex_date DESC, symbol ASC LIMIT ?",
+                        (limit,),
+                    ).fetchall()
+            return [dict(r) for r in rows]
+        stmt = select(corporate_actions_t)
+        if symbol:
+            stmt = stmt.where(corporate_actions_t.c.symbol == symbol.upper())
+        stmt = stmt.order_by(corporate_actions_t.c.ex_date.desc(), corporate_actions_t.c.symbol.asc()).limit(limit)
+        with self.engine().connect() as conn:
+            return [dict(r) for r in conn.execute(stmt).mappings().all()]
 
 
     # ---- Profile / Settings helpers ----
