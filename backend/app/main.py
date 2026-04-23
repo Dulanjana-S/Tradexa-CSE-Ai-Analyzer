@@ -589,10 +589,22 @@ def api_portfolio(request: Request):
     return data_service.get_portfolio(user['username'])
 
 
+@app.get("/api/portfolio/performance")
+def api_portfolio_performance(request: Request, days: int = Query(365, ge=30, le=1825)):
+    user = require_user(request)
+    return data_service.get_portfolio_performance(user['username'], days=days)
+
+
 @app.post("/api/portfolio/transactions")
 def api_portfolio_create_transaction(request: Request, payload: Dict[str, Any] = Body(...)):
     user = require_user(request)
     return data_service.create_portfolio_transaction(user['username'], payload)
+
+
+@app.patch("/api/portfolio/transactions/{tx_id}")
+def api_portfolio_update_transaction(tx_id: str, request: Request, payload: Dict[str, Any] = Body(...)):
+    user = require_user(request)
+    return data_service.update_portfolio_transaction(user['username'], tx_id, payload)
 
 
 @app.delete("/api/portfolio/transactions/{tx_id}")

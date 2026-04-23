@@ -1440,6 +1440,49 @@ class Storage:
             conn.execute(portfolio_transactions_t.insert().values(row))
         return row
 
+    def update_portfolio_transaction(
+        self,
+        tx_id: str,
+        username: str,
+        symbol: str,
+        tx_type: str,
+        quantity: float,
+        price: float,
+        *,
+        fees: float = 0.0,
+        traded_at: Optional[str] = None,
+        notes: Optional[str] = None,
+    ) -> bool:
+        uname = username.lower()
+        values = {
+            "symbol": symbol.upper(),
+            "tx_type": tx_type.lower(),
+            "quantity": float(quantity),
+            "price": float(price),
+            "fees": float(fees or 0.0),
+            "traded_at": traded_at,
+            "notes": notes,
+        }
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                cur = conn.execute(
+                    """
+                    UPDATE portfolio_transactions
+                    SET symbol = :symbol, tx_type = :tx_type, quantity = :quantity, price = :price,
+                        fees = :fees, traded_at = :traded_at, notes = :notes
+                    WHERE tx_id = :tx_id AND username = :username
+                    """,
+                    {**values, "tx_id": tx_id, "username": uname},
+                )
+                return (cur.rowcount or 0) > 0
+        with self.engine().begin() as conn:
+            res = conn.execute(
+                portfolio_transactions_t.update()
+                .where((portfolio_transactions_t.c.tx_id == tx_id) & (portfolio_transactions_t.c.username == uname))
+                .values(**values)
+            )
+        return (res.rowcount or 0) > 0
+
     def delete_portfolio_transaction(self, tx_id: str, username: str) -> bool:
         uname = username.lower()
         if self._is_sqlite():

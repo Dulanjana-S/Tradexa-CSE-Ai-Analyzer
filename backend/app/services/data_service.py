@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
@@ -674,17 +675,22 @@ def list_portfolio_transactions(username: str) -> List[Dict[str, Any]]:
     return _storage.list_portfolio_transactions(username)
 
 
-def _portfolio_position_state(username: str) -> Dict[str, Dict[str, Any]]:
-    rows = sorted(
-        _storage.list_portfolio_transactions(username),
-        key=lambda item: (str(item.get("traded_at") or item.get("created_at") or ""), str(item.get("created_at") or "")),
+def _portfolio_sort_key(item: Dict[str, Any]) -> Tuple[str, str, str]:
+    return (
+        str(item.get("traded_at") or item.get("created_at") or ""),
+        str(item.get("created_at") or ""),
+        str(item.get("tx_id") or item.get("id") or ""),
     )
+
+
+def _portfolio_position_state_from_rows(rows: List[Dict[str, Any]], *, strict: bool = False) -> Dict[str, Dict[str, Any]]:
+    ordered = sorted(rows, key=_portfolio_sort_key)
     state: Dict[str, Dict[str, Any]] = {}
-    for tx in rows:
-        symbol = str(tx.get("symbol") or "").upper()
+    for tx in ordered:
+        symbol = str(tx.get("symbol") or "").upper().strip()
         if not symbol:
             continue
-        tx_type = str(tx.get("tx_type") or "buy").lower()
+        tx_type = str(tx.get("tx_type") or tx.get("type") or "buy").lower().strip()
         quantity = float(tx.get("quantity") or 0.0)
         price = float(tx.get("price") or 0.0)
         fees = float(tx.get("fees") or 0.0)
@@ -694,6 +700,12 @@ def _portfolio_position_state(username: str) -> Dict[str, Dict[str, Any]]:
             info["cost_total"] += quantity * price + fees
         elif tx_type == "sell":
             held_qty = float(info.get("quantity") or 0.0)
+            if strict and held_qty + 1e-9 < quantity:
+                tx_label = tx.get("traded_at") or tx.get("created_at") or "this transaction"
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Cannot sell {quantity:.4f} shares of {symbol} on {tx_label}; current holding is {held_qty:.4f}",
+                )
             avg_cost = (float(info.get("cost_total") or 0.0) / held_qty) if held_qty > 0 else 0.0
             info["realized_pl"] += quantity * (price - avg_cost) - fees
             info["quantity"] = max(0.0, held_qty - quantity)
@@ -702,9 +714,44 @@ def _portfolio_position_state(username: str) -> Dict[str, Dict[str, Any]]:
     return state
 
 
+def _portfolio_position_state(username: str) -> Dict[str, Dict[str, Any]]:
+    return _portfolio_position_state_from_rows(_storage.list_portfolio_transactions(username))
+
+
+def _validate_portfolio_transaction_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    symbol = str(payload.get("symbol") or "").upper().strip()
+    tx_type = str(payload.get("tx_type") or payload.get("type") or "buy").lower().strip()
+    quantity = _to_float(payload.get("quantity"))
+    price = _to_float(payload.get("price"))
+    fees = _to_float(payload.get("fees")) or 0.0
+    traded_at = str(payload.get("traded_at") or payload.get("date") or "").strip() or None
+    notes = str(payload.get("notes") or "").strip() or None
+    if not symbol:
+        raise HTTPException(status_code=400, detail="Symbol is required")
+    if tx_type not in {"buy", "sell"}:
+        raise HTTPException(status_code=400, detail="Transaction type must be buy or sell")
+    if quantity is None or quantity <= 0:
+        raise HTTPException(status_code=400, detail="Quantity must be greater than zero")
+    if price is None or price <= 0:
+        raise HTTPException(status_code=400, detail="Price must be greater than zero")
+    return {
+        "symbol": symbol,
+        "tx_type": tx_type,
+        "quantity": float(quantity),
+        "price": float(price),
+        "fees": float(fees),
+        "traded_at": traded_at,
+        "notes": notes,
+    }
+
+
+def _validate_portfolio_sequence(next_rows: List[Dict[str, Any]]) -> None:
+    _portfolio_position_state_from_rows(next_rows, strict=True)
+
+
 def get_portfolio(username: str) -> Dict[str, Any]:
     transactions = _storage.list_portfolio_transactions(username)
-    state = _portfolio_position_state(username)
+    state = _portfolio_position_state_from_rows(transactions)
     open_symbols = [symbol for symbol, item in state.items() if float(item.get("quantity") or 0.0) > 0]
     snapshots = {item.get("symbol"): item for item in stock_snapshots(open_symbols)} if open_symbols else {}
     positions: List[Dict[str, Any]] = []
@@ -751,36 +798,135 @@ def get_portfolio(username: str) -> Dict[str, Any]:
         "realized_pl": total_realized,
         "total_pl": (total_market_value - total_cost_basis) + total_realized,
     }
-    transactions_sorted = sorted(
-        transactions,
-        key=lambda item: (str(item.get("traded_at") or item.get("created_at") or ""), str(item.get("created_at") or "")),
-        reverse=True,
-    )
+    transactions_sorted = sorted(transactions, key=_portfolio_sort_key, reverse=True)
     return {"summary": summary, "positions": positions, "transactions": transactions_sorted}
 
 
+def get_portfolio_performance(username: str, days: int = 365) -> Dict[str, Any]:
+    transactions = _storage.list_portfolio_transactions(username)
+    if not transactions:
+        return {"days": days, "series": []}
+
+    ordered_txs = sorted(transactions, key=_portfolio_sort_key)
+    symbols = sorted({str(item.get("symbol") or "").upper() for item in ordered_txs if item.get("symbol")})
+    histories: Dict[str, Dict[str, float]] = {}
+    history_dates: List[date] = []
+    for symbol in symbols:
+        price_rows = _storage.get_price_history(symbol, limit=max(days + 40, 2000))
+        price_map: Dict[str, float] = {}
+        for row in price_rows:
+            date_key = str(row.get("date") or "")[:10]
+            close_value = _to_float(row.get("close"))
+            if date_key and close_value is not None:
+                price_map[date_key] = float(close_value)
+                history_dates.append(date.fromisoformat(date_key))
+        if price_map:
+            histories[symbol] = price_map
+
+    if not histories:
+        return {"days": days, "series": []}
+
+    tx_dates = [date.fromisoformat(str(item.get("traded_at") or item.get("created_at") or "")[:10]) for item in ordered_txs if str(item.get("traded_at") or item.get("created_at") or "")[:10]]
+    if not tx_dates:
+        return {"days": days, "series": []}
+
+    latest_history_date = max(history_dates)
+    start_date = max(min(tx_dates), latest_history_date - timedelta(days=max(days - 1, 0)))
+    market_dates = sorted({d for d in history_dates if d >= start_date})
+    if not market_dates:
+        return {"days": days, "series": []}
+
+    tx_by_date: Dict[date, List[Dict[str, Any]]] = {}
+    for tx in ordered_txs:
+        raw_day = str(tx.get("traded_at") or tx.get("created_at") or "")[:10]
+        if not raw_day:
+            continue
+        tx_day = date.fromisoformat(raw_day)
+        tx_by_date.setdefault(tx_day, []).append(tx)
+
+    positions: Dict[str, Dict[str, float]] = {}
+    last_close: Dict[str, float] = {}
+    series: List[Dict[str, Any]] = []
+    for market_day in market_dates:
+        for tx in tx_by_date.get(market_day, []):
+            symbol = str(tx.get("symbol") or "").upper().strip()
+            if not symbol:
+                continue
+            tx_type = str(tx.get("tx_type") or tx.get("type") or "buy").lower().strip()
+            quantity = float(tx.get("quantity") or 0.0)
+            price = float(tx.get("price") or 0.0)
+            fees = float(tx.get("fees") or 0.0)
+            pos = positions.setdefault(symbol, {"quantity": 0.0, "cost_total": 0.0, "realized_pl": 0.0})
+            if tx_type == "buy":
+                pos["quantity"] += quantity
+                pos["cost_total"] += quantity * price + fees
+            elif tx_type == "sell":
+                held_qty = float(pos.get("quantity") or 0.0)
+                avg_cost = (float(pos.get("cost_total") or 0.0) / held_qty) if held_qty > 0 else 0.0
+                pos["realized_pl"] += quantity * (price - avg_cost) - fees
+                pos["quantity"] = max(0.0, held_qty - quantity)
+                pos["cost_total"] = max(0.0, float(pos.get("cost_total") or 0.0) - avg_cost * quantity)
+
+        total_market_value = 0.0
+        total_cost_basis = 0.0
+        total_realized = 0.0
+        for symbol, price_map in histories.items():
+            date_key = market_day.isoformat()
+            if date_key in price_map:
+                last_close[symbol] = float(price_map[date_key])
+            pos = positions.get(symbol)
+            if not pos:
+                continue
+            quantity = float(pos.get("quantity") or 0.0)
+            if quantity <= 0:
+                total_realized += float(pos.get("realized_pl") or 0.0)
+                continue
+            close_value = float(last_close.get(symbol) or 0.0)
+            total_market_value += quantity * close_value
+            total_cost_basis += float(pos.get("cost_total") or 0.0)
+            total_realized += float(pos.get("realized_pl") or 0.0)
+        unrealized = total_market_value - total_cost_basis
+        series.append({
+            "date": market_day.isoformat(),
+            "market_value": round(total_market_value, 4),
+            "cost_basis": round(total_cost_basis, 4),
+            "realized_pl": round(total_realized, 4),
+            "unrealized_pl": round(unrealized, 4),
+            "total_pl": round(unrealized + total_realized, 4),
+        })
+    return {"days": days, "series": series}
+
+
 def create_portfolio_transaction(username: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-    symbol = str(payload.get("symbol") or "").upper().strip()
-    tx_type = str(payload.get("tx_type") or payload.get("type") or "buy").lower().strip()
-    quantity = _to_float(payload.get("quantity"))
-    price = _to_float(payload.get("price"))
-    fees = _to_float(payload.get("fees")) or 0.0
-    traded_at = str(payload.get("traded_at") or payload.get("date") or "").strip() or None
-    notes = str(payload.get("notes") or "").strip() or None
-    if not symbol:
-        raise HTTPException(status_code=400, detail="Symbol is required")
-    if tx_type not in {"buy", "sell"}:
-        raise HTTPException(status_code=400, detail="Transaction type must be buy or sell")
-    if quantity is None or quantity <= 0:
-        raise HTTPException(status_code=400, detail="Quantity must be greater than zero")
-    if price is None or price <= 0:
-        raise HTTPException(status_code=400, detail="Price must be greater than zero")
-    if tx_type == "sell":
-        state = _portfolio_position_state(username)
-        held_qty = float((state.get(symbol) or {}).get("quantity") or 0.0)
-        if held_qty + 1e-9 < float(quantity):
-            raise HTTPException(status_code=400, detail=f"Cannot sell {quantity:.4f} shares of {symbol}; current holding is {held_qty:.4f}")
-    _storage.create_portfolio_transaction(username, symbol, tx_type, float(quantity), float(price), fees=float(fees), traded_at=traded_at, notes=notes)
+    clean = _validate_portfolio_transaction_payload(payload)
+    current_rows = _storage.list_portfolio_transactions(username)
+    next_rows = list(current_rows) + [clean]
+    _validate_portfolio_sequence(next_rows)
+    _storage.create_portfolio_transaction(username, clean["symbol"], clean["tx_type"], clean["quantity"], clean["price"], fees=clean["fees"], traded_at=clean["traded_at"], notes=clean["notes"])
+    return get_portfolio(username)
+
+
+def update_portfolio_transaction(username: str, tx_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    clean = _validate_portfolio_transaction_payload(payload)
+    current_rows = _storage.list_portfolio_transactions(username)
+    found = False
+    next_rows: List[Dict[str, Any]] = []
+    for row in current_rows:
+        current_id = str(row.get("tx_id") or row.get("id") or "")
+        if current_id == tx_id:
+            found = True
+            replacement = dict(row)
+            replacement.update(clean)
+            replacement["tx_id"] = tx_id
+            next_rows.append(replacement)
+        else:
+            next_rows.append(row)
+    if not found:
+        raise HTTPException(status_code=404, detail="Portfolio transaction not found")
+    _validate_portfolio_sequence(next_rows)
+    updated = _storage.update_portfolio_transaction(tx_id, username, clean["symbol"], clean["tx_type"], clean["quantity"], clean["price"], fees=clean["fees"], traded_at=clean["traded_at"], notes=clean["notes"])
+    if not updated:
+        raise HTTPException(status_code=404, detail="Portfolio transaction not found")
     return get_portfolio(username)
 
 
@@ -788,7 +934,6 @@ def delete_portfolio_transaction(username: str, tx_id: str) -> Dict[str, Any]:
     if not _storage.delete_portfolio_transaction(tx_id, username):
         raise HTTPException(status_code=404, detail="Portfolio transaction not found")
     return get_portfolio(username)
-
 
 
 # ---- Alerts / Notifications / Announcement logic ----

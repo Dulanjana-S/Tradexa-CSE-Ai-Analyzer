@@ -111,6 +111,7 @@ class SmokeTest(unittest.TestCase):
             "/api/preferences",
             "/api/settings",
             "/api/portfolio",
+            "/api/portfolio/performance",
             "/api/alerts",
             "/api/notifications",
             "/api/signals/top",
@@ -130,6 +131,18 @@ class SmokeTest(unittest.TestCase):
         self.assertTrue((body.get("positions") or []))
         self.assertEqual((body.get("positions") or [])[0]["symbol"], self.symbol)
         tx_id = (body.get("transactions") or [])[0]["tx_id"]
+
+        resp = self.client.get("/api/portfolio/performance?days=365")
+        self.assertEqual(resp.status_code, 200, msg=resp.text)
+        self.assertTrue(isinstance(resp.json().get("series"), list))
+
+        resp = self.client.patch(
+            f"/api/portfolio/transactions/{tx_id}",
+            json={"symbol": self.symbol, "tx_type": "buy", "quantity": 120, "price": 10.0, "fees": 15, "traded_at": "2025-01-03"},
+        )
+        self.assertEqual(resp.status_code, 200, msg=resp.text)
+        updated = resp.json()
+        self.assertEqual((updated.get("transactions") or [])[0]["quantity"], 120)
 
         resp = self.client.delete(f"/api/portfolio/transactions/{tx_id}")
         self.assertEqual(resp.status_code, 200)

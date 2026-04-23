@@ -18,6 +18,7 @@ import type {
   UserSettings,
   Watchlist,
   PortfolioData,
+  PortfolioPerformancePoint,
   PortfolioPosition,
   PortfolioSummary,
   PortfolioTransaction,
@@ -145,6 +146,17 @@ function mapPortfolioData(raw: any): PortfolioData {
     summary: mapPortfolioSummary(raw?.summary || {}),
     positions: Array.isArray(raw?.positions) ? raw.positions.map(mapPortfolioPosition) : [],
     transactions: Array.isArray(raw?.transactions) ? raw.transactions.map(mapPortfolioTransaction) : [],
+  };
+}
+
+function mapPortfolioPerformancePoint(raw: any): PortfolioPerformancePoint {
+  return {
+    date: String(raw?.date || ""),
+    marketValue: num(raw?.market_value ?? raw?.marketValue),
+    costBasis: num(raw?.cost_basis ?? raw?.costBasis),
+    realizedPl: num(raw?.realized_pl ?? raw?.realizedPl),
+    unrealizedPl: num(raw?.unrealized_pl ?? raw?.unrealizedPl),
+    totalPl: num(raw?.total_pl ?? raw?.totalPl),
   };
 }
 
@@ -481,6 +493,11 @@ export const watchlistApi = {
 export const portfolioApi = {
   get: async (): Promise<PortfolioData> => mapPortfolioData(await api.get<any>("/api/portfolio")),
 
+  getPerformance: async (days = 365): Promise<PortfolioPerformancePoint[]> => {
+    const response = await api.get<any>(`/api/portfolio/performance?days=${encodeURIComponent(String(days))}`);
+    return Array.isArray(response?.series) ? response.series.map(mapPortfolioPerformancePoint) : [];
+  },
+
   addTransaction: async (payload: {
     symbol: string;
     txType: "buy" | "sell";
@@ -492,6 +509,27 @@ export const portfolioApi = {
   }): Promise<PortfolioData> =>
     mapPortfolioData(
       await api.post<any>("/api/portfolio/transactions", {
+        symbol: payload.symbol,
+        tx_type: payload.txType,
+        quantity: payload.quantity,
+        price: payload.price,
+        fees: payload.fees,
+        traded_at: payload.tradedAt,
+        notes: payload.notes,
+      })
+    ),
+
+  updateTransaction: async (transactionId: string, payload: {
+    symbol: string;
+    txType: "buy" | "sell";
+    quantity: number;
+    price: number;
+    fees?: number;
+    tradedAt?: string;
+    notes?: string;
+  }): Promise<PortfolioData> =>
+    mapPortfolioData(
+      await api.patch<any>(`/api/portfolio/transactions/${encodeURIComponent(transactionId)}`, {
         symbol: payload.symbol,
         tx_type: payload.txType,
         quantity: payload.quantity,

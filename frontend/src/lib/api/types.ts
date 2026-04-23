@@ -143,6 +143,15 @@ export interface PortfolioData {
   transactions: PortfolioTransaction[];
 }
 
+export interface PortfolioPerformancePoint {
+  date: string;
+  marketValue: number;
+  costBasis: number;
+  realizedPl: number;
+  unrealizedPl: number;
+  totalPl: number;
+}
+
 export interface Alert {
   id: string;
   username?: string;
