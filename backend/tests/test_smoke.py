@@ -173,12 +173,9 @@ class SmokeTest(unittest.TestCase):
 
     def test_portfolio_csv_import_preview(self):
         csv_payload = (
-            "Symbol,Type,Quantity,Price,Fees,Date
-"
-            f"{self.symbol},buy,10,12.50,5,2025-01-03
-"
-            f"{self.symbol},sell,2,13.25,2,2025-01-10
-"
+            "Symbol,Type,Quantity,Price,Fees,Date\n"
+            f"{self.symbol},buy,10,12.50,5,2025-01-03\n"
+            f"{self.symbol},sell,2,13.25,2,2025-01-10\n"
         )
         resp = self.client.post(
             "/api/portfolio/import/preview",

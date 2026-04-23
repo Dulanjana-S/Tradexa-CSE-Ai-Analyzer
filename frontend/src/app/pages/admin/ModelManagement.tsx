@@ -28,6 +28,10 @@ export function ModelManagement() {
 
   useEffect(() => {
     load().catch(() => setLoading(false));
+    const timer = window.setInterval(() => {
+      load().catch(() => undefined);
+    }, 5000);
+    return () => window.clearInterval(timer);
   }, []);
 
   const activateModel = async (id: string) => {

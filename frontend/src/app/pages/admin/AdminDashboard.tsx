@@ -41,6 +41,10 @@ export function AdminDashboard() {
 
   useEffect(() => {
     load().catch(() => setLoading(false));
+    const timer = window.setInterval(() => {
+      load().catch(() => undefined);
+    }, 5000);
+    return () => window.clearInterval(timer);
   }, []);
 
   const stats = useMemo(() => ({

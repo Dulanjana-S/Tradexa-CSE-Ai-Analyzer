@@ -195,6 +195,17 @@ def _uploads_dir() -> Path:
     return uploads
 
 
+def _check_admin_access(request: Request, x_admin_key: Optional[str] = None) -> Dict[str, Any]:
+    user = current_user_from_request(request)
+    if user and user.get("role") == "admin":
+        return user
+    required = settings.admin_api_key
+    provided = x_admin_key or request.headers.get("X-Admin-Key") or request.query_params.get("admin_key")
+    if required and provided == required:
+        return {"username": "api-key-admin", "role": "admin"}
+    raise HTTPException(status_code=401, detail="Admin access required")
+
+
 # ---- Pages ----
 @app.get("/", response_class=HTMLResponse)
 def page_home(request: Request):
@@ -343,7 +354,7 @@ def api_admin_status(request: Request, x_admin_key: Optional[str] = Header(defau
 @app.get("/api/admin/models")
 def api_admin_models(request: Request, x_admin_key: Optional[str] = Header(default=None)):
     _check_admin_access(request, x_admin_key)
-    return {"models": data_service.list_models(), "active_model": data_service.admin_status().get("active_model")}
+    return {"models": data_service.list_models(), "active_model": data_service.get_active_model_record()}
 
 
 @app.post("/api/admin/models/{model_id}/activate")

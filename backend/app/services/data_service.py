@@ -1099,6 +1099,95 @@ def import_portfolio_transactions(username: str, file: UploadFile) -> Dict[str, 
     return result
 
 
+
+# ---- Alerts / Notifications / Announcement logic ----
+def _ensure_notification(username: str, category: str, title: str, message: str, *, symbol: Optional[str] = None, severity: str = 'info', link: Optional[str] = None, dedupe_key: Optional[str] = None, meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    existing = _storage.list_notifications(username)
+    if dedupe_key:
+        for n in existing:
+            n_meta = n.get('meta') or {}
+            if n_meta.get('dedupe_key') == dedupe_key:
+                return n
+    payload = dict(meta or {})
+    if dedupe_key:
+        payload['dedupe_key'] = dedupe_key
+    return _storage.create_notification(username, category, title, message, symbol=symbol, severity=severity, link=link, meta=payload)
+
+
+def _latest_close_and_prev(symbol: str) -> Tuple[Optional[float], Optional[float], Optional[float]]:
+    hist = _storage.get_price_history(symbol.upper(), limit=21)
+    if not hist:
+        return None, None, None
+    latest = _to_float(hist[-1].get('close'))
+    prev = _to_float(hist[-2].get('close')) if len(hist) >= 2 else None
+    avg_vol = None
+    vols = [_to_float(r.get('volume')) for r in hist[-20:] if _to_float(r.get('volume')) is not None]
+    if vols:
+        avg_vol = sum(vols) / len(vols)
+    return latest, prev, avg_vol
+
+
+def _sync_important_announcement_notifications(username: str) -> None:
+    watched = set(_storage.list_watchlist(profile=username))
+    for a in _storage.list_alerts(username):
+        if a.get('alert_type') == 'important_announcement' and a.get('symbol'):
+            watched.add(str(a['symbol']).upper())
+    if not watched:
+        return
+    recent = announcements(None, limit=100)
+    for ann in recent:
+        sym = (ann.get('symbol') or '').upper()
+        if sym not in watched:
+            continue
+        if not ann.get('is_important'):
+            continue
+        dedupe_key = f"important-ann:{ann.get('ann_id')}:{sym}"
+        _ensure_notification(username, 'announcement', f"Important announcement for {sym}", ann.get('title') or 'Important announcement', symbol=sym, severity='warning', link=ann.get('url'), dedupe_key=dedupe_key, meta={'ann_id': ann.get('ann_id'), 'importance': ann.get('importance')})
+
+
+def evaluate_alerts(username: str) -> List[Dict[str, Any]]:
+    alerts = _storage.list_alerts(username)
+    triggered = []
+    for alert in alerts:
+        if not alert.get('is_enabled'):
+            continue
+        symbol = (alert.get('symbol') or '').upper()
+        latest, prev, avg_vol = _latest_close_and_prev(symbol) if symbol else (None, None, None)
+        fire = False
+        message = None
+        if alert.get('alert_type') == 'above_price' and latest is not None and alert.get('target_value') is not None:
+            if latest >= float(alert['target_value']):
+                fire = True
+                message = f"{symbol} moved above {float(alert['target_value']):.2f}. Latest price is {latest:.2f}."
+        elif alert.get('alert_type') == 'below_price' and latest is not None and alert.get('target_value') is not None:
+            if latest <= float(alert['target_value']):
+                fire = True
+                message = f"{symbol} moved below {float(alert['target_value']):.2f}. Latest price is {latest:.2f}."
+        elif alert.get('alert_type') == 'pct_move' and latest is not None and prev not in (None, 0) and alert.get('target_value') is not None:
+            pct = abs((latest / prev - 1.0) * 100.0)
+            if pct >= float(alert['target_value']):
+                fire = True
+                message = f"{symbol} moved {pct:.2f}% today."
+        elif alert.get('alert_type') == 'volume_spike' and symbol:
+            bar = _storage.get_latest_bar(symbol)
+            vol = _to_float((bar or {}).get('volume'))
+            multiple = float(alert.get('target_value') or 2.0)
+            if vol is not None and avg_vol not in (None, 0) and vol >= avg_vol * multiple:
+                fire = True
+                message = f"{symbol} volume spiked to {int(vol)} against a recent average of {int(avg_vol or 0)}."
+        if fire:
+            _storage.mark_alert_triggered(str(alert['alert_id']))
+            _ensure_notification(username, 'alert', f"Alert triggered for {symbol or 'market'}", message or 'Alert triggered', symbol=symbol or None, severity='info', dedupe_key=f"alert:{alert.get('alert_id')}", meta={'alert_id': alert.get('alert_id')})
+            triggered.append(alert)
+    _sync_important_announcement_notifications(username)
+    return triggered
+
+
+def list_alerts(username: str) -> List[Dict[str, Any]]:
+    evaluate_alerts(username)
+    return _storage.list_alerts(username)
+
+
 def create_alert(username: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     alert = _storage.create_alert(username, payload.get('symbol'), str(payload.get('alert_type') or 'above_price'), _to_float(payload.get('target_value')), meta=payload.get('meta') if isinstance(payload.get('meta'), dict) else {})
     return {'alert': alert, 'alerts': list_alerts(username)}

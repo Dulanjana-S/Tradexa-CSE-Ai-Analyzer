@@ -31,6 +31,10 @@ export function JobLogs() {
 
   useEffect(() => {
     adminApi.getJobs().then(setJobs).finally(() => setLoading(false));
+    const timer = window.setInterval(() => {
+      adminApi.getJobs().then(setJobs).catch(() => undefined);
+    }, 5000);
+    return () => window.clearInterval(timer);
   }, []);
 
   const filteredJobs = useMemo(() => jobs.filter((job) => {
