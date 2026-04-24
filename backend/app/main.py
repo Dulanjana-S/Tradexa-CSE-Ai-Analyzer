@@ -657,6 +657,12 @@ def api_portfolio_performance(request: Request, days: int = Query(365, ge=30, le
     return data_service.get_portfolio_performance(user['username'], days=days)
 
 
+@app.get("/api/portfolio/analytics")
+def api_portfolio_analytics(request: Request, days: int = Query(365, ge=30, le=1825)):
+    user = require_user(request)
+    return data_service.get_portfolio_analytics(user['username'], days=days)
+
+
 @app.post("/api/portfolio/transactions")
 def api_portfolio_create_transaction(request: Request, payload: Dict[str, Any] = Body(...)):
     user = require_user(request)

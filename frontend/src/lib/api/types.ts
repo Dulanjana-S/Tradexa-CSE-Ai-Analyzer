@@ -174,6 +174,92 @@ export interface PortfolioPerformancePoint {
   totalReturn?: number;
 }
 
+export interface PortfolioAnalyticsSector {
+  sector: string;
+  marketValue: number;
+  positionsCount: number;
+  weightPct: number;
+}
+
+export interface PortfolioAnalyticsMover {
+  symbol: string;
+  company: string;
+  sector?: string;
+  marketValue: number;
+  returnPct: number;
+  profit: number;
+}
+
+export interface PortfolioDiversification {
+  score: number;
+  label: string;
+  effectiveHoldings: number;
+  sectorCount: number;
+  largestPositionPct: number;
+}
+
+export interface PortfolioPerformanceBreakdown {
+  realizedPl: number;
+  unrealizedPl: number;
+  dividendIncome: number;
+  totalReturn: number;
+  realizedSharePct: number;
+  unrealizedSharePct: number;
+  dividendSharePct: number;
+}
+
+export interface PortfolioDividendPosition {
+  symbol: string;
+  company: string;
+  dividendIncome: number;
+  yieldOnPositionCostPct: number;
+}
+
+export interface PortfolioDividendSummary {
+  totalIncome: number;
+  yieldOnCostPct: number;
+  payingPositionsCount: number;
+  topPositions: PortfolioDividendPosition[];
+}
+
+export interface PortfolioRisk {
+  score: number;
+  label: string;
+  annualizedVolatilityPct: number;
+  weightedBeta: number;
+  largestPositionPct: number;
+  largestSectorPct: number;
+}
+
+export interface PortfolioBenchmarkPoint {
+  date: string;
+  portfolio?: number;
+  aspi?: number;
+  sp20?: number;
+}
+
+export interface PortfolioBenchmarkComparison {
+  periodDays: number;
+  portfolioReturnPct: number;
+  aspiReturnPct: number;
+  sp20ReturnPct: number;
+  alphaVsAspiPct: number;
+  alphaVsSp20Pct: number;
+  series: PortfolioBenchmarkPoint[];
+}
+
+export interface PortfolioAnalytics {
+  days: number;
+  sectorAllocation: PortfolioAnalyticsSector[];
+  topGainers: PortfolioAnalyticsMover[];
+  topLosers: PortfolioAnalyticsMover[];
+  diversification: PortfolioDiversification;
+  performanceBreakdown: PortfolioPerformanceBreakdown;
+  dividendSummary: PortfolioDividendSummary;
+  risk: PortfolioRisk;
+  benchmark: PortfolioBenchmarkComparison;
+}
+
 export interface Alert {
   id: string;
   username?: string;

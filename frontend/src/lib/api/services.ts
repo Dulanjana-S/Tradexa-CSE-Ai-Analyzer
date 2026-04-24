@@ -25,6 +25,7 @@ import type {
   CorporateAction,
   PortfolioSummary,
   PortfolioTransaction,
+  PortfolioAnalytics,
 } from "./types";
 
 function num(value: any, fallback = 0): number {
@@ -199,6 +200,93 @@ function mapPortfolioPerformancePoint(raw: any): PortfolioPerformancePoint {
     dividendIncome: raw?.dividend_income !== undefined ? num(raw?.dividend_income) : undefined,
     totalPl: num(raw?.total_pl ?? raw?.totalPl),
     totalReturn: raw?.total_return !== undefined ? num(raw?.total_return) : undefined,
+  };
+}
+
+function mapPortfolioAnalytics(raw: any): PortfolioAnalytics {
+  return {
+    days: num(raw?.days),
+    sectorAllocation: Array.isArray(raw?.sector_allocation)
+      ? raw.sector_allocation.map((item: any) => ({
+          sector: String(item?.sector || "Unclassified"),
+          marketValue: num(item?.market_value ?? item?.marketValue),
+          positionsCount: num(item?.positions_count ?? item?.positionsCount),
+          weightPct: num(item?.weight_pct ?? item?.weightPct),
+        }))
+      : [],
+    topGainers: Array.isArray(raw?.top_gainers)
+      ? raw.top_gainers.map((item: any) => ({
+          symbol: String(item?.symbol || ""),
+          company: String(item?.company || item?.symbol || ""),
+          sector: item?.sector || undefined,
+          marketValue: num(item?.market_value ?? item?.marketValue),
+          returnPct: num(item?.return_pct ?? item?.returnPct),
+          profit: num(item?.profit),
+        }))
+      : [],
+    topLosers: Array.isArray(raw?.top_losers)
+      ? raw.top_losers.map((item: any) => ({
+          symbol: String(item?.symbol || ""),
+          company: String(item?.company || item?.symbol || ""),
+          sector: item?.sector || undefined,
+          marketValue: num(item?.market_value ?? item?.marketValue),
+          returnPct: num(item?.return_pct ?? item?.returnPct),
+          profit: num(item?.profit),
+        }))
+      : [],
+    diversification: {
+      score: num(raw?.diversification?.score),
+      label: String(raw?.diversification?.label || "Balanced"),
+      effectiveHoldings: num(raw?.diversification?.effective_holdings ?? raw?.diversification?.effectiveHoldings),
+      sectorCount: num(raw?.diversification?.sector_count ?? raw?.diversification?.sectorCount),
+      largestPositionPct: num(raw?.diversification?.largest_position_pct ?? raw?.diversification?.largestPositionPct),
+    },
+    performanceBreakdown: {
+      realizedPl: num(raw?.performance_breakdown?.realized_pl ?? raw?.performanceBreakdown?.realizedPl),
+      unrealizedPl: num(raw?.performance_breakdown?.unrealized_pl ?? raw?.performanceBreakdown?.unrealizedPl),
+      dividendIncome: num(raw?.performance_breakdown?.dividend_income ?? raw?.performanceBreakdown?.dividendIncome),
+      totalReturn: num(raw?.performance_breakdown?.total_return ?? raw?.performanceBreakdown?.totalReturn),
+      realizedSharePct: num(raw?.performance_breakdown?.realized_share_pct ?? raw?.performanceBreakdown?.realizedSharePct),
+      unrealizedSharePct: num(raw?.performance_breakdown?.unrealized_share_pct ?? raw?.performanceBreakdown?.unrealizedSharePct),
+      dividendSharePct: num(raw?.performance_breakdown?.dividend_share_pct ?? raw?.performanceBreakdown?.dividendSharePct),
+    },
+    dividendSummary: {
+      totalIncome: num(raw?.dividend_summary?.total_income ?? raw?.dividendSummary?.totalIncome),
+      yieldOnCostPct: num(raw?.dividend_summary?.yield_on_cost_pct ?? raw?.dividendSummary?.yieldOnCostPct),
+      payingPositionsCount: num(raw?.dividend_summary?.paying_positions_count ?? raw?.dividendSummary?.payingPositionsCount),
+      topPositions: Array.isArray(raw?.dividend_summary?.top_positions)
+        ? raw.dividend_summary.top_positions.map((item: any) => ({
+            symbol: String(item?.symbol || ""),
+            company: String(item?.company || item?.symbol || ""),
+            dividendIncome: num(item?.dividend_income ?? item?.dividendIncome),
+            yieldOnPositionCostPct: num(item?.yield_on_position_cost_pct ?? item?.yieldOnPositionCostPct),
+          }))
+        : [],
+    },
+    risk: {
+      score: num(raw?.risk?.score),
+      label: String(raw?.risk?.label || "Moderate"),
+      annualizedVolatilityPct: num(raw?.risk?.annualized_volatility_pct ?? raw?.risk?.annualizedVolatilityPct),
+      weightedBeta: num(raw?.risk?.weighted_beta ?? raw?.risk?.weightedBeta, 1),
+      largestPositionPct: num(raw?.risk?.largest_position_pct ?? raw?.risk?.largestPositionPct),
+      largestSectorPct: num(raw?.risk?.largest_sector_pct ?? raw?.risk?.largestSectorPct),
+    },
+    benchmark: {
+      periodDays: num(raw?.benchmark?.period_days ?? raw?.benchmark?.periodDays),
+      portfolioReturnPct: num(raw?.benchmark?.portfolio_return_pct ?? raw?.benchmark?.portfolioReturnPct),
+      aspiReturnPct: num(raw?.benchmark?.aspi_return_pct ?? raw?.benchmark?.aspiReturnPct),
+      sp20ReturnPct: num(raw?.benchmark?.sp20_return_pct ?? raw?.benchmark?.sp20ReturnPct),
+      alphaVsAspiPct: num(raw?.benchmark?.alpha_vs_aspi_pct ?? raw?.benchmark?.alphaVsAspiPct),
+      alphaVsSp20Pct: num(raw?.benchmark?.alpha_vs_sp20_pct ?? raw?.benchmark?.alphaVsSp20Pct),
+      series: Array.isArray(raw?.benchmark?.series)
+        ? raw.benchmark.series.map((item: any) => ({
+            date: String(item?.date || ""),
+            portfolio: item?.portfolio !== undefined ? num(item?.portfolio) : undefined,
+            aspi: item?.aspi !== undefined ? num(item?.aspi) : undefined,
+            sp20: item?.sp20 !== undefined ? num(item?.sp20) : undefined,
+          }))
+        : [],
+    },
   };
 }
 
@@ -549,6 +637,9 @@ export const portfolioApi = {
     const response = await api.get<any>(`/api/portfolio/performance?days=${encodeURIComponent(String(days))}`);
     return Array.isArray(response?.series) ? response.series.map(mapPortfolioPerformancePoint) : [];
   },
+
+  getAnalytics: async (days = 365): Promise<PortfolioAnalytics> =>
+    mapPortfolioAnalytics(await api.get<any>(`/api/portfolio/analytics?days=${encodeURIComponent(String(days))}`)),
 
   addTransaction: async (payload: {
     symbol: string;

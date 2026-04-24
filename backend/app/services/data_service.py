@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import csv
 import io
+import math
+import statistics
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -1038,6 +1040,294 @@ def get_portfolio_performance(username: str, days: int = 365) -> Dict[str, Any]:
             "total_return": round(unrealized + total_realized + total_dividends, 4),
         })
     return {"days": days, "series": series}
+
+
+
+def _safe_pct(numerator: float, denominator: float) -> float:
+    if abs(denominator) < 1e-9:
+        return 0.0
+    return (numerator / denominator) * 100.0
+
+
+def _score_label(score: float, bands: Tuple[int, int] = (40, 70), labels: Tuple[str, str, str] = ("Low", "Moderate", "High")) -> str:
+    low_band, high_band = bands
+    if score < low_band:
+        return labels[0]
+    if score < high_band:
+        return labels[1]
+    return labels[2]
+
+
+def _normalized_index_series(price_map: Dict[str, float], start_date: date) -> Dict[str, float]:
+    points = []
+    for raw_date, value in price_map.items():
+        try:
+            parsed = date.fromisoformat(str(raw_date)[:10])
+        except Exception:
+            continue
+        if parsed >= start_date and value not in (None, 0):
+            points.append((parsed, float(value)))
+    points.sort(key=lambda item: item[0])
+    if not points:
+        return {}
+    base = points[0][1]
+    if abs(base) < 1e-9:
+        return {}
+    return {d.isoformat(): (v / base) * 100.0 for d, v in points}
+
+
+def _build_holdings_comparison_series(positions: List[Dict[str, Any]], days: int) -> Dict[str, Any]:
+    if not positions:
+        return {"series": [], "portfolio_return_pct": 0.0}
+
+    total_market_value = sum(float(p.get("market_value") or 0.0) for p in positions)
+    if total_market_value <= 0:
+        return {"series": [], "portfolio_return_pct": 0.0}
+
+    today = date.today()
+    start_date = today - timedelta(days=max(days - 1, 0))
+    symbol_weights: Dict[str, float] = {}
+    symbol_norms: Dict[str, Dict[str, float]] = {}
+    date_pool: set[str] = set()
+
+    for position in positions:
+        symbol = str(position.get("symbol") or "").upper().strip()
+        weight = float(position.get("market_value") or 0.0) / total_market_value if total_market_value > 0 else 0.0
+        if not symbol or weight <= 0:
+            continue
+        history = _storage.get_price_history(symbol, limit=max(days + 40, 600))
+        price_map: Dict[str, float] = {}
+        for row in history:
+            key = str(row.get("date") or "")[:10]
+            close_value = _to_float(row.get("close"))
+            if key and close_value not in (None, 0):
+                price_map[key] = float(close_value)
+        normalized = _normalized_index_series(price_map, start_date)
+        if normalized:
+            symbol_weights[symbol] = weight
+            symbol_norms[symbol] = normalized
+            date_pool.update(normalized.keys())
+
+    if not symbol_norms:
+        return {"series": [], "portfolio_return_pct": 0.0}
+
+    ordered_dates = sorted(date_pool)
+    last_seen = {symbol: next(iter(series.values())) for symbol, series in symbol_norms.items()}
+    portfolio_series: List[Dict[str, Any]] = []
+    for day_key in ordered_dates:
+        total = 0.0
+        active_weight = 0.0
+        for symbol, weight in symbol_weights.items():
+            series = symbol_norms.get(symbol) or {}
+            if day_key in series:
+                last_seen[symbol] = float(series[day_key])
+            if symbol in last_seen:
+                total += weight * float(last_seen[symbol])
+                active_weight += weight
+        if active_weight > 0:
+            portfolio_series.append({"date": day_key, "portfolio": round(total / active_weight, 4)})
+
+    portfolio_return = 0.0
+    if len(portfolio_series) >= 2:
+        first_value = float(portfolio_series[0]["portfolio"] or 0.0)
+        last_value = float(portfolio_series[-1]["portfolio"] or 0.0)
+        portfolio_return = _safe_pct(last_value - first_value, first_value)
+
+    return {"series": portfolio_series, "portfolio_return_pct": round(portfolio_return, 2)}
+
+
+def _benchmark_series(name: str, start_date: date, days: int) -> Dict[str, Any]:
+    rows = _storage.get_index_series(name, limit=max(days + 40, 800))
+    price_map: Dict[str, float] = {}
+    for row in rows:
+        key = str(row.get("date") or "")[:10]
+        value = _to_float(row.get("value"))
+        if key and value not in (None, 0):
+            price_map[key] = float(value)
+    normalized = _normalized_index_series(price_map, start_date)
+    ordered = [{"date": key, "value": round(float(value), 4)} for key, value in sorted(normalized.items())]
+    ret = 0.0
+    if len(ordered) >= 2:
+        ret = _safe_pct(ordered[-1]["value"] - ordered[0]["value"], ordered[0]["value"])
+    return {"name": name, "series": ordered, "return_pct": round(ret, 2)}
+
+
+def _merge_benchmark_lines(portfolio_series: List[Dict[str, Any]], benchmarks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    date_map: Dict[str, Dict[str, Any]] = {}
+    for point in portfolio_series:
+        key = str(point.get("date") or "")[:10]
+        if not key:
+            continue
+        date_map.setdefault(key, {"date": key})["portfolio"] = point.get("portfolio")
+    for benchmark in benchmarks:
+        field_name = "aspi" if benchmark.get("name") == "ASPI" else "sp20"
+        for point in benchmark.get("series") or []:
+            key = str(point.get("date") or "")[:10]
+            if not key:
+                continue
+            date_map.setdefault(key, {"date": key})[field_name] = point.get("value")
+    merged = [date_map[key] for key in sorted(date_map)]
+    return merged
+
+
+def get_portfolio_analytics(username: str, days: int = 365) -> Dict[str, Any]:
+    portfolio = get_portfolio(username)
+    positions = portfolio.get("positions") or []
+    summary = portfolio.get("summary") or {}
+
+    total_market_value = float(summary.get("market_value") or 0.0)
+    total_cost_basis = float(summary.get("cost_basis") or 0.0)
+    total_unrealized = float(summary.get("unrealized_pl") or 0.0)
+    total_realized = float(summary.get("realized_pl") or 0.0)
+    total_dividends = float(summary.get("dividend_income") or 0.0)
+    total_return = float(summary.get("total_return") or (total_unrealized + total_realized + total_dividends))
+
+    sector_map: Dict[str, Dict[str, Any]] = {}
+    for position in positions:
+        sector = str(position.get("sector") or "Unclassified").strip() or "Unclassified"
+        entry = sector_map.setdefault(sector, {"sector": sector, "market_value": 0.0, "positions_count": 0})
+        entry["market_value"] += float(position.get("market_value") or 0.0)
+        entry["positions_count"] += 1
+    sector_allocation = []
+    for entry in sorted(sector_map.values(), key=lambda item: float(item.get("market_value") or 0.0), reverse=True):
+        mv = float(entry.get("market_value") or 0.0)
+        sector_allocation.append({
+            **entry,
+            "market_value": round(mv, 2),
+            "weight_pct": round(_safe_pct(mv, total_market_value), 2),
+        })
+
+    positions_sorted = sorted(positions, key=lambda item: float(item.get("unrealized_pl_pct") or 0.0), reverse=True)
+    top_gainers = []
+    top_losers = []
+    for item in positions_sorted[:5]:
+        top_gainers.append({
+            "symbol": item.get("symbol"),
+            "company": item.get("company"),
+            "sector": item.get("sector"),
+            "market_value": round(float(item.get("market_value") or 0.0), 2),
+            "return_pct": round(float(item.get("unrealized_pl_pct") or 0.0), 2),
+            "profit": round(float(item.get("unrealized_pl") or 0.0), 2),
+        })
+    for item in sorted(positions, key=lambda row: float(row.get("unrealized_pl_pct") or 0.0))[:5]:
+        top_losers.append({
+            "symbol": item.get("symbol"),
+            "company": item.get("company"),
+            "sector": item.get("sector"),
+            "market_value": round(float(item.get("market_value") or 0.0), 2),
+            "return_pct": round(float(item.get("unrealized_pl_pct") or 0.0), 2),
+            "profit": round(float(item.get("unrealized_pl") or 0.0), 2),
+        })
+
+    weights = [float(item.get("weight_pct") or 0.0) / 100.0 for item in positions if float(item.get("market_value") or 0.0) > 0]
+    hhi = sum(weight * weight for weight in weights)
+    effective_holdings = (1.0 / hhi) if hhi > 1e-9 else 0.0
+    sector_weights = [float(item.get("weight_pct") or 0.0) / 100.0 for item in sector_allocation if float(item.get("weight_pct") or 0.0) > 0]
+    sector_hhi = sum(weight * weight for weight in sector_weights)
+    largest_position_pct = max((float(item.get("weight_pct") or 0.0) for item in positions), default=0.0)
+    effective_score = min(1.0, effective_holdings / 8.0)
+    sector_score = min(1.0, len(sector_allocation) / 5.0)
+    concentration_score = max(0.0, min(1.0, 1.0 - ((largest_position_pct / 100.0 - 0.1) / 0.45)))
+    diversification_score = round(max(0.0, min(100.0, 100.0 * (0.45 * effective_score + 0.25 * sector_score + 0.30 * concentration_score))))
+    diversification = {
+        "score": diversification_score,
+        "label": _score_label(diversification_score, bands=(45, 75), labels=("Concentrated", "Balanced", "Well diversified")),
+        "effective_holdings": round(effective_holdings, 2),
+        "sector_count": len(sector_allocation),
+        "largest_position_pct": round(largest_position_pct, 2),
+        "position_concentration_hhi": round(hhi, 4),
+        "sector_concentration_hhi": round(sector_hhi, 4),
+    }
+
+    contribution_denominator = abs(total_realized) + abs(total_unrealized) + abs(total_dividends)
+    performance_breakdown = {
+        "realized_pl": round(total_realized, 2),
+        "unrealized_pl": round(total_unrealized, 2),
+        "dividend_income": round(total_dividends, 2),
+        "total_return": round(total_return, 2),
+        "realized_share_pct": round(_safe_pct(abs(total_realized), contribution_denominator), 2) if contribution_denominator > 0 else 0.0,
+        "unrealized_share_pct": round(_safe_pct(abs(total_unrealized), contribution_denominator), 2) if contribution_denominator > 0 else 0.0,
+        "dividend_share_pct": round(_safe_pct(abs(total_dividends), contribution_denominator), 2) if contribution_denominator > 0 else 0.0,
+    }
+
+    dividend_positions = [item for item in positions if float(item.get("dividend_income") or 0.0) > 0]
+    dividend_summary = {
+        "total_income": round(total_dividends, 2),
+        "yield_on_cost_pct": round(_safe_pct(total_dividends, total_cost_basis), 2),
+        "paying_positions_count": len(dividend_positions),
+        "top_positions": [
+            {
+                "symbol": item.get("symbol"),
+                "company": item.get("company"),
+                "dividend_income": round(float(item.get("dividend_income") or 0.0), 2),
+                "yield_on_position_cost_pct": round(_safe_pct(float(item.get("dividend_income") or 0.0), float(item.get("cost_basis") or 0.0)), 2),
+            }
+            for item in sorted(dividend_positions, key=lambda row: float(row.get("dividend_income") or 0.0), reverse=True)[:5]
+        ],
+    }
+
+    comparison = _build_holdings_comparison_series(positions, days)
+    today = date.today()
+    start_date = today - timedelta(days=max(days - 1, 0))
+    aspi = _benchmark_series("ASPI", start_date, days)
+    sp20 = _benchmark_series("S&P SL20", start_date, days)
+    merged_bench = _merge_benchmark_lines(comparison.get("series") or [], [aspi, sp20])
+
+    portfolio_line = [float(item.get("portfolio") or 0.0) for item in merged_bench if item.get("portfolio") is not None]
+    daily_returns = []
+    for prev, curr in zip(portfolio_line, portfolio_line[1:]):
+        if prev not in (None, 0):
+            daily_returns.append((curr / prev) - 1.0)
+    annualized_vol_pct = 0.0
+    if len(daily_returns) >= 2:
+        try:
+            annualized_vol_pct = statistics.stdev(daily_returns) * math.sqrt(252) * 100.0
+        except statistics.StatisticsError:
+            annualized_vol_pct = 0.0
+
+    beta_values = []
+    for position in positions:
+        company = _storage.get_company(str(position.get("symbol") or "")) or {}
+        beta = _to_float(company.get("beta"))
+        if beta is not None:
+            beta_values.append((float(position.get("weight_pct") or 0.0) / 100.0, beta))
+    weighted_beta = sum(weight * beta for weight, beta in beta_values) if beta_values else 1.0
+    largest_sector_pct = max((float(item.get("weight_pct") or 0.0) for item in sector_allocation), default=0.0)
+    beta_component = min(1.0, max(0.0, (weighted_beta - 0.8) / 0.8))
+    concentration_component = min(1.0, largest_position_pct / 35.0)
+    sector_component = min(1.0, largest_sector_pct / 50.0)
+    vol_component = min(1.0, annualized_vol_pct / 35.0)
+    risk_score = round(max(0.0, min(100.0, 100.0 * (0.30 * concentration_component + 0.25 * sector_component + 0.30 * vol_component + 0.15 * beta_component))))
+    risk = {
+        "score": risk_score,
+        "label": _score_label(risk_score),
+        "annualized_volatility_pct": round(annualized_vol_pct, 2),
+        "weighted_beta": round(weighted_beta, 2),
+        "largest_position_pct": round(largest_position_pct, 2),
+        "largest_sector_pct": round(largest_sector_pct, 2),
+    }
+
+    benchmark = {
+        "period_days": days,
+        "portfolio_return_pct": round(float(comparison.get("portfolio_return_pct") or 0.0), 2),
+        "aspi_return_pct": round(float(aspi.get("return_pct") or 0.0), 2),
+        "sp20_return_pct": round(float(sp20.get("return_pct") or 0.0), 2),
+        "alpha_vs_aspi_pct": round(float(comparison.get("portfolio_return_pct") or 0.0) - float(aspi.get("return_pct") or 0.0), 2),
+        "alpha_vs_sp20_pct": round(float(comparison.get("portfolio_return_pct") or 0.0) - float(sp20.get("return_pct") or 0.0), 2),
+        "series": merged_bench,
+    }
+
+    return {
+        "days": days,
+        "sector_allocation": sector_allocation,
+        "top_gainers": top_gainers,
+        "top_losers": top_losers,
+        "diversification": diversification,
+        "performance_breakdown": performance_breakdown,
+        "dividend_summary": dividend_summary,
+        "risk": risk,
+        "benchmark": benchmark,
+    }
 
 
 def create_portfolio_transaction(username: str, payload: Dict[str, Any]) -> Dict[str, Any]:

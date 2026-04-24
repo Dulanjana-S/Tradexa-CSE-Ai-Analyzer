@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { marketApi, portfolioApi, watchlistApi } from "../../lib/api/services";
-import type { PortfolioData, PortfolioPerformancePoint, PortfolioTransaction, Stock, Watchlist } from "../../lib/api/types";
+import type { PortfolioAnalytics, PortfolioData, PortfolioPerformancePoint, PortfolioTransaction, Stock, Watchlist } from "../../lib/api/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -11,7 +11,7 @@ import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Textarea } from "../components/ui/textarea";
-import { BriefcaseBusiness, FileUp, Landmark, Loader2, Pencil, Plus, ShoppingBag, Trash2, TrendingDown, TrendingUp } from "lucide-react";
+import { BarChart3, BriefcaseBusiness, FileUp, Landmark, Loader2, Pencil, PieChart, Plus, ShieldAlert, ShoppingBag, Trash2, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 
 const emptyPortfolio: PortfolioData = {
   summary: {
@@ -30,6 +30,18 @@ const emptyPortfolio: PortfolioData = {
 };
 
 const emptyWatchlist: Watchlist = { symbols: [], items: [] };
+
+const emptyAnalytics: PortfolioAnalytics = {
+  days: 365,
+  sectorAllocation: [],
+  topGainers: [],
+  topLosers: [],
+  diversification: { score: 0, label: "Concentrated", effectiveHoldings: 0, sectorCount: 0, largestPositionPct: 0 },
+  performanceBreakdown: { realizedPl: 0, unrealizedPl: 0, dividendIncome: 0, totalReturn: 0, realizedSharePct: 0, unrealizedSharePct: 0, dividendSharePct: 0 },
+  dividendSummary: { totalIncome: 0, yieldOnCostPct: 0, payingPositionsCount: 0, topPositions: [] },
+  risk: { score: 0, label: "Low", annualizedVolatilityPct: 0, weightedBeta: 1, largestPositionPct: 0, largestSectorPct: 0 },
+  benchmark: { periodDays: 365, portfolioReturnPct: 0, aspiReturnPct: 0, sp20ReturnPct: 0, alphaVsAspiPct: 0, alphaVsSp20Pct: 0, series: [] },
+};
 
 const defaultForm = () => ({
   symbol: "",
@@ -60,8 +72,10 @@ export function Portfolio() {
   const [portfolio, setPortfolio] = useState<PortfolioData>(emptyPortfolio);
   const [watchlist, setWatchlist] = useState<Watchlist>(emptyWatchlist);
   const [performance, setPerformance] = useState<PortfolioPerformancePoint[]>([]);
+  const [analytics, setAnalytics] = useState<PortfolioAnalytics>(emptyAnalytics);
   const [loading, setLoading] = useState(true);
   const [chartLoading, setChartLoading] = useState(true);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -92,12 +106,22 @@ export function Portfolio() {
     }
   };
 
+  const loadAnalytics = async (days: number) => {
+    setAnalyticsLoading(true);
+    try {
+      const payload = await portfolioApi.getAnalytics(days);
+      setAnalytics(payload);
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    Promise.all([loadPortfolio(), loadPerformance(chartDays)]).finally(() => setLoading(false));
+    Promise.all([loadPortfolio(), loadPerformance(chartDays), loadAnalytics(chartDays)]).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    loadPerformance(chartDays).catch(() => setPerformance([]));
+    Promise.all([loadPerformance(chartDays).catch(() => setPerformance([])), loadAnalytics(chartDays).catch(() => setAnalytics(emptyAnalytics))]);
   }, [chartDays]);
 
   useEffect(() => {
@@ -142,6 +166,11 @@ export function Portfolio() {
   const chartData = useMemo(
     () => performance.map((point) => ({ ...point, label: compactDate(point.date) })),
     [performance]
+  );
+
+  const benchmarkChartData = useMemo(
+    () => (analytics.benchmark.series || []).map((point) => ({ ...point, label: compactDate(point.date) })),
+    [analytics]
   );
 
   const resetDialog = () => {
@@ -194,7 +223,7 @@ export function Portfolio() {
       };
       const updated = editingId ? await portfolioApi.updateTransaction(editingId, payload) : await portfolioApi.addTransaction(payload);
       setPortfolio(updated);
-      await Promise.all([loadPerformance(chartDays), watchlistApi.get().then(setWatchlist)]);
+      await Promise.all([loadPerformance(chartDays), loadAnalytics(chartDays), watchlistApi.get().then(setWatchlist)]);
       resetDialog();
     } catch (err: any) {
       setError(err?.message || "Could not save portfolio transaction");
@@ -206,7 +235,7 @@ export function Portfolio() {
   const deleteTransaction = async (transactionId: string) => {
     const updated = await portfolioApi.deleteTransaction(transactionId);
     setPortfolio(updated);
-    await loadPerformance(chartDays);
+    await Promise.all([loadPerformance(chartDays), loadAnalytics(chartDays)]);
   };
 
   const previewCsvImport = async (file: File) => {
@@ -227,7 +256,7 @@ export function Portfolio() {
     try {
       const updated = await portfolioApi.importTransactions(csvFile);
       setPortfolio(updated);
-      await loadPerformance(chartDays);
+      await Promise.all([loadPerformance(chartDays), loadAnalytics(chartDays)]);
       setCsvFile(null);
       setCsvPreview(null);
     } catch (err: any) {
@@ -349,6 +378,116 @@ export function Portfolio() {
           <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className={`flex h-10 w-10 items-center justify-center rounded-md ${portfolio.summary.realizedPl >= 0 ? "bg-amber-500/10" : "bg-red-500/10"}`}>{portfolio.summary.realizedPl >= 0 ? <TrendingUp className="h-5 w-5 text-amber-500" /> : <TrendingDown className="h-5 w-5 text-red-500" />}</div><div><p className="text-[13px] text-[#768390]">Realized P/L</p><p className={`text-[24px] font-bold ${portfolio.summary.realizedPl >= 0 ? "text-amber-400" : "text-red-400"}`}>{money(portfolio.summary.realizedPl)}</p><p className="text-[12px] text-[#768390]">{portfolio.summary.positionsCount} open positions</p></div></div></CardContent></Card>
         </div>
 
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-cyan-500/10"><PieChart className="h-5 w-5 text-cyan-400" /></div><div><p className="text-[13px] text-[#768390]">Diversification</p><p className="text-[24px] font-bold text-[#e6edf3]">{analytics.diversification.score}/100</p><p className="text-[12px] text-[#768390]">{analytics.diversification.label} · {analytics.diversification.sectorCount} sectors</p></div></div></CardContent></Card>
+          <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-rose-500/10"><ShieldAlert className="h-5 w-5 text-rose-400" /></div><div><p className="text-[13px] text-[#768390]">Portfolio risk</p><p className="text-[24px] font-bold text-[#e6edf3]">{analytics.risk.score}/100</p><p className="text-[12px] text-[#768390]">{analytics.risk.label} · Vol {analytics.risk.annualizedVolatilityPct.toFixed(1)}%</p></div></div></CardContent></Card>
+          <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-amber-500/10"><Wallet className="h-5 w-5 text-amber-400" /></div><div><p className="text-[13px] text-[#768390]">Dividend income</p><p className="text-[24px] font-bold text-[#e6edf3]">{money(analytics.dividendSummary.totalIncome)}</p><p className="text-[12px] text-[#768390]">Yield on cost {signedPercent(analytics.dividendSummary.yieldOnCostPct)}</p></div></div></CardContent></Card>
+          <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-indigo-500/10"><BarChart3 className="h-5 w-5 text-indigo-400" /></div><div><p className="text-[13px] text-[#768390]">Vs ASPI</p><p className={`text-[24px] font-bold ${analytics.benchmark.alphaVsAspiPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>{signedPercent(analytics.benchmark.alphaVsAspiPct)}</p><p className="text-[12px] text-[#768390]">{chartDays >= 365 ? `${chartDays / 365}Y` : `${chartDays}D`} alpha</p></div></div></CardContent></Card>
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-3">
+          <Card className="border-[#30363d] bg-[#161b22]">
+            <CardHeader>
+              <CardTitle className="text-[18px] text-[#e6edf3]">Sector allocation</CardTitle>
+              <CardDescription className="text-[13px] text-[#768390]">How your current holdings are distributed across sectors.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {(analytics.sectorAllocation || []).length ? analytics.sectorAllocation.map((item) => (
+                <div key={item.sector} className="space-y-2">
+                  <div className="flex items-center justify-between gap-3 text-[13px]">
+                    <div>
+                      <div className="font-medium text-[#e6edf3]">{item.sector}</div>
+                      <div className="text-[#768390]">{item.positionsCount} holding{item.positionsCount === 1 ? "" : "s"}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium text-[#e6edf3]">{item.weightPct.toFixed(1)}%</div>
+                      <div className="text-[#768390]">{money(item.marketValue)}</div>
+                    </div>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-[#0d1117]"><div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.min(100, item.weightPct)}%` }} /></div>
+                </div>
+              )) : <p className="text-[13px] text-[#768390]">Add positions to see sector allocation.</p>}
+            </CardContent>
+          </Card>
+
+          <Card className="border-[#30363d] bg-[#161b22]">
+            <CardHeader>
+              <CardTitle className="text-[18px] text-[#e6edf3]">Top gainers and losers</CardTitle>
+              <CardDescription className="text-[13px] text-[#768390]">Best and weakest current holdings by unrealized return.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="space-y-3">
+                <div className="text-[13px] font-semibold uppercase tracking-wide text-emerald-400">Top gainers</div>
+                {(analytics.topGainers || []).length ? analytics.topGainers.map((item) => (
+                  <div key={`g-${item.symbol}`} className="flex items-center justify-between gap-3 rounded-lg border border-[#30363d] bg-[#0d1117] p-3">
+                    <div>
+                      <div className="font-medium text-[#e6edf3]">{item.symbol}</div>
+                      <div className="text-[12px] text-[#768390]">{item.company}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium text-emerald-400">{signedPercent(item.returnPct)}</div>
+                      <div className="text-[12px] text-[#768390]">{money(item.profit)}</div>
+                    </div>
+                  </div>
+                )) : <p className="text-[13px] text-[#768390]">No gainers yet.</p>}
+              </div>
+              <div className="space-y-3">
+                <div className="text-[13px] font-semibold uppercase tracking-wide text-red-400">Top losers</div>
+                {(analytics.topLosers || []).length ? analytics.topLosers.map((item) => (
+                  <div key={`l-${item.symbol}`} className="flex items-center justify-between gap-3 rounded-lg border border-[#30363d] bg-[#0d1117] p-3">
+                    <div>
+                      <div className="font-medium text-[#e6edf3]">{item.symbol}</div>
+                      <div className="text-[12px] text-[#768390]">{item.company}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium text-red-400">{signedPercent(item.returnPct)}</div>
+                      <div className="text-[12px] text-[#768390]">{money(item.profit)}</div>
+                    </div>
+                  </div>
+                )) : <p className="text-[13px] text-[#768390]">No losers yet.</p>}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-[#30363d] bg-[#161b22]">
+            <CardHeader>
+              <CardTitle className="text-[18px] text-[#e6edf3]">Performance and income mix</CardTitle>
+              <CardDescription className="text-[13px] text-[#768390]">Break down realized profits, unrealized gains, and dividend income.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {[
+                { label: "Unrealized", value: analytics.performanceBreakdown.unrealizedPl, pct: analytics.performanceBreakdown.unrealizedSharePct, tone: analytics.performanceBreakdown.unrealizedPl >= 0 ? "bg-emerald-500" : "bg-red-500" },
+                { label: "Realized", value: analytics.performanceBreakdown.realizedPl, pct: analytics.performanceBreakdown.realizedSharePct, tone: analytics.performanceBreakdown.realizedPl >= 0 ? "bg-amber-500" : "bg-red-500" },
+                { label: "Dividends", value: analytics.performanceBreakdown.dividendIncome, pct: analytics.performanceBreakdown.dividendSharePct, tone: "bg-blue-500" },
+              ].map((item) => (
+                <div key={item.label} className="space-y-2">
+                  <div className="flex items-center justify-between text-[13px]">
+                    <span className="font-medium text-[#e6edf3]">{item.label}</span>
+                    <span className="text-[#768390]">{money(item.value)} · {item.pct.toFixed(1)}%</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-[#0d1117]"><div className={`h-full rounded-full ${item.tone}`} style={{ width: `${Math.min(100, item.pct)}%` }} /></div>
+                </div>
+              ))}
+              <div className="rounded-lg border border-[#30363d] bg-[#0d1117] p-4 text-[13px]">
+                <div className="flex items-center justify-between"><span className="text-[#768390]">Total return</span><span className={analytics.performanceBreakdown.totalReturn >= 0 ? "font-semibold text-emerald-400" : "font-semibold text-red-400"}>{money(analytics.performanceBreakdown.totalReturn)}</span></div>
+                <div className="mt-3 flex items-center justify-between"><span className="text-[#768390]">Dividend-paying positions</span><span className="font-medium text-[#e6edf3]">{analytics.dividendSummary.payingPositionsCount}</span></div>
+                <div className="mt-2 flex items-center justify-between"><span className="text-[#768390]">Yield on cost</span><span className="font-medium text-[#e6edf3]">{signedPercent(analytics.dividendSummary.yieldOnCostPct)}</span></div>
+              </div>
+              {(analytics.dividendSummary.topPositions || []).length ? (
+                <div className="space-y-2">
+                  <div className="text-[13px] font-semibold text-[#e6edf3]">Top dividend contributors</div>
+                  {analytics.dividendSummary.topPositions.map((item) => (
+                    <div key={item.symbol} className="flex items-center justify-between text-[13px]">
+                      <span className="text-[#768390]">{item.symbol}</span>
+                      <span className="text-[#e6edf3]">{money(item.dividendIncome)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+        </div>
+
         <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
           <Card className="border-[#30363d] bg-[#161b22]">
             <CardHeader className="flex flex-col gap-4 border-b border-[#30363d] sm:flex-row sm:items-center sm:justify-between">
@@ -388,6 +527,52 @@ export function Portfolio() {
                       <Area type="monotone" dataKey="marketValue" stroke="#2563eb" fill="url(#portfolioMarketValue)" strokeWidth={2.5} />
                       <Area type="monotone" dataKey="costBasis" stroke="#f59e0b" fillOpacity={0} strokeWidth={2} />
                     </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-[#30363d] bg-[#161b22]">
+            <CardHeader>
+              <CardTitle className="text-[18px] text-[#e6edf3]">Benchmark comparison</CardTitle>
+              <CardDescription className="text-[13px] text-[#768390]">Current holdings basket compared against ASPI and S&P SL20 on a normalized 100-base chart.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 p-6">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border border-[#30363d] bg-[#0d1117] p-3">
+                  <div className="text-[12px] text-[#768390]">Portfolio</div>
+                  <div className={`text-[18px] font-semibold ${analytics.benchmark.portfolioReturnPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>{signedPercent(analytics.benchmark.portfolioReturnPct)}</div>
+                </div>
+                <div className="rounded-lg border border-[#30363d] bg-[#0d1117] p-3">
+                  <div className="text-[12px] text-[#768390]">ASPI</div>
+                  <div className={`text-[18px] font-semibold ${analytics.benchmark.aspiReturnPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>{signedPercent(analytics.benchmark.aspiReturnPct)}</div>
+                </div>
+                <div className="rounded-lg border border-[#30363d] bg-[#0d1117] p-3">
+                  <div className="text-[12px] text-[#768390]">S&P SL20</div>
+                  <div className={`text-[18px] font-semibold ${analytics.benchmark.sp20ReturnPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>{signedPercent(analytics.benchmark.sp20ReturnPct)}</div>
+                </div>
+              </div>
+              {analyticsLoading ? (
+                <div className="flex h-[260px] items-center justify-center text-[#768390]"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading benchmark comparison...</div>
+              ) : benchmarkChartData.length === 0 ? (
+                <div className="flex h-[260px] items-center justify-center text-center text-[#768390]">Add positions with price history to compare against the market benchmarks.</div>
+              ) : (
+                <div className="h-[260px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={benchmarkChartData} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
+                      <CartesianGrid stroke="#30363d" vertical={false} strokeDasharray="3 3" />
+                      <XAxis dataKey="label" tick={{ fill: "#768390", fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={24} />
+                      <YAxis tick={{ fill: "#768390", fontSize: 11 }} axisLine={false} tickLine={false} width={62} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "#0d1117", border: "1px solid #30363d", borderRadius: 12, color: "#e6edf3" }}
+                        formatter={(value: number, name: string) => [Number(value).toFixed(2), name === "portfolio" ? "Portfolio" : name === "aspi" ? "ASPI" : "S&P SL20"]}
+                        labelFormatter={(_, payload) => payload?.[0]?.payload?.label || ""}
+                      />
+                      <Line type="monotone" dataKey="portfolio" stroke="#60a5fa" strokeWidth={2.5} dot={false} />
+                      <Line type="monotone" dataKey="aspi" stroke="#f59e0b" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="sp20" stroke="#10b981" strokeWidth={2} dot={false} />
+                    </LineChart>
                   </ResponsiveContainer>
                 </div>
               )}

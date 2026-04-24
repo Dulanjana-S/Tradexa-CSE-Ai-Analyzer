@@ -112,6 +112,7 @@ class SmokeTest(unittest.TestCase):
             "/api/settings",
             "/api/portfolio",
             "/api/portfolio/performance",
+            "/api/portfolio/analytics",
             "/api/alerts",
             "/api/notifications",
             "/api/signals/top",
