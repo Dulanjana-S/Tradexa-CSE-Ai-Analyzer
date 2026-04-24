@@ -489,6 +489,59 @@ def announcements(symbol: Optional[str], limit: int) -> List[Dict[str, Any]]:
     return _cache.get_or_set(("announcements", prov.name, sym, limit), _factory)
 
 
+
+
+def _official_cse_profile_url(symbol: str) -> str:
+    return f"https://www.cse.lk/pages/company-profile/company-profile.component.html?symbol={(symbol or '').upper()}"
+
+
+def stock_resources(symbol: str) -> Dict[str, Any]:
+    sym = (symbol or '').upper()
+    docs = []
+    for ann in announcements(sym, 120):
+        title = str(ann.get('title') or '')
+        url = ann.get('url')
+        if not url:
+            continue
+        title_l = title.lower()
+        report_type = None
+        if 'annual report' in title_l:
+            report_type = 'annual_report'
+        elif any(token in title_l for token in ('quarter', 'quarterly', 'interim', 'financial statement', 'financial statements')):
+            report_type = 'quarterly_earnings'
+        elif any(token in title_l for token in ('dividend', 'split', 'bonus', 'rights')):
+            report_type = 'corporate_action'
+        if report_type:
+            docs.append({
+                'id': ann.get('ann_id') or ann.get('id') or title,
+                'title': title,
+                'date': ann.get('date'),
+                'url': url,
+                'category': ann.get('category'),
+                'report_type': report_type,
+            })
+    seen = set()
+    unique_docs = []
+    for doc in docs:
+        key = (doc.get('title'), doc.get('url'))
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_docs.append(doc)
+    annual_reports = [d for d in unique_docs if d.get('report_type') == 'annual_report'][:8]
+    quarterly_reports = [d for d in unique_docs if d.get('report_type') == 'quarterly_earnings'][:12]
+    corporate_docs = [d for d in unique_docs if d.get('report_type') == 'corporate_action'][:12]
+    return {
+        'symbol': sym,
+        'official_profile_url': _official_cse_profile_url(sym),
+        'official_announcements': [
+            {'id': ann.get('ann_id') or ann.get('id') or ann.get('title'), 'title': ann.get('title'), 'date': ann.get('date'), 'url': ann.get('url'), 'category': ann.get('category')}
+            for ann in announcements(sym, 25) if ann.get('url')
+        ],
+        'annual_reports': annual_reports,
+        'quarterly_reports': quarterly_reports,
+        'corporate_documents': corporate_docs,
+    }
 def prediction(symbol: str) -> Dict[str, Any]:
     hist = stock_history(symbol, days=320)
     if len(hist) < 120 or hist[-1].get("close") is None:

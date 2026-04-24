@@ -136,6 +136,16 @@ if metadata is not None:
         Column("expires_at", DateTime, nullable=True),
     )
 
+    password_reset_tokens_t = Table(
+        "password_reset_tokens",
+        metadata,
+        Column("token", String(128), primary_key=True),
+        Column("username", String(64), nullable=False),
+        Column("created_at", DateTime, nullable=True),
+        Column("expires_at", DateTime, nullable=True),
+        Column("used_at", DateTime, nullable=True),
+    )
+
     model_registry_t = Table(
         "model_registry",
         metadata,
@@ -220,7 +230,7 @@ if metadata is not None:
         Column("created_at", DateTime, nullable=True),
     )
 else:  # pragma: no cover
-    companies_t = prices_t = indices_t = announcements_t = meta_t = watchlists_t = preferences_t = job_runs_t = users_t = sessions_t = model_registry_t = alerts_t = notifications_t = portfolio_transactions_t = announcement_meta_t = corporate_actions_t = None  # type: ignore
+    companies_t = prices_t = indices_t = announcements_t = meta_t = watchlists_t = preferences_t = job_runs_t = users_t = sessions_t = password_reset_tokens_t = model_registry_t = alerts_t = notifications_t = portfolio_transactions_t = announcement_meta_t = corporate_actions_t = None  # type: ignore
 
 
 def _utc_now() -> str:
@@ -359,6 +369,14 @@ class Storage:
                         created_at TEXT,
                         expires_at TEXT
                     );
+                    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                        token TEXT PRIMARY KEY,
+                        username TEXT NOT NULL,
+                        created_at TEXT,
+                        expires_at TEXT,
+                        used_at TEXT
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_password_reset_username ON password_reset_tokens(username, expires_at DESC);
                     CREATE TABLE IF NOT EXISTS model_registry (
                         model_id TEXT PRIMARY KEY,
                         path TEXT NOT NULL,
@@ -1352,6 +1370,44 @@ class Storage:
             return
         with self.engine().begin() as conn:
             conn.execute(users_t.update().where(users_t.c.username == uname).values(password_hash=password_hash))
+
+    def create_password_reset_token(self, username: str, token: str, expires_at: str) -> None:
+        row = {"token": token, "username": username.lower(), "created_at": _utc_now(), "expires_at": expires_at, "used_at": None}
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.execute("DELETE FROM password_reset_tokens WHERE username=? OR expires_at < ?", (username.lower(), _utc_now()))
+                conn.execute("INSERT OR REPLACE INTO password_reset_tokens (token, username, created_at, expires_at, used_at) VALUES (:token, :username, :created_at, :expires_at, :used_at)", row)
+            return
+        with self.engine().begin() as conn:
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+            conn.execute(password_reset_tokens_t.delete().where(password_reset_tokens_t.c.username == username.lower()))
+            stmt = pg_insert(password_reset_tokens_t).values(row)
+            conn.execute(stmt.on_conflict_do_update(index_elements=[password_reset_tokens_t.c.token], set_={"username": stmt.excluded.username, "created_at": stmt.excluded.created_at, "expires_at": stmt.excluded.expires_at, "used_at": None}))
+
+    def get_password_reset_token(self, token: str) -> Optional[Dict[str, Any]]:
+        now = _utc_now()
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                row = conn.execute("SELECT token, username, created_at, expires_at, used_at FROM password_reset_tokens WHERE token=? AND used_at IS NULL AND expires_at >= ?", (token, now)).fetchone()
+            return dict(row) if row else None
+        with self.engine().connect() as conn:
+            row = conn.execute(select(password_reset_tokens_t).where(password_reset_tokens_t.c.token == token, password_reset_tokens_t.c.used_at.is_(None), password_reset_tokens_t.c.expires_at >= now)).mappings().first()
+            return dict(row) if row else None
+
+    def consume_password_reset_token(self, token: str) -> Optional[Dict[str, Any]]:
+        row = self.get_password_reset_token(token)
+        if not row:
+            return None
+        now = _utc_now()
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.execute("UPDATE password_reset_tokens SET used_at=? WHERE token=?", (now, token))
+            row["used_at"] = now
+            return row
+        with self.engine().begin() as conn:
+            conn.execute(password_reset_tokens_t.update().where(password_reset_tokens_t.c.token == token).values(used_at=now))
+        row["used_at"] = now
+        return row
 
     # ---- Announcement metadata ----
     def list_announcement_meta(self) -> Dict[str, Dict[str, Any]]:

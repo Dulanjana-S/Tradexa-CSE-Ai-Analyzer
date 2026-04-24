@@ -6,6 +6,7 @@ import { Badge } from "../../components/ui/badge";
 import { Separator } from "../../components/ui/separator";
 import { Loader2, Database, Cpu, Users, Bell, RefreshCw, ShieldCheck, BriefcaseBusiness } from "lucide-react";
 import { adminApi } from "../../../lib/api/services";
+import { isStaffRole, normalizeRole, roleLabel } from "../../../lib/auth/roles";
 import type { AdminStatus, Job, Model, AdminUser, Alert, Notification } from "../../../lib/api/types";
 
 export function AdminDashboard() {
@@ -50,7 +51,7 @@ export function AdminDashboard() {
   const stats = useMemo(() => ({
     activeModels: models.filter((m) => m.isActive).length,
     runningJobs: jobs.filter((j) => String(j.status).toLowerCase() === "running").length,
-    adminUsers: users.filter((u) => u.role === "admin").length,
+    adminUsers: users.filter((u) => isStaffRole(u.role)).length,
     unreadNotifications: notifications.filter((n) => !n.isRead).length,
   }), [jobs, models, notifications, users]);
 
@@ -192,7 +193,7 @@ export function AdminDashboard() {
                     <div className="text-[13px] font-semibold text-[#e6edf3]">{user.name}</div>
                     <div className="text-[12px] text-[#768390]">{user.email || user.username}</div>
                   </div>
-                  <Badge className={user.role === "admin" ? "bg-blue-600/20 text-blue-400 border-blue-500/30" : "bg-[#1c2128] text-[#768390] border-[#30363d]"}>{user.role}</Badge>
+                  <Badge className={normalizeRole(user.role) === "admin" ? "bg-amber-600/20 text-amber-300 border-amber-500/30" : normalizeRole(user.role) === "co_admin" ? "bg-purple-600/20 text-purple-300 border-purple-500/30" : "bg-[#1c2128] text-[#768390] border-[#30363d]"}>{roleLabel(user.role)}</Badge>
                 </div>
               ))}
             </CardContent>

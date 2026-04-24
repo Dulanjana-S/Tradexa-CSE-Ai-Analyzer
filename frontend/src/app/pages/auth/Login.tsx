@@ -82,13 +82,13 @@ export function Login() {
 
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-[13px] text-[var(--color-text-primary)]">
-                  Email
+                  Email or username
                 </Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-tertiary)]" />
                   <Input
                     id="email"
-                    type="email"
+                    type="text"
                     placeholder="you@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -100,9 +100,12 @@ export function Login() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-[13px] text-[var(--color-text-primary)]">
-                  Password
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password" className="text-[13px] text-[var(--color-text-primary)]">
+                    Password
+                  </Label>
+                  <Link to="/forgot-password" className="text-[12px] text-emerald-400 hover:text-emerald-300">Forgot password?</Link>
+                </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-tertiary)]" />
                   <Input

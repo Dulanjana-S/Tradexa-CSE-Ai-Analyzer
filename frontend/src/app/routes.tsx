@@ -13,6 +13,8 @@ import { Alerts } from "./pages/Alerts";
 import { Settings } from "./pages/Settings";
 import { Login } from "./pages/auth/Login";
 import { Register } from "./pages/auth/Register";
+import { ForgotPassword } from "./pages/auth/ForgotPassword";
+import { ResetPassword } from "./pages/auth/ResetPassword";
 import { AdminDashboard } from "./pages/admin/AdminDashboard";
 import { UserManagement } from "./pages/admin/UserManagement";
 import { DataSync } from "./pages/admin/DataSync";
@@ -171,6 +173,22 @@ export const router = createBrowserRouter([
     element: (
       <RootLayout>
         <Register />
+      </RootLayout>
+    ),
+  },
+  {
+    path: "/forgot-password",
+    element: (
+      <RootLayout>
+        <ForgotPassword />
+      </RootLayout>
+    ),
+  },
+  {
+    path: "/reset-password",
+    element: (
+      <RootLayout>
+        <ResetPassword />
       </RootLayout>
     ),
   },

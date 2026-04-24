@@ -1,4 +1,5 @@
 import { api } from "./client";
+import { normalizeRole } from "../auth/roles";
 import type {
   AdminStatus,
   AdminUser,
@@ -14,6 +15,7 @@ import type {
   PredictionCardData,
   RegisterRequest,
   Stock,
+  StockResources,
   User,
   UserSettings,
   Watchlist,
@@ -49,7 +51,7 @@ function mapUser(raw: any): User {
     email: String(raw?.email || ""),
     name: String(raw?.display_name || raw?.name || raw?.username || "User"),
     displayName: String(raw?.display_name || raw?.name || raw?.username || "User"),
-    role: raw?.role === "admin" ? "admin" : "user",
+    role: normalizeRole(raw?.role),
     createdAt: raw?.created_at,
     lastLoginAt: raw?.last_login_at,
   };
@@ -109,6 +111,25 @@ function mapCorporateAction(raw: any): CorporateAction {
     ratioDenominator: raw?.ratio_denominator !== undefined ? num(raw?.ratio_denominator) : undefined,
     description: raw?.description || undefined,
     source: raw?.source || undefined,
+  };
+}
+
+function mapStockResources(raw: any): StockResources {
+  const mapLink = (item: any) => ({
+    id: String(item?.id || item?.title || item?.url || ""),
+    title: String(item?.title || "Document"),
+    date: item?.date ? String(item.date) : undefined,
+    url: item?.url ? String(item.url) : undefined,
+    category: item?.category ? String(item.category) : undefined,
+    reportType: item?.report_type ? String(item.report_type) : undefined,
+  });
+  return {
+    symbol: String(raw?.symbol || ""),
+    officialProfileUrl: String(raw?.official_profile_url || ""),
+    officialAnnouncements: Array.isArray(raw?.official_announcements) ? raw.official_announcements.map(mapLink) : [],
+    annualReports: Array.isArray(raw?.annual_reports) ? raw.annual_reports.map(mapLink) : [],
+    quarterlyReports: Array.isArray(raw?.quarterly_reports) ? raw.quarterly_reports.map(mapLink) : [],
+    corporateDocuments: Array.isArray(raw?.corporate_documents) ? raw.corporate_documents.map(mapLink) : [],
   };
 }
 
@@ -256,7 +277,7 @@ function mapAdminUser(raw: any): AdminUser {
     username: String(raw?.username || ""),
     email: String(raw?.email || ""),
     name: String(raw?.display_name || raw?.name || raw?.username || "User"),
-    role: String(raw?.role || "user"),
+    role: normalizeRole(raw?.role),
     createdAt: raw?.created_at,
     lastLogin: raw?.last_login_at,
     status: "active",
@@ -371,6 +392,11 @@ export const authApi = {
       current_password: currentPassword,
       new_password: newPassword,
     }),
+
+  forgotPassword: (email: string) => api.post<any>("/api/auth/forgot-password", { email }),
+
+  resetPassword: (token: string, newPassword: string) =>
+    api.post<any>("/api/auth/reset-password", { token, new_password: newPassword }),
 };
 
 export const marketApi = {
@@ -446,6 +472,11 @@ export const marketApi = {
       close: num(item.close),
       volume: num(item.volume),
     }));
+  },
+
+  getStockResources: async (symbol: string): Promise<StockResources> => {
+    const response = await api.get<any>(`/api/stocks/${encodeURIComponent(symbol)}/resources`);
+    return mapStockResources(response);
   },
 
   getStockPrediction: async (symbol: string, currentPrice = 0): Promise<PredictionCardData> => {
@@ -717,7 +748,7 @@ export const adminApi = {
     return Array.isArray(response?.users) ? response.users.map(mapAdminUser) : [];
   },
 
-  updateUserRole: async (username: string, role: "admin" | "user") => {
+  updateUserRole: async (username: string, role: "co_admin" | "user") => {
     const response = await api.post<any>(`/api/admin/users/${encodeURIComponent(username)}/role`, { role });
     return Array.isArray(response?.users) ? response.users.map(mapAdminUser) : [];
   },

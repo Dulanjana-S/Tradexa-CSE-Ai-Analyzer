@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useNavigate } from "react-router";
 import { authApi } from "../api/services";
+import { isStaffRole } from "./roles";
 import type { User, LoginRequest, RegisterRequest } from "../api/types";
 
 interface AuthContextType {
@@ -37,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (credentials: LoginRequest) => {
     const response = await authApi.login(credentials);
     setUser(response.user);
-    if (response.user.role === "admin") {
+    if (isStaffRole(response.user.role)) {
       navigate("/admin");
     } else {
       navigate("/");
@@ -61,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const isAuthenticated = !!user;
-  const isAdmin = user?.role === "admin";
+  const isAdmin = isStaffRole(user?.role);
 
   return (
     <AuthContext.Provider

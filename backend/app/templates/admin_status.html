@@ -119,9 +119,9 @@ async function loadAdmin() {
   usersTbl.innerHTML = '<thead><tr><th>User</th><th>Role</th><th class="text-right">Action</th></tr></thead>';
   const ub = document.createElement('tbody');
   (data.users || []).forEach(u => {
-    const nextRole = u.role === 'admin' ? 'user' : 'admin';
+    const nextRole = u.role === 'co_admin' ? 'user' : 'co_admin';
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${escapeHtml(u.username)}</td><td>${escapeHtml(u.role)}</td><td class="text-right"><button class="btnSecondary text-xs" data-username="${escapeHtml(u.username)}" data-role="${nextRole}">Make ${nextRole}</button></td>`;
+    tr.innerHTML = `<td>${escapeHtml(u.username)}</td><td>${escapeHtml(u.role)}</td><td class="text-right"><button class="btnSecondary text-xs" data-username="${escapeHtml(u.username)}" data-role="${nextRole}">Set ${nextRole}</button></td>`;
     ub.appendChild(tr);
   });
   usersTbl.appendChild(ub);

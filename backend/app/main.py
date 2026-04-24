@@ -19,7 +19,7 @@ from .config import settings
 from .import_tools import persist_upload_zip, preview_dataset
 from .jobs import enqueue_daily_pipeline, enqueue_import, enqueue_sync, enqueue_sync_train, enqueue_train, run_daily_pipeline_now, run_import_now, run_sync_now, run_train_now, start_job_system
 from .services import data_service
-from .services.auth_service import SESSION_COOKIE, change_password, create_user, current_user_from_request, ensure_bootstrap_admin, list_users, login, logout, require_admin, require_user, set_role, update_profile
+from .services.auth_service import SESSION_COOKIE, change_password, complete_password_reset, create_user, current_user_from_request, ensure_bootstrap_admin, is_staff_role, list_users, login, logout, require_admin, require_user, set_role, start_password_reset, update_profile
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -54,7 +54,7 @@ start_job_system()
 
 def _render(request: Request, template: str, context: Optional[Dict[str, Any]] = None, status_code: int = 200):
     user = current_user_from_request(request)
-    base = {"request": request, "current_user": user, "is_admin": bool(user and user.get("role") == "admin")}
+    base = {"request": request, "current_user": user, "is_admin": bool(user and is_staff_role(user.get("role")))}
     if context:
         base.update(context)
     return templates.TemplateResponse(request, template, base, status_code=status_code)
@@ -68,6 +68,18 @@ def _find_user_by_email(email: str) -> Optional[Dict[str, Any]]:
         return None
     for user in list_users():
         if str(user.get('email') or '').strip().lower() == wanted:
+            return user
+    return None
+
+
+def _find_user(identifier: str) -> Optional[Dict[str, Any]]:
+    ident = (identifier or '').strip().lower()
+    if not ident:
+        return None
+    if '@' in ident:
+        return _find_user_by_email(ident)
+    for user in list_users():
+        if str(user.get('username') or '').strip().lower() == ident:
             return user
     return None
 
@@ -197,7 +209,7 @@ def _uploads_dir() -> Path:
 
 def _check_admin_access(request: Request, x_admin_key: Optional[str] = None) -> Dict[str, Any]:
     user = current_user_from_request(request)
-    if user and user.get("role") == "admin":
+    if user and is_staff_role(user.get("role")):
         return user
     required = settings.admin_api_key
     provided = x_admin_key or request.headers.get("X-Admin-Key") or request.query_params.get("admin_key")
@@ -303,6 +315,27 @@ def api_auth_logout(request: Request):
     return resp
 
 
+@app.post("/api/auth/forgot-password")
+def api_auth_forgot_password(payload: Dict[str, Any] = Body(...)):
+    identifier = str(payload.get("email") or payload.get("username") or "").strip()
+    user = _find_user(identifier)
+    if not user:
+        return {"ok": True, "message": "If an account exists for that email, a reset link has been prepared."}
+    result = start_password_reset(user)
+    response = {"ok": True, "message": "If an account exists for that email, a reset link has been prepared."}
+    if result.get("preview_reset_link"):
+        response["preview_reset_link"] = result.get("preview_reset_link")
+    if result.get("expires_at"):
+        response["expires_at"] = result.get("expires_at")
+    return response
+
+
+@app.post("/api/auth/reset-password")
+def api_auth_reset_password(payload: Dict[str, Any] = Body(...)):
+    user = complete_password_reset(str(payload.get("token") or ""), str(payload.get("new_password") or ""))
+    return {"ok": True, "user": user}
+
+
 @app.post("/api/auth/change-password")
 def api_auth_change_password(request: Request, payload: Dict[str, Any] = Body(...)):
     user = require_user(request)
@@ -373,8 +406,10 @@ def api_admin_users(request: Request, x_admin_key: Optional[str] = Header(defaul
 
 @app.post("/api/admin/users/{username}/role")
 def api_admin_set_role(username: str, request: Request, payload: Dict[str, Any] = Body(...), x_admin_key: Optional[str] = Header(default=None)):
-    _check_admin_access(request, x_admin_key)
-    set_role(username, str(payload.get("role") or "user"))
+    actor = _check_admin_access(request, x_admin_key)
+    if actor.get("username") == "api-key-admin":
+        raise HTTPException(status_code=403, detail="Role changes require the signed-in main Admin account")
+    set_role(str(actor.get("username") or ""), username, str(payload.get("role") or "user"))
     return {"ok": True, "users": list_users()}
 
 
@@ -485,6 +520,11 @@ def api_stocks(limit: int = Query(500, ge=1, le=5000)):
 @app.get("/api/companies/search")
 def api_company_search(q: str = Query("", min_length=0, max_length=50), limit: int = Query(20, ge=1, le=50)):
     return {"results": data_service.company_search(q, limit=limit)}
+
+
+@app.get("/api/stocks/{symbol}/resources")
+def api_stock_resources(symbol: str):
+    return data_service.stock_resources(symbol)
 
 
 @app.get("/api/stock/{symbol}")

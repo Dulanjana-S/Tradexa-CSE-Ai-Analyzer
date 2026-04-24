@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
 import { User, Bell, Shield, Palette, Database, CreditCard, Loader2 } from "lucide-react";
 import { authApi, settingsApi } from "../../lib/api/services";
 import { useAuth } from "../../lib/auth/AuthContext";
+import { useTheme } from "../contexts/ThemeContext";
 
 const defaultSettings = {
   theme: "dark",
@@ -34,6 +35,7 @@ const defaultSettings = {
 
 export function Settings() {
   const { user, refreshUser } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -47,7 +49,11 @@ export function Settings() {
       try {
         const [me, userSettings] = await Promise.all([authApi.me(), settingsApi.getUserSettings()]);
         setProfile({ name: me.name || "", email: me.email || "", phone: String(userSettings.settings?.phone || "") });
-        setSettings({ ...defaultSettings, ...(userSettings.settings || {}) });
+        const merged = { ...defaultSettings, ...(userSettings.settings || {}) };
+        setSettings(merged);
+        if (merged.theme === "light" || merged.theme === "dark") {
+          setTheme(merged.theme);
+        }
       } catch {
         setProfile({ name: user?.name || "", email: user?.email || "", phone: "" });
         setSettings(defaultSettings);
@@ -245,6 +251,16 @@ export function Settings() {
                         <SelectItem value="dd-mm-yyyy">DD/MM/YYYY</SelectItem>
                         <SelectItem value="mm-dd-yyyy">MM/DD/YYYY</SelectItem>
                         <SelectItem value="yyyy-mm-dd">YYYY-MM-DD</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[#e6edf3]">Theme</Label>
+                    <Select value={theme} onValueChange={(value) => { setTheme(value as "light" | "dark"); setSettings((prev) => ({ ...prev, theme: value })); }}>
+                      <SelectTrigger className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]"><SelectValue /></SelectTrigger>
+                      <SelectContent className="border-[#30363d] bg-[#161b22]">
+                        <SelectItem value="dark">Dark Mode</SelectItem>
+                        <SelectItem value="light">Light Mode</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

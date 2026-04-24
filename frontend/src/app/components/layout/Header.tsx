@@ -13,6 +13,7 @@ import { NotificationPanel } from "../notifications/NotificationPanel";
 import { Link, useNavigate } from "react-router";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useAuth } from "../../../lib/auth/AuthContext";
+import { isStaffRole, roleLabel } from "../../../lib/auth/roles";
 import { useEffect, useMemo, useState } from "react";
 import { marketApi } from "../../../lib/api/services";
 import type { Stock } from "../../../lib/api/types";
@@ -205,7 +206,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                 <DropdownMenuLabel className="text-[var(--color-text-primary)]">
                   <div>
                     <p className="text-[13px] font-semibold">{user?.name || "User"}</p>
-                    <p className="text-[11px] font-normal text-[var(--color-text-tertiary)]">{user?.email || user?.username}</p>
+                    <p className="text-[11px] font-normal text-[var(--color-text-tertiary)]">{user?.email || user?.username} · {roleLabel(user?.role)}</p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-[var(--color-border)]" />
@@ -221,7 +222,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                 <DropdownMenuItem asChild className="text-[var(--color-text-secondary)] focus:bg-[var(--color-bg-tertiary)] focus:text-[var(--color-text-primary)]">
                   <Link to="/settings">Settings</Link>
                 </DropdownMenuItem>
-                {user?.role === "admin" && (
+                {isStaffRole(user?.role) && (
                   <DropdownMenuItem asChild className="text-[var(--color-text-secondary)] focus:bg-[var(--color-bg-tertiary)] focus:text-[var(--color-text-primary)]">
                     <Link to="/admin">Admin</Link>
                   </DropdownMenuItem>

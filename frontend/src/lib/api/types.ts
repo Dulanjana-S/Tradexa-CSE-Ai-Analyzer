@@ -3,7 +3,7 @@ export interface User {
   email: string;
   name: string;
   displayName?: string;
-  role: "admin" | "user";
+  role: "co_admin" | "admin" | "user";
   createdAt?: string;
   lastLoginAt?: string;
 }
@@ -16,6 +16,10 @@ export interface AuthResponse {
 export interface LoginRequest {
   email: string;
   password: string;
+}
+
+export interface ForgotPasswordRequest {
+  email: string;
 }
 
 export interface RegisterRequest {
@@ -244,8 +248,27 @@ export interface AdminUser {
   username: string;
   email: string;
   name: string;
-  role: string;
+  role: "co_admin" | "admin" | "user";
   createdAt?: string;
   lastLogin?: string;
   status: string;
+}
+
+
+export interface StockResourceLink {
+  id: string;
+  title: string;
+  date?: string;
+  url?: string;
+  category?: string;
+  reportType?: string;
+}
+
+export interface StockResources {
+  symbol: string;
+  officialProfileUrl: string;
+  officialAnnouncements: StockResourceLink[];
+  annualReports: StockResourceLink[];
+  quarterlyReports: StockResourceLink[];
+  corporateDocuments: StockResourceLink[];
 }
