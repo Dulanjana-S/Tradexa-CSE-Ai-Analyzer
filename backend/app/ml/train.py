@@ -9,9 +9,10 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 from sklearn.base import clone
-from sklearn.ensemble import GradientBoostingRegressor, RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.metrics import accuracy_score, mean_absolute_error, mean_squared_error, roc_auc_score
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 
 from ..storage import Storage
 from .features import make_feature_frame
@@ -63,10 +64,23 @@ def _date_holdout_split(df: pd.DataFrame, holdout_ratio: float = 0.15) -> Tuple[
     return train_df, test_df
 
 
+def _regressor_template() -> Pipeline:
+    return Pipeline(
+        [
+            ("scale", StandardScaler()),
+            ("ridge", Ridge(alpha=1.0)),
+        ]
+    )
+
+
 def _clf_candidates() -> Dict[str, object]:
     out: Dict[str, object] = {
-        "LogisticRegression": LogisticRegression(max_iter=1200, class_weight="balanced", solver="lbfgs", random_state=42),
-        "RandomForestClassifier": RandomForestClassifier(random_state=42, n_estimators=80, max_depth=6, min_samples_leaf=4, n_jobs=-1),
+        "LogisticRegression": Pipeline(
+            [
+                ("scale", StandardScaler()),
+                ("logreg", LogisticRegression(max_iter=800, class_weight="balanced", solver="lbfgs", random_state=42)),
+            ]
+        ),
     }
     return out
 
@@ -179,13 +193,18 @@ def train_from_db(
     y_test_r = test_df["target_return"].values
     y_test_u = test_df["target_up"].values
 
-    mean = GradientBoostingRegressor(random_state=42, n_estimators=240, learning_rate=0.05, max_depth=3, subsample=0.9)
-    q10 = GradientBoostingRegressor(loss="quantile", alpha=0.10, random_state=42, n_estimators=200, learning_rate=0.05, max_depth=3, subsample=0.9)
-    q90 = GradientBoostingRegressor(loss="quantile", alpha=0.90, random_state=42, n_estimators=200, learning_rate=0.05, max_depth=3, subsample=0.9)
+    mean = _regressor_template()
     mean.fit(X_train, y_train_r)
-    q10.fit(X_train, y_train_r)
-    q90.fit(X_train, y_train_r)
+    pred_train_r = mean.predict(X_train)
     pred_r = mean.predict(X_test)
+
+    residuals = y_train_r - pred_train_r
+    q10_offset = float(np.quantile(residuals, 0.10)) if len(residuals) else 0.0
+    q90_offset = float(np.quantile(residuals, 0.90)) if len(residuals) else 0.0
+    q10 = _regressor_template()
+    q10.fit(X_train, y_train_r + q10_offset)
+    q90 = _regressor_template()
+    q90.fit(X_train, y_train_r + q90_offset)
 
     comparison: Dict[str, Dict[str, float]] = {}
     best_name = None
@@ -213,7 +232,7 @@ def train_from_db(
     majority_class = int(base_rate >= 0.5) if not np.isnan(base_rate) else 0
     baseline_pred = np.full_like(y_test_u, majority_class)
 
-    walk_forward = _walk_forward_report(df, feat_cols, LogisticRegression(max_iter=1200, class_weight="balanced", solver="lbfgs", random_state=42))
+    walk_forward = _walk_forward_report(df, feat_cols, next(iter(_clf_candidates().values())))
     per_symbol = _per_symbol_holdout(test_df, best_prob, pred_r)
 
     metrics = {
@@ -228,12 +247,14 @@ def train_from_db(
         "rows_train": int(len(train_df)),
         "rows_test": int(len(test_df)),
         "features": int(len(feat_cols)),
+        "residual_q10": q10_offset,
+        "residual_q90": q90_offset,
     }
 
     train_dates = pd.to_datetime(train_df["date"])
     test_dates = pd.to_datetime(test_df["date"])
     meta = {
-        "model_version": "v5",
+        "model_version": "v6-fast",
         "model_id": f"model_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
         "trained_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "horizon_days": horizon_days,
@@ -242,7 +263,7 @@ def train_from_db(
         "metrics_holdout": metrics,
         "train_period": {"start": str(train_dates.min().date()), "end": str(train_dates.max().date())},
         "test_period": {"start": str(test_dates.min().date()), "end": str(test_dates.max().date())},
-        "models": {"mean": "GradientBoostingRegressor", "quantiles": "GradientBoostingRegressor", "direction": best_name},
+        "models": {"mean": "Ridge", "quantiles": "ResidualOffset", "direction": best_name},
         "model_comparison": comparison,
         "walk_forward": walk_forward,
         "per_symbol_holdout": per_symbol[:25],

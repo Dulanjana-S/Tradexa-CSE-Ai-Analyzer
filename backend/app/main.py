@@ -17,7 +17,7 @@ from fastapi.templating import Jinja2Templates
 
 from .config import settings
 from .import_tools import persist_upload_zip, preview_dataset
-from .jobs import enqueue_daily_pipeline, enqueue_import, enqueue_sync, enqueue_sync_train, enqueue_train, start_job_system
+from .jobs import enqueue_daily_pipeline, enqueue_import, enqueue_sync, enqueue_sync_train, enqueue_train, run_daily_pipeline_now, run_import_now, run_sync_now, run_train_now, start_job_system
 from .services import data_service
 from .services.auth_service import SESSION_COOKIE, change_password, create_user, current_user_from_request, ensure_bootstrap_admin, list_users, login, logout, require_admin, require_user, set_role, update_profile
 
@@ -395,7 +395,7 @@ def api_admin_run_sync(request: Request, payload: Dict[str, Any] = Body(default=
 @app.post("/api/admin/actions/train")
 def api_admin_run_train(request: Request, payload: Dict[str, Any] = Body(default={}), x_admin_key: Optional[str] = Header(default=None)):
     _check_admin_access(request, x_admin_key)
-    job = enqueue_train({"symbols": payload.get("symbols"), "horizon_days": int(payload.get("horizon_days") or 1)})
+    job = run_train_now({"symbols": payload.get("symbols"), "horizon_days": int(payload.get("horizon_days") or 1)})
     return {"ok": True, "job": job}
 
 

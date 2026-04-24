@@ -86,6 +86,35 @@ def enqueue_daily_pipeline(params: Optional[Dict[str, Any]] = None) -> Dict[str,
     return enqueue_job("daily_pipeline", merged)
 
 
+def run_sync_now(params: Dict[str, Any]) -> Dict[str, Any]:
+    run_id = _storage().record_job_run(job_name="sync", status="running", details={"params": params}, started_at=utc_now(), finished_at=None)
+    _run_sync(params, run_id)
+    return _get_job(run_id) or {"run_id": run_id, "job_name": "sync", "status": "completed"}
+
+
+def run_train_now(params: Dict[str, Any]) -> Dict[str, Any]:
+    run_id = _storage().record_job_run(job_name="train", status="running", details={"params": params}, started_at=utc_now(), finished_at=None)
+    _run_train(params, run_id)
+    return _get_job(run_id) or {"run_id": run_id, "job_name": "train", "status": "completed"}
+
+
+def run_import_now(params: Dict[str, Any], *, preview: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    details = {"params": params}
+    if preview:
+        details["preview"] = preview
+    run_id = _storage().record_job_run(job_name="import_dataset", status="running", details=details, started_at=utc_now(), finished_at=None)
+    _run_import(params, run_id)
+    return _get_job(run_id) or {"run_id": run_id, "job_name": "import_dataset", "status": "completed"}
+
+
+def run_daily_pipeline_now(params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    merged = _default_scheduler_settings()
+    merged.update(params or {})
+    run_id = _storage().record_job_run(job_name="daily_pipeline", status="running", details={"params": merged}, started_at=utc_now(), finished_at=None)
+    _run_daily_pipeline(merged, run_id)
+    return _get_job(run_id) or {"run_id": run_id, "job_name": "daily_pipeline", "status": "completed"}
+
+
 def _run_sync(params: Dict[str, Any], run_id: str) -> None:
     from .cli import cmd_sync
 

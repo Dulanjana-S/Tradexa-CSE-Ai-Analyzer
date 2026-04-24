@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { portfolioApi, watchlistApi } from "../../lib/api/services";
-import type { PortfolioData, PortfolioPerformancePoint, PortfolioTransaction, Watchlist } from "../../lib/api/types";
+import { marketApi, portfolioApi, watchlistApi } from "../../lib/api/services";
+import type { PortfolioData, PortfolioPerformancePoint, PortfolioTransaction, Stock, Watchlist } from "../../lib/api/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -72,6 +72,9 @@ export function Portfolio() {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvPreview, setCsvPreview] = useState<any | null>(null);
   const [form, setForm] = useState(defaultForm());
+  const [symbolSuggestions, setSymbolSuggestions] = useState<Stock[]>([]);
+  const [symbolSearchOpen, setSymbolSearchOpen] = useState(false);
+  const [symbolSearchLoading, setSymbolSearchLoading] = useState(false);
 
   const loadPortfolio = async () => {
     const [portfolioData, watchlistData] = await Promise.all([portfolioApi.get(), watchlistApi.get()]);
@@ -97,6 +100,40 @@ export function Portfolio() {
     loadPerformance(chartDays).catch(() => setPerformance([]));
   }, [chartDays]);
 
+  useEffect(() => {
+    let alive = true;
+    const query = form.symbol.trim();
+    if (!dialogOpen || query.length < 1) {
+      setSymbolSuggestions([]);
+      setSymbolSearchOpen(false);
+      setSymbolSearchLoading(false);
+      return;
+    }
+    setSymbolSearchLoading(true);
+    const timer = window.setTimeout(() => {
+      marketApi
+        .searchCompanies(query)
+        .then((results) => {
+          if (!alive) return;
+          setSymbolSuggestions(results.slice(0, 8));
+          setSymbolSearchOpen(true);
+        })
+        .catch(() => {
+          if (!alive) return;
+          setSymbolSuggestions([]);
+          setSymbolSearchOpen(true);
+        })
+        .finally(() => {
+          if (alive) setSymbolSearchLoading(false);
+        });
+    }, 160);
+
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+    };
+  }, [dialogOpen, form.symbol]);
+
   const watchlistCandidates = useMemo(
     () => watchlist.items.filter((item) => !portfolio.positions.some((position) => position.symbol === item.symbol)).slice(0, 8),
     [watchlist.items, portfolio.positions]
@@ -112,18 +149,24 @@ export function Portfolio() {
     setEditingId(null);
     setError(null);
     setForm(defaultForm());
+    setSymbolSuggestions([]);
+    setSymbolSearchOpen(false);
   };
 
   const openAddDialog = (symbol?: string) => {
     setEditingId(null);
     setError(null);
     setForm({ ...defaultForm(), symbol: symbol || "" });
+    setSymbolSuggestions([]);
+    setSymbolSearchOpen(Boolean(symbol));
     setDialogOpen(true);
   };
 
   const openEditDialog = (tx: PortfolioTransaction) => {
     setEditingId(tx.id);
     setError(null);
+    setSymbolSuggestions([]);
+    setSymbolSearchOpen(false);
     setForm({
       symbol: tx.symbol,
       txType: tx.type,
@@ -214,7 +257,47 @@ export function Portfolio() {
               <div className="grid gap-4 py-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="symbol">Symbol</Label>
-                  <Input id="symbol" value={form.symbol} onChange={(e) => setForm((prev) => ({ ...prev, symbol: e.target.value.toUpperCase() }))} placeholder="e.g., JKH.N0000" className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
+                  <div className="relative">
+                    <Input
+                      id="symbol"
+                      value={form.symbol}
+                      onChange={(e) => setForm((prev) => ({ ...prev, symbol: e.target.value.toUpperCase() }))}
+                      onFocus={() => form.symbol.trim() && setSymbolSearchOpen(true)}
+                      onBlur={() => window.setTimeout(() => setSymbolSearchOpen(false), 120)}
+                      placeholder="Search symbol or company"
+                      className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]"
+                    />
+                    {symbolSearchOpen && (
+                      <div className="absolute left-0 right-0 top-11 z-20 overflow-hidden rounded-md border border-[#30363d] bg-[#161b22] shadow-2xl">
+                        {symbolSearchLoading ? (
+                          <div className="px-3 py-2 text-[12px] text-[#768390]">Searching symbols…</div>
+                        ) : symbolSuggestions.length ? (
+                          <div className="max-h-56 overflow-y-auto py-1">
+                            {symbolSuggestions.map((item) => (
+                              <button
+                                key={item.symbol}
+                                type="button"
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={() => {
+                                  setForm((prev) => ({ ...prev, symbol: item.symbol }));
+                                  setSymbolSearchOpen(false);
+                                }}
+                                className="flex w-full items-start justify-between gap-3 px-3 py-2 text-left hover:bg-[#1c2128]"
+                              >
+                                <div>
+                                  <div className="text-[13px] font-semibold text-[#e6edf3]">{item.symbol}</div>
+                                  <div className="text-[12px] text-[#768390]">{item.company}</div>
+                                </div>
+                                <div className="text-[11px] text-[#768390]">{item.sector || "—"}</div>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="px-3 py-2 text-[12px] text-[#768390]">No matching symbols found.</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Type</Label>
