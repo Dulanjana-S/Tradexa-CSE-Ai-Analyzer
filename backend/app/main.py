@@ -473,6 +473,42 @@ def api_admin_refresh_sentiment(request: Request, payload: Dict[str, Any] = Body
     return {"ok": True, "result": data_service.refresh_sentiment_scores(limit=int(payload.get("limit") or 1200))}
 
 
+@app.post("/api/admin/actions/refresh-documents")
+def api_admin_refresh_documents(request: Request, payload: Dict[str, Any] = Body(default={}), x_admin_key: Optional[str] = Header(default=None)):
+    _check_admin_access(request, x_admin_key)
+    return {"ok": True, "result": data_service.refresh_documents(
+        limit=int(payload.get("limit") or 120),
+        symbol=payload.get("symbol"),
+        force=_to_bool(payload.get("force"), False),
+        max_pages=int(payload.get("max_pages") or 12),
+    )}
+
+
+@app.post("/api/admin/actions/seed-news-whitelist")
+def api_admin_seed_news_whitelist(request: Request, x_admin_key: Optional[str] = Header(default=None)):
+    _check_admin_access(request, x_admin_key)
+    return {"ok": True, "result": data_service.seed_news_whitelist()}
+
+
+@app.post("/api/admin/actions/refresh-selected-news")
+def api_admin_refresh_selected_news(request: Request, payload: Dict[str, Any] = Body(default={}), x_admin_key: Optional[str] = Header(default=None)):
+    _check_admin_access(request, x_admin_key)
+    return {"ok": True, "result": data_service.refresh_selected_news(
+        lookback_days=int(payload.get("lookback_days") or 30),
+        max_per_source=int(payload.get("max_per_source") or 40),
+    )}
+
+
+@app.post("/api/admin/actions/compare-news-models")
+def api_admin_compare_news_models(request: Request, payload: Dict[str, Any] = Body(default={}), x_admin_key: Optional[str] = Header(default=None)):
+    _check_admin_access(request, x_admin_key)
+    return {"ok": True, "result": data_service.compare_news_models(
+        symbols=payload.get("symbols"),
+        horizon_days=int(payload.get("horizon_days") or 1),
+        max_symbols=int(payload.get("max_symbols") or 40),
+    )}
+
+
 @app.post("/api/admin/macro/preview")
 def api_admin_macro_preview(request: Request, file: UploadFile = File(...), x_admin_key: Optional[str] = Header(default=None)):
     _check_admin_access(request, x_admin_key)
@@ -551,6 +587,17 @@ def api_stock_resources(symbol: str):
 @app.get("/api/stocks/{symbol}/sentiment")
 def api_stock_sentiment(symbol: str, days: int = Query(90, ge=7, le=365)):
     return data_service.sentiment_summary(symbol, days=days)
+
+
+@app.get("/api/stocks/{symbol}/documents")
+def api_stock_documents(symbol: str, limit: int = Query(50, ge=1, le=200)):
+    return data_service.stock_documents(symbol, limit=limit)
+
+
+@app.get("/api/stocks/{symbol}/news")
+def api_stock_news(symbol: str, limit: int = Query(40, ge=1, le=120)):
+    return data_service.stock_news(symbol, limit=limit)
+
 
 @app.get("/api/stock/{symbol}")
 def api_stock(symbol: str):

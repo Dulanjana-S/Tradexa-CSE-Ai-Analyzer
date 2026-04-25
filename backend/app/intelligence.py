@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import json
 import math
 import re
+from html import unescape
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 POSITIVE_TERMS = {
@@ -309,4 +311,239 @@ def preview_macro_rows(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
         "totals": {"rows": len(rows), "indicators": len(indicators)},
         "indicators": indicators,
         "templates": DEFAULT_MACRO_TEMPLATES,
+    }
+
+
+# ---- Official CSE PDF / report intelligence ----
+REPORT_KEYWORDS = (
+    "annual report", "quarter", "quarterly", "interim", "financial statement", "financial statements",
+    "dividend", "corporate disclosure", "rights issue", "bonus issue", "split", "subdivision", "sub-division",
+)
+
+
+def is_report_or_corporate_document(title: str, url: Optional[str] = None) -> bool:
+    hay = f"{title or ''} {url or ''}".lower()
+    return any(token in hay for token in REPORT_KEYWORDS) or hay.endswith(".pdf") or ".pdf" in hay
+
+
+def make_stable_id(*parts: Any) -> str:
+    raw = "|".join(str(x or "") for x in parts)
+    return hashlib.sha256(raw.encode("utf-8", errors="ignore")).hexdigest()[:32]
+
+
+def summarize_document_text(text: str, max_sentences: int = 4) -> str:
+    cleaned = re.sub(r"\s+", " ", (text or "").strip())
+    if not cleaned:
+        return ""
+    sentences = re.split(r"(?<=[.!?])\s+", cleaned)
+    scored = []
+    for sentence in sentences[:180]:
+        s_l = sentence.lower()
+        score = 0
+        for term in list(POSITIVE_TERMS) + list(NEGATIVE_TERMS) + list(HIGH_IMPACT_TERMS):
+            if term in s_l:
+                score += 1
+        if any(token in s_l for token in ("profit", "loss", "revenue", "earnings", "dividend", "rights", "quarter", "annual", "cash", "debt", "risk")):
+            score += 1
+        if 40 <= len(sentence) <= 260:
+            scored.append((score, sentence.strip()))
+    scored.sort(key=lambda item: item[0], reverse=True)
+    picked = []
+    for _, sentence in scored:
+        if sentence and sentence not in picked:
+            picked.append(sentence)
+        if len(picked) >= max_sentences:
+            break
+    if not picked:
+        picked = sentences[:max_sentences]
+    return " ".join(picked).strip()[:1200]
+
+
+def extract_pdf_text_from_bytes(payload: bytes, max_pages: int = 12) -> Dict[str, Any]:
+    try:
+        from pypdf import PdfReader
+    except Exception as exc:
+        return {"text": "", "pages_analyzed": 0, "error": f"pypdf unavailable: {exc}"}
+    try:
+        reader = PdfReader(io.BytesIO(payload))
+        pages = []
+        for page in reader.pages[:max_pages]:
+            try:
+                pages.append(page.extract_text() or "")
+            except Exception:
+                pages.append("")
+        text = "\n".join(pages)
+        return {"text": text, "pages_analyzed": min(len(reader.pages), max_pages), "total_pages": len(reader.pages), "error": None}
+    except Exception as exc:
+        return {"text": "", "pages_analyzed": 0, "total_pages": 0, "error": str(exc)}
+
+
+def build_document_intelligence_row(announcement: Dict[str, Any], pdf_payload: bytes, max_pages: int = 12) -> Dict[str, Any]:
+    extracted = extract_pdf_text_from_bytes(pdf_payload, max_pages=max_pages)
+    title = str(announcement.get("title") or "")
+    full_text = extracted.get("text") or title
+    summary = summarize_document_text(full_text)
+    combined = f"{title}. {summary}"
+    sent = analyze_text_sentiment(combined, announcement.get("category"))
+    doc_url = announcement.get("url") or announcement.get("source_url")
+    ann_id = announcement.get("ann_id") or announcement.get("id") or make_stable_id(doc_url, title)
+    doc_id = make_stable_id(ann_id, doc_url, title)
+    return {
+        "doc_id": doc_id,
+        "ann_id": ann_id,
+        "symbol": str(announcement.get("symbol") or "").upper() or None,
+        "date": str(announcement.get("date") or "")[:10],
+        "title": title,
+        "document_url": doc_url,
+        "document_type": sent.get("event_type") or detect_event_type(title, announcement.get("category")),
+        "summary": summary,
+        "extracted_text": (extracted.get("text") or "")[:20000],
+        "pages_analyzed": extracted.get("pages_analyzed") or 0,
+        "sentiment_score": sent["sentiment_score"],
+        "sentiment_label": sent["sentiment_label"],
+        "impact_score": sent["impact_score"],
+        "event_type": sent["event_type"],
+        "confidence": sent["confidence"],
+        "keywords": sent["keywords"],
+        "meta": {"category": announcement.get("category"), "pdf_error": extracted.get("error"), "total_pages": extracted.get("total_pages")},
+    }
+
+
+def document_row_to_sentiment(row: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "item_id": f"doc:{row.get('doc_id')}",
+        "ann_id": row.get("ann_id"),
+        "symbol": row.get("symbol"),
+        "date": row.get("date"),
+        "title": row.get("title"),
+        "source_url": row.get("document_url"),
+        "source_type": "cse_document",
+        "sentiment_score": row.get("sentiment_score"),
+        "sentiment_label": row.get("sentiment_label"),
+        "impact_score": row.get("impact_score"),
+        "event_type": row.get("event_type"),
+        "confidence": row.get("confidence"),
+        "keywords": row.get("keywords") or [],
+        "meta": {"document_type": row.get("document_type"), "summary": row.get("summary")},
+    }
+
+
+# ---- Whitelisted selected Sri Lanka economy/business news ingestion ----
+DEFAULT_NEWS_WHITELIST: List[Dict[str, Any]] = [
+    {"source_name": "EconomyNext", "domain": "economynext.com", "base_url": "https://economynext.com/more-news/", "parser_kind": "html_links", "enabled": True, "scope_hint": "market"},
+    {"source_name": "Daily FT", "domain": "ft.lk", "base_url": "https://www.ft.lk/business/34", "parser_kind": "html_links", "enabled": True, "scope_hint": "market"},
+    {"source_name": "CBSL News", "domain": "cbsl.gov.lk", "base_url": "https://www.cbsl.gov.lk/en/news", "parser_kind": "html_links", "enabled": True, "scope_hint": "macro"},
+    {"source_name": "CBSL Press Releases", "domain": "cbsl.gov.lk", "base_url": "https://www.cbsl.gov.lk/en/press-releases", "parser_kind": "html_links", "enabled": True, "scope_hint": "macro"},
+]
+
+
+def validate_whitelisted_url(url: str, domain: str) -> bool:
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    host = parsed.netloc.lower().replace("www.", "")
+    domain = domain.lower().replace("www.", "")
+    return host == domain or host.endswith("." + domain)
+
+
+def extract_links_from_html(html: str, base_url: str, domain: str, source_name: str, limit: int = 40) -> List[Dict[str, Any]]:
+    from urllib.parse import urljoin
+    items: List[Dict[str, Any]] = []
+    try:
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html, "html.parser")
+        anchors = soup.find_all("a")
+        for a in anchors:
+            title = " ".join(a.get_text(" ", strip=True).split())
+            href = a.get("href") or ""
+            if len(title) < 12 or not href:
+                continue
+            url = urljoin(base_url, href)
+            if not validate_whitelisted_url(url, domain):
+                continue
+            title_l = title.lower()
+            if any(skip in title_l for skip in ("advertise", "privacy", "terms", "contact", "login", "subscribe")):
+                continue
+            item_id = make_stable_id(source_name, url, title)
+            items.append({"item_id": item_id, "source_name": source_name, "source_domain": domain, "url": url, "title": unescape(title), "published_at": None, "published_date": datetime.now(timezone.utc).date().isoformat(), "raw": {}})
+            if len(items) >= limit:
+                break
+    except Exception:
+        # Regex fallback keeps ingestion usable if BeautifulSoup is unavailable.
+        for m in re.finditer(r'<a[^>]+href=["\']([^"\']+)["\'][^>]*>(.*?)</a>', html, flags=re.I | re.S):
+            href, raw_title = m.group(1), re.sub(r"<[^>]+>", " ", m.group(2))
+            title = " ".join(unescape(raw_title).split())
+            if len(title) < 12:
+                continue
+            url = urljoin(base_url, href)
+            if not validate_whitelisted_url(url, domain):
+                continue
+            items.append({"item_id": make_stable_id(source_name, url, title), "source_name": source_name, "source_domain": domain, "url": url, "title": title, "published_at": None, "published_date": datetime.now(timezone.utc).date().isoformat(), "raw": {}})
+            if len(items) >= limit:
+                break
+    # Deduplicate by URL/title.
+    seen = set()
+    out = []
+    for item in items:
+        key = (item["url"], item["title"].lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(item)
+    return out
+
+
+def link_news_to_company(title: str, companies: Iterable[Dict[str, Any]]) -> Dict[str, Optional[str]]:
+    text = _clean_text(title)
+    best_symbol = None
+    best_name = None
+    best_score = 0
+    for comp in companies:
+        symbol = str(comp.get("symbol") or "").upper()
+        name = str(comp.get("name") or comp.get("company") or "")
+        terms = [symbol.lower().replace(".n0000", ""), symbol.lower(), name.lower()]
+        terms += [w for w in re.split(r"[^a-z0-9]+", name.lower()) if len(w) >= 5]
+        score = sum(1 for term in set(terms) if term and term in text)
+        if score > best_score:
+            best_score = score
+            best_symbol = symbol
+            best_name = name
+    if best_score <= 0:
+        return {"symbol": None, "company_name": None}
+    return {"symbol": best_symbol, "company_name": best_name}
+
+
+def enrich_external_news_item(item: Dict[str, Any], companies: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
+    link = link_news_to_company(item.get("title") or "", companies)
+    sent = analyze_text_sentiment(item.get("title") or "", item.get("source_name"))
+    scope = "symbol" if link.get("symbol") else "market"
+    return {
+        **item,
+        "scope": scope,
+        "symbol": link.get("symbol"),
+        "company_name": link.get("company_name"),
+        "sentiment_score": sent["sentiment_score"],
+        "sentiment_label": sent["sentiment_label"],
+        "impact_score": sent["impact_score"],
+        "event_type": sent["event_type"],
+        "confidence": sent["confidence"],
+        "keywords": sent["keywords"],
+    }
+
+
+def external_news_to_sentiment_row(item: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "item_id": f"news:{item.get('item_id')}",
+        "ann_id": None,
+        "symbol": item.get("symbol"),
+        "date": item.get("published_date"),
+        "title": item.get("title"),
+        "source_url": item.get("url"),
+        "source_type": "external_news",
+        "sentiment_score": item.get("sentiment_score"),
+        "sentiment_label": item.get("sentiment_label"),
+        "impact_score": item.get("impact_score"),
+        "event_type": item.get("event_type"),
+        "confidence": item.get("confidence"),
+        "keywords": item.get("keywords") or [],
+        "meta": {"source_name": item.get("source_name"), "source_domain": item.get("source_domain"), "scope": item.get("scope"), "company_name": item.get("company_name")},
     }

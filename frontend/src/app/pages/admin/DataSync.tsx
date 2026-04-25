@@ -28,6 +28,9 @@ export function DataSync() {
   const [macroFile, setMacroFile] = useState<File | null>(null);
   const [macroPreview, setMacroPreview] = useState<any>(null);
   const [sentimentResult, setSentimentResult] = useState<any>(null);
+  const [documentResult, setDocumentResult] = useState<any>(null);
+  const [selectedNewsResult, setSelectedNewsResult] = useState<any>(null);
+  const [comparisonResult, setComparisonResult] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const load = async () => {
@@ -106,6 +109,40 @@ export function DataSync() {
     try {
       const response = await adminApi.refreshSentiment(1600);
       setSentimentResult(response?.result || response);
+      await load();
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const refreshDocuments = async () => {
+    setBusyAction("documents");
+    try {
+      const response = await adminApi.refreshDocuments({ limit: 120, max_pages: 12 });
+      setDocumentResult(response?.result || response);
+      await load();
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const refreshSelectedNews = async () => {
+    setBusyAction("selected-news");
+    try {
+      await adminApi.seedNewsWhitelist();
+      const response = await adminApi.refreshSelectedNews({ lookback_days: 30, max_per_source: 40 });
+      setSelectedNewsResult(response?.result || response);
+      await load();
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const compareNewsModels = async () => {
+    setBusyAction("compare-news");
+    try {
+      const response = await adminApi.compareNewsModels({ horizon_days: horizonDays, max_symbols: 40 });
+      setComparisonResult(response?.result || response);
       await load();
     } finally {
       setBusyAction(null);
@@ -334,8 +371,21 @@ export function DataSync() {
                 <div className="rounded-md border border-[#30363d] bg-[#0d1117] p-4 text-[13px] text-[#e6edf3]"><div className="mb-1 text-[#768390]">Last refresh</div>{status?.freshness?.last_sentiment_refresh_utc || "—"}</div>
                 <div className="rounded-md border border-[#30363d] bg-[#0d1117] p-4 text-[13px] text-[#e6edf3]"><div className="mb-1 text-[#768390]">Pipeline note</div>Runs automatically after daily sync</div>
               </div>
-              <Button onClick={refreshSentiment} disabled={busyAction !== null} className="bg-violet-600 text-white hover:bg-violet-700">{busyAction === "sentiment" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Brain className="mr-2 h-4 w-4" />} Rebuild Sentiment from CSE Announcements</Button>
+              <div className="flex flex-wrap gap-3">
+                <Button onClick={refreshSentiment} disabled={busyAction !== null} className="bg-violet-600 text-white hover:bg-violet-700">{busyAction === "sentiment" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Brain className="mr-2 h-4 w-4" />} Rebuild CSE Announcement Sentiment</Button>
+                <Button onClick={refreshDocuments} disabled={busyAction !== null} className="bg-indigo-600 text-white hover:bg-indigo-700">{busyAction === "documents" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FolderArchive className="mr-2 h-4 w-4" />} Ingest Report PDFs</Button>
+                <Button onClick={refreshSelectedNews} disabled={busyAction !== null} className="bg-sky-600 text-white hover:bg-sky-700">{busyAction === "selected-news" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />} Refresh Selected News</Button>
+                <Button onClick={compareNewsModels} disabled={busyAction !== null} variant="outline" className="border-[#30363d] text-[#e6edf3] hover:bg-[#1c2128]">{busyAction === "compare-news" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Brain className="mr-2 h-4 w-4" />} Compare News Model</Button>
+              </div>
               {sentimentResult ? <div className="rounded-md border border-violet-500/30 bg-violet-500/10 p-4 text-[13px] text-violet-100">Announcements scanned: {sentimentResult.announcements_scanned || 0} • Rows upserted: {sentimentResult.sentiment_rows_upserted || 0}</div> : null}
+              {documentResult ? <div className="rounded-md border border-indigo-500/30 bg-indigo-500/10 p-4 text-[13px] text-indigo-100">Documents analyzed: {documentResult.documents_analyzed || 0} • Document sentiment rows: {documentResult.sentiment_rows_upserted || 0}</div> : null}
+              {selectedNewsResult ? <div className="rounded-md border border-sky-500/30 bg-sky-500/10 p-4 text-[13px] text-sky-100">News items: {selectedNewsResult.news_items_upserted || 0} • Symbol rows: {selectedNewsResult.symbol_sentiment_rows_upserted || 0} • Market features: {selectedNewsResult.market_feature_points_upserted || 0}</div> : null}
+              {comparisonResult ? <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-4 text-[13px] text-emerald-100">Recommendation: {comparisonResult.recommendation || "—"} • Accuracy delta: {comparisonResult.deltas?.acc_up ?? "—"} • Added features: {comparisonResult.deltas?.added_features ?? 0}</div> : null}
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="rounded-md border border-[#30363d] bg-[#0d1117] p-4 text-[13px] text-[#e6edf3]"><div className="mb-1 text-[#768390]">PDF docs</div>{status?.counts?.document_intelligence ?? 0}</div>
+                <div className="rounded-md border border-[#30363d] bg-[#0d1117] p-4 text-[13px] text-[#e6edf3]"><div className="mb-1 text-[#768390]">Selected news</div>{status?.counts?.selected_news_items ?? 0}</div>
+                <div className="rounded-md border border-[#30363d] bg-[#0d1117] p-4 text-[13px] text-[#e6edf3]"><div className="mb-1 text-[#768390]">Last document refresh</div>{status?.freshness?.last_document_refresh_utc || "—"}</div>
+              </div>
             </CardContent>
           </Card>
 

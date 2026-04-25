@@ -14,6 +14,7 @@ from typing import Dict, List, Optional, Tuple
 from fastapi.testclient import TestClient
 
 from .config import settings
+from .intelligence import parse_macro_csv_bytes
 from .mock_data import generate_dataset, load_dataset
 from .ml.train import train_from_db
 from .storage import Storage
@@ -519,6 +520,30 @@ def cmd_import_macro_csv(args: argparse.Namespace) -> None:
     result = data_service.import_macro_rows(rows)
     print(json.dumps(result, indent=2))
 
+def cmd_refresh_documents(args: argparse.Namespace) -> None:
+    from .services import data_service
+
+    result = data_service.refresh_documents(limit=args.limit, symbol=args.symbol, force=args.force, max_pages=args.max_pages)
+    print(json.dumps(result, indent=2))
+
+
+def cmd_seed_news_whitelist(args: argparse.Namespace) -> None:
+    from .services import data_service
+
+    print(json.dumps(data_service.seed_news_whitelist(), indent=2))
+
+
+def cmd_refresh_selected_news(args: argparse.Namespace) -> None:
+    from .services import data_service
+
+    print(json.dumps(data_service.refresh_selected_news(lookback_days=args.lookback_days, max_per_source=args.max_per_source), indent=2))
+
+
+def cmd_compare_news_models(args: argparse.Namespace) -> None:
+    from .services import data_service
+
+    print(json.dumps(data_service.compare_news_models(symbols=args.symbols, horizon_days=args.horizon_days, max_symbols=args.max_symbols), indent=2))
+
 def cmd_bootstrap_real_data(args: argparse.Namespace) -> None:
     st = Storage(settings.database_url)
     st.init()
@@ -571,6 +596,27 @@ def main(argv: Optional[List[str]] = None) -> None:
     smacro = sub.add_parser("import-macro-csv", help="Import macro / global indicator rows from CSV")
     smacro.add_argument("--file", required=True)
     smacro.set_defaults(func=cmd_import_macro_csv)
+
+    sdoc = sub.add_parser("refresh-documents", help="Extract official CSE PDF/report intelligence")
+    sdoc.add_argument("--limit", type=int, default=120)
+    sdoc.add_argument("--symbol", help="Optional symbol such as LOLC.N0000")
+    sdoc.add_argument("--force", action="store_true", help="Reprocess documents already in the DB")
+    sdoc.add_argument("--max-pages", type=int, default=12)
+    sdoc.set_defaults(func=cmd_refresh_documents)
+
+    snewsseed = sub.add_parser("seed-news-whitelist", help="Seed selected Sri Lanka news source whitelist")
+    snewsseed.set_defaults(func=cmd_seed_news_whitelist)
+
+    snews = sub.add_parser("refresh-selected-news", help="Ingest selected whitelisted Sri Lanka economy/business news")
+    snews.add_argument("--lookback-days", type=int, default=30)
+    snews.add_argument("--max-per-source", type=int, default=40)
+    snews.set_defaults(func=cmd_refresh_selected_news)
+
+    scompnews = sub.add_parser("compare-news-models", help="Compare official-CSE-only model vs CSE + selected-news feature set")
+    scompnews.add_argument("--symbols", nargs="*", help="Optional symbols")
+    scompnews.add_argument("--horizon-days", type=int, default=1)
+    scompnews.add_argument("--max-symbols", type=int, default=40)
+    scompnews.set_defaults(func=cmd_compare_news_models)
 
     s3 = sub.add_parser("import-eod-zip", help="Import vendor EOD CSVs from a .zip (one CSV per symbol)")
     s3.add_argument("--file", required=True, help="Path to zip file")

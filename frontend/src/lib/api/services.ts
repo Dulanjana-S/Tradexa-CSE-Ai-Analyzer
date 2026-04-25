@@ -15,6 +15,8 @@ import type {
   PredictionCardData,
   RegisterRequest,
   Stock,
+  StockDocuments,
+  StockNews,
   StockResources,
   User,
   UserSettings,
@@ -410,6 +412,46 @@ function mapSentimentSummary(raw: any): SentimentSummary {
   };
 }
 
+function mapDocumentIntelligence(item: any) {
+  return {
+    docId: String(item?.doc_id || item?.docId || ""),
+    annId: item?.ann_id || item?.annId,
+    symbol: item?.symbol,
+    date: item?.date,
+    title: String(item?.title || "Document"),
+    documentUrl: item?.document_url || item?.documentUrl,
+    documentType: item?.document_type || item?.documentType,
+    summary: item?.summary,
+    pagesAnalyzed: num(item?.pages_analyzed ?? item?.pagesAnalyzed),
+    sentimentScore: num(item?.sentiment_score ?? item?.sentimentScore),
+    sentimentLabel: item?.sentiment_label || item?.sentimentLabel,
+    impactScore: num(item?.impact_score ?? item?.impactScore),
+    eventType: item?.event_type || item?.eventType,
+    confidence: num(item?.confidence),
+    keywords: Array.isArray(item?.keywords) ? item.keywords.map(String) : [],
+  };
+}
+
+function mapExternalNewsItem(item: any) {
+  return {
+    itemId: String(item?.item_id || item?.itemId || ""),
+    sourceName: String(item?.source_name || item?.sourceName || ""),
+    sourceDomain: String(item?.source_domain || item?.sourceDomain || ""),
+    url: String(item?.url || ""),
+    title: String(item?.title || "News"),
+    publishedDate: item?.published_date || item?.publishedDate,
+    scope: item?.scope,
+    symbol: item?.symbol,
+    companyName: item?.company_name || item?.companyName,
+    sentimentScore: num(item?.sentiment_score ?? item?.sentimentScore),
+    sentimentLabel: item?.sentiment_label || item?.sentimentLabel,
+    impactScore: num(item?.impact_score ?? item?.impactScore),
+    eventType: item?.event_type || item?.eventType,
+    confidence: num(item?.confidence),
+    keywords: Array.isArray(item?.keywords) ? item.keywords.map(String) : [],
+  };
+}
+
 function mapPrediction(raw: any, currentPrice = 0): PredictionCardData {
   if (!raw?.available) {
     return {
@@ -613,6 +655,16 @@ export const marketApi = {
   getStockSentiment: async (symbol: string, days = 90): Promise<SentimentSummary> => {
     const response = await api.get<any>(`/api/stocks/${encodeURIComponent(symbol)}/sentiment?days=${encodeURIComponent(String(days))}`);
     return mapSentimentSummary(response);
+  },
+
+  getStockDocuments: async (symbol: string, limit = 50): Promise<StockDocuments> => {
+    const response = await api.get<any>(`/api/stocks/${encodeURIComponent(symbol)}/documents?limit=${encodeURIComponent(String(limit))}`);
+    return { symbol: String(response?.symbol || symbol), count: num(response?.count), documents: Array.isArray(response?.documents) ? response.documents.map(mapDocumentIntelligence) : [] };
+  },
+
+  getStockNews: async (symbol: string, limit = 40): Promise<StockNews> => {
+    const response = await api.get<any>(`/api/stocks/${encodeURIComponent(symbol)}/news?limit=${encodeURIComponent(String(limit))}`);
+    return { symbol: String(response?.symbol || symbol), linkedNews: Array.isArray(response?.linked_news) ? response.linked_news.map(mapExternalNewsItem) : [], marketContext: Array.isArray(response?.market_context) ? response.market_context.map(mapExternalNewsItem) : [] };
   },
 };
 
@@ -873,6 +925,14 @@ export const adminApi = {
   },
 
   refreshSentiment: (limit = 1200) => api.post<any>("/api/admin/actions/refresh-sentiment", { limit }),
+
+  refreshDocuments: (payload?: { limit?: number; symbol?: string; force?: boolean; max_pages?: number }) => api.post<any>("/api/admin/actions/refresh-documents", payload || {}),
+
+  seedNewsWhitelist: () => api.post<any>("/api/admin/actions/seed-news-whitelist", {}),
+
+  refreshSelectedNews: (payload?: { lookback_days?: number; max_per_source?: number }) => api.post<any>("/api/admin/actions/refresh-selected-news", payload || {}),
+
+  compareNewsModels: (payload?: { symbols?: string[]; horizon_days?: number; max_symbols?: number }) => api.post<any>("/api/admin/actions/compare-news-models", payload || {}),
 
   previewMacroData: async (file: File) => {
     const form = new FormData();

@@ -262,8 +262,68 @@ if metadata is not None:
         Column("category", String(64), nullable=True),
         Column("created_at", DateTime, nullable=True),
     )
+
+    document_intelligence_t = Table(
+        "document_intelligence",
+        metadata,
+        Column("doc_id", String(128), primary_key=True),
+        Column("ann_id", String(128), nullable=True, index=True),
+        Column("symbol", String(32), nullable=True, index=True),
+        Column("date", String(32), nullable=True, index=True),
+        Column("title", Text, nullable=True),
+        Column("document_url", Text, nullable=True),
+        Column("document_type", String(64), nullable=True),
+        Column("summary", Text, nullable=True),
+        Column("extracted_text", Text, nullable=True),
+        Column("pages_analyzed", Float, nullable=True),
+        Column("sentiment_score", Float, nullable=True),
+        Column("sentiment_label", String(32), nullable=True),
+        Column("impact_score", Float, nullable=True),
+        Column("event_type", String(64), nullable=True),
+        Column("confidence", Float, nullable=True),
+        Column("keywords", Text, nullable=True),
+        Column("meta", Text, nullable=True),
+        Column("created_at", DateTime, nullable=True),
+        Column("updated_at", DateTime, nullable=True),
+    )
+
+    source_whitelist_t = Table(
+        "source_whitelist",
+        metadata,
+        Column("source_name", String(128), primary_key=True),
+        Column("domain", String(128), nullable=False),
+        Column("base_url", Text, nullable=False),
+        Column("enabled", Float, nullable=False),
+        Column("parser_kind", String(64), nullable=False),
+        Column("scope_hint", String(64), nullable=True),
+        Column("meta", Text, nullable=True),
+        Column("created_at", DateTime, nullable=True),
+    )
+
+    external_news_items_t = Table(
+        "external_news_items",
+        metadata,
+        Column("item_id", String(128), primary_key=True),
+        Column("source_name", String(128), nullable=False, index=True),
+        Column("source_domain", String(128), nullable=False),
+        Column("url", Text, nullable=False),
+        Column("title", Text, nullable=False),
+        Column("published_at", String(64), nullable=True),
+        Column("published_date", String(32), nullable=True, index=True),
+        Column("scope", String(32), nullable=True),
+        Column("symbol", String(32), nullable=True, index=True),
+        Column("company_name", Text, nullable=True),
+        Column("sentiment_score", Float, nullable=True),
+        Column("sentiment_label", String(32), nullable=True),
+        Column("impact_score", Float, nullable=True),
+        Column("event_type", String(64), nullable=True),
+        Column("confidence", Float, nullable=True),
+        Column("keywords", Text, nullable=True),
+        Column("raw", Text, nullable=True),
+        Column("created_at", DateTime, nullable=True),
+    )
 else:  # pragma: no cover
-    companies_t = prices_t = indices_t = announcements_t = meta_t = watchlists_t = preferences_t = job_runs_t = users_t = sessions_t = password_reset_tokens_t = model_registry_t = alerts_t = notifications_t = portfolio_transactions_t = announcement_meta_t = corporate_actions_t = news_sentiment_t = macro_indicators_t = None  # type: ignore
+    companies_t = prices_t = indices_t = announcements_t = meta_t = watchlists_t = preferences_t = job_runs_t = users_t = sessions_t = password_reset_tokens_t = model_registry_t = alerts_t = notifications_t = portfolio_transactions_t = announcement_meta_t = corporate_actions_t = news_sentiment_t = macro_indicators_t = document_intelligence_t = source_whitelist_t = external_news_items_t = None  # type: ignore
 
 
 def _utc_now() -> str:
@@ -513,6 +573,61 @@ class Storage:
                         PRIMARY KEY(indicator_key, date)
                     );
                     CREATE INDEX IF NOT EXISTS idx_macro_indicators_key_date ON macro_indicators(indicator_key, date DESC);
+                    CREATE TABLE IF NOT EXISTS document_intelligence (
+                        doc_id TEXT PRIMARY KEY,
+                        ann_id TEXT,
+                        symbol TEXT,
+                        date TEXT,
+                        title TEXT,
+                        document_url TEXT,
+                        document_type TEXT,
+                        summary TEXT,
+                        extracted_text TEXT,
+                        pages_analyzed REAL,
+                        sentiment_score REAL,
+                        sentiment_label TEXT,
+                        impact_score REAL,
+                        event_type TEXT,
+                        confidence REAL,
+                        keywords TEXT,
+                        meta TEXT,
+                        created_at TEXT,
+                        updated_at TEXT
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_document_intelligence_symbol_date ON document_intelligence(symbol, date DESC);
+                    CREATE INDEX IF NOT EXISTS idx_document_intelligence_ann ON document_intelligence(ann_id);
+                    CREATE TABLE IF NOT EXISTS source_whitelist (
+                        source_name TEXT PRIMARY KEY,
+                        domain TEXT NOT NULL,
+                        base_url TEXT NOT NULL,
+                        enabled REAL NOT NULL DEFAULT 1,
+                        parser_kind TEXT NOT NULL,
+                        scope_hint TEXT,
+                        meta TEXT,
+                        created_at TEXT
+                    );
+                    CREATE TABLE IF NOT EXISTS external_news_items (
+                        item_id TEXT PRIMARY KEY,
+                        source_name TEXT NOT NULL,
+                        source_domain TEXT NOT NULL,
+                        url TEXT NOT NULL UNIQUE,
+                        title TEXT NOT NULL,
+                        published_at TEXT,
+                        published_date TEXT,
+                        scope TEXT,
+                        symbol TEXT,
+                        company_name TEXT,
+                        sentiment_score REAL,
+                        sentiment_label TEXT,
+                        impact_score REAL,
+                        event_type TEXT,
+                        confidence REAL,
+                        keywords TEXT,
+                        raw TEXT,
+                        created_at TEXT
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_external_news_symbol_date ON external_news_items(symbol, published_date DESC);
+                    CREATE INDEX IF NOT EXISTS idx_external_news_source_date ON external_news_items(source_name, published_date DESC);
                     CREATE INDEX IF NOT EXISTS idx_prices_symbol_date ON prices(symbol, date DESC);
                     CREATE INDEX IF NOT EXISTS idx_indices_name_date ON indices(name, date DESC);
                     CREATE INDEX IF NOT EXISTS idx_job_runs_job_name ON job_runs(job_name, started_at DESC);
@@ -986,19 +1101,24 @@ class Storage:
             conn.execute(stmt.on_conflict_do_update(index_elements=[news_sentiment_t.c.item_id], set_=update_cols))
         return len(payload)
 
-    def get_news_sentiment(self, symbol: Optional[str] = None, limit: int = 200) -> List[Dict[str, Any]]:
+    def get_news_sentiment(self, symbol: Optional[str] = None, limit: int = 200, source_types: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        source_types = [str(x) for x in (source_types or []) if x]
         if self._is_sqlite():
+            clauses = []
+            params: List[Any] = []
+            if symbol:
+                clauses.append("symbol = ?")
+                params.append(symbol.upper())
+            if source_types:
+                placeholders = ",".join("?" for _ in source_types)
+                clauses.append(f"source_type IN ({placeholders})")
+                params.extend(source_types)
+            where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
             with self._sqlite() as conn:
-                if symbol:
-                    rows = conn.execute(
-                        "SELECT item_id, ann_id, symbol, date, title, source_url, source_type, sentiment_score, sentiment_label, impact_score, event_type, confidence, keywords, meta, created_at FROM news_sentiment WHERE symbol = ? ORDER BY date DESC, created_at DESC LIMIT ?",
-                        (symbol.upper(), limit),
-                    ).fetchall()
-                else:
-                    rows = conn.execute(
-                        "SELECT item_id, ann_id, symbol, date, title, source_url, source_type, sentiment_score, sentiment_label, impact_score, event_type, confidence, keywords, meta, created_at FROM news_sentiment ORDER BY date DESC, created_at DESC LIMIT ?",
-                        (limit,),
-                    ).fetchall()
+                rows = conn.execute(
+                    f"SELECT item_id, ann_id, symbol, date, title, source_url, source_type, sentiment_score, sentiment_label, impact_score, event_type, confidence, keywords, meta, created_at FROM news_sentiment {where} ORDER BY date DESC, created_at DESC LIMIT ?",
+                    (*params, limit),
+                ).fetchall()
             out = [dict(r) for r in rows]
         else:
             with self.engine().connect() as conn:
@@ -1009,6 +1129,8 @@ class Storage:
                 )
                 if symbol:
                     stmt = stmt.where(news_sentiment_t.c.symbol == symbol.upper())
+                if source_types:
+                    stmt = stmt.where(news_sentiment_t.c.source_type.in_(source_types))
                 stmt = stmt.order_by(news_sentiment_t.c.date.desc(), news_sentiment_t.c.created_at.desc()).limit(limit)
                 out = [dict(r) for r in conn.execute(stmt).mappings().all()]
         for row in out:
@@ -1021,8 +1143,8 @@ class Storage:
                         row[key] = [] if key == "keywords" else {}
         return out
 
-    def get_sentiment_feature_series(self, symbol: str, limit: int = 1500) -> List[Dict[str, Any]]:
-        rows = self.get_news_sentiment(symbol=symbol, limit=limit)
+    def get_sentiment_feature_series(self, symbol: str, limit: int = 1500, source_types: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        rows = self.get_news_sentiment(symbol=symbol, limit=limit, source_types=source_types)
         grouped: Dict[str, Dict[str, Any]] = {}
         for row in rows:
             dt = str(row.get("date") or "")[:10]
@@ -1122,6 +1244,220 @@ class Storage:
                 stmt = stmt.order_by(macro_indicators_t.c.date.desc()).limit(limit)
                 out = [dict(r) for r in conn.execute(stmt).mappings().all()]
         out.reverse()
+        return out
+
+    # ---- Document intelligence & selected news ----
+    def upsert_document_intelligence(self, rows: List[Dict[str, Any]], *, force: bool = True) -> int:
+        payload = []
+        for row in rows:
+            doc_id = str(row.get("doc_id") or "").strip()
+            if not doc_id:
+                continue
+            payload.append({
+                "doc_id": doc_id,
+                "ann_id": row.get("ann_id"),
+                "symbol": (row.get("symbol") or "").upper() or None,
+                "date": str(row.get("date") or "")[:10] or None,
+                "title": row.get("title"),
+                "document_url": row.get("document_url"),
+                "document_type": row.get("document_type"),
+                "summary": row.get("summary"),
+                "extracted_text": row.get("extracted_text"),
+                "pages_analyzed": row.get("pages_analyzed"),
+                "sentiment_score": row.get("sentiment_score"),
+                "sentiment_label": row.get("sentiment_label"),
+                "impact_score": row.get("impact_score"),
+                "event_type": row.get("event_type"),
+                "confidence": row.get("confidence"),
+                "keywords": _json_dumps(row.get("keywords") or []),
+                "meta": _json_dumps(row.get("meta") or {}),
+                "created_at": _utc_now(),
+                "updated_at": _utc_now(),
+            })
+        if not payload:
+            return 0
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.executemany(
+                    """
+                    INSERT OR REPLACE INTO document_intelligence
+                    (doc_id, ann_id, symbol, date, title, document_url, document_type, summary, extracted_text, pages_analyzed, sentiment_score, sentiment_label, impact_score, event_type, confidence, keywords, meta, created_at, updated_at)
+                    VALUES (:doc_id, :ann_id, :symbol, :date, :title, :document_url, :document_type, :summary, :extracted_text, :pages_analyzed, :sentiment_score, :sentiment_label, :impact_score, :event_type, :confidence, :keywords, :meta, :created_at, :updated_at)
+                    """,
+                    payload,
+                )
+            return len(payload)
+        with self.engine().begin() as conn:
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+            stmt = pg_insert(document_intelligence_t).values(payload)
+            update_cols = {c.name: getattr(stmt.excluded, c.name) for c in document_intelligence_t.c if c.name != "doc_id"}
+            conn.execute(stmt.on_conflict_do_update(index_elements=[document_intelligence_t.c.doc_id], set_=update_cols))
+        return len(payload)
+
+    def get_document_intelligence(self, symbol: Optional[str] = None, limit: int = 200) -> List[Dict[str, Any]]:
+        if self._is_sqlite():
+            clauses = []
+            params: List[Any] = []
+            if symbol:
+                clauses.append("symbol = ?")
+                params.append(symbol.upper())
+            where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+            with self._sqlite() as conn:
+                rows = conn.execute(
+                    f"SELECT * FROM document_intelligence {where} ORDER BY date DESC, updated_at DESC LIMIT ?",
+                    (*params, limit),
+                ).fetchall()
+            out = [dict(r) for r in rows]
+        else:
+            with self.engine().connect() as conn:
+                stmt = select(document_intelligence_t).order_by(document_intelligence_t.c.date.desc(), document_intelligence_t.c.updated_at.desc()).limit(limit)
+                if symbol:
+                    stmt = stmt.where(document_intelligence_t.c.symbol == symbol.upper())
+                out = [dict(r) for r in conn.execute(stmt).mappings().all()]
+        for row in out:
+            for key in ("keywords", "meta"):
+                value = row.get(key)
+                if isinstance(value, str):
+                    try:
+                        row[key] = json.loads(value)
+                    except Exception:
+                        row[key] = [] if key == "keywords" else {}
+        return out
+
+    def upsert_source_whitelist(self, rows: List[Dict[str, Any]]) -> int:
+        payload = []
+        for row in rows:
+            name = str(row.get("source_name") or "").strip()
+            domain = str(row.get("domain") or "").strip().lower()
+            base_url = str(row.get("base_url") or "").strip()
+            if not name or not domain or not base_url:
+                continue
+            payload.append({
+                "source_name": name,
+                "domain": domain,
+                "base_url": base_url,
+                "enabled": 1 if bool(row.get("enabled", True)) else 0,
+                "parser_kind": row.get("parser_kind") or "html_links",
+                "scope_hint": row.get("scope_hint") or "market",
+                "meta": _json_dumps(row.get("meta") or {}),
+                "created_at": _utc_now(),
+            })
+        if not payload:
+            return 0
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.executemany(
+                    """
+                    INSERT OR REPLACE INTO source_whitelist
+                    (source_name, domain, base_url, enabled, parser_kind, scope_hint, meta, created_at)
+                    VALUES (:source_name, :domain, :base_url, :enabled, :parser_kind, :scope_hint, :meta, :created_at)
+                    """,
+                    payload,
+                )
+            return len(payload)
+        with self.engine().begin() as conn:
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+            stmt = pg_insert(source_whitelist_t).values(payload)
+            update_cols = {c.name: getattr(stmt.excluded, c.name) for c in source_whitelist_t.c if c.name != "source_name"}
+            conn.execute(stmt.on_conflict_do_update(index_elements=[source_whitelist_t.c.source_name], set_=update_cols))
+        return len(payload)
+
+    def list_source_whitelist(self, enabled_only: bool = True) -> List[Dict[str, Any]]:
+        if self._is_sqlite():
+            query = "SELECT * FROM source_whitelist"
+            params: Tuple[Any, ...] = ()
+            if enabled_only:
+                query += " WHERE enabled = 1"
+            query += " ORDER BY source_name"
+            with self._sqlite() as conn:
+                rows = conn.execute(query, params).fetchall()
+            out = [dict(r) for r in rows]
+        else:
+            with self.engine().connect() as conn:
+                stmt = select(source_whitelist_t).order_by(source_whitelist_t.c.source_name)
+                if enabled_only:
+                    stmt = stmt.where(source_whitelist_t.c.enabled == 1)
+                out = [dict(r) for r in conn.execute(stmt).mappings().all()]
+        for row in out:
+            if isinstance(row.get("meta"), str):
+                try:
+                    row["meta"] = json.loads(row.get("meta") or "{}")
+                except Exception:
+                    row["meta"] = {}
+            row["enabled"] = bool(row.get("enabled"))
+        return out
+
+    def upsert_external_news_items(self, rows: List[Dict[str, Any]]) -> int:
+        payload = []
+        for row in rows:
+            item_id = str(row.get("item_id") or "").strip()
+            if not item_id:
+                continue
+            payload.append({
+                "item_id": item_id,
+                "source_name": row.get("source_name"),
+                "source_domain": row.get("source_domain"),
+                "url": row.get("url"),
+                "title": row.get("title"),
+                "published_at": row.get("published_at"),
+                "published_date": str(row.get("published_date") or "")[:10] or None,
+                "scope": row.get("scope") or "market",
+                "symbol": (row.get("symbol") or "").upper() or None,
+                "company_name": row.get("company_name"),
+                "sentiment_score": row.get("sentiment_score"),
+                "sentiment_label": row.get("sentiment_label"),
+                "impact_score": row.get("impact_score"),
+                "event_type": row.get("event_type"),
+                "confidence": row.get("confidence"),
+                "keywords": _json_dumps(row.get("keywords") or []),
+                "raw": _json_dumps(row.get("raw") or {}),
+                "created_at": _utc_now(),
+            })
+        if not payload:
+            return 0
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.executemany(
+                    """
+                    INSERT OR REPLACE INTO external_news_items
+                    (item_id, source_name, source_domain, url, title, published_at, published_date, scope, symbol, company_name, sentiment_score, sentiment_label, impact_score, event_type, confidence, keywords, raw, created_at)
+                    VALUES (:item_id, :source_name, :source_domain, :url, :title, :published_at, :published_date, :scope, :symbol, :company_name, :sentiment_score, :sentiment_label, :impact_score, :event_type, :confidence, :keywords, :raw, :created_at)
+                    """,
+                    payload,
+                )
+            return len(payload)
+        with self.engine().begin() as conn:
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+            stmt = pg_insert(external_news_items_t).values(payload)
+            update_cols = {c.name: getattr(stmt.excluded, c.name) for c in external_news_items_t.c if c.name != "item_id"}
+            conn.execute(stmt.on_conflict_do_update(index_elements=[external_news_items_t.c.item_id], set_=update_cols))
+        return len(payload)
+
+    def get_external_news_items(self, symbol: Optional[str] = None, limit: int = 200) -> List[Dict[str, Any]]:
+        if self._is_sqlite():
+            if symbol:
+                query = "SELECT * FROM external_news_items WHERE symbol = ? ORDER BY published_date DESC, created_at DESC LIMIT ?"
+                params: Tuple[Any, ...] = (symbol.upper(), limit)
+            else:
+                query = "SELECT * FROM external_news_items ORDER BY published_date DESC, created_at DESC LIMIT ?"
+                params = (limit,)
+            with self._sqlite() as conn:
+                rows = conn.execute(query, params).fetchall()
+            out = [dict(r) for r in rows]
+        else:
+            with self.engine().connect() as conn:
+                stmt = select(external_news_items_t).order_by(external_news_items_t.c.published_date.desc(), external_news_items_t.c.created_at.desc()).limit(limit)
+                if symbol:
+                    stmt = stmt.where(external_news_items_t.c.symbol == symbol.upper())
+                out = [dict(r) for r in conn.execute(stmt).mappings().all()]
+        for row in out:
+            for key in ("keywords", "raw"):
+                value = row.get(key)
+                if isinstance(value, str):
+                    try:
+                        row[key] = json.loads(value)
+                    except Exception:
+                        row[key] = [] if key == "keywords" else {}
         return out
 
     # ---- User state ----

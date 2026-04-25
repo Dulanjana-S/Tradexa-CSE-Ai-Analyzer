@@ -5,14 +5,14 @@ import io
 import json
 import math
 import statistics
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from fastapi import HTTPException, UploadFile
 
 from ..config import settings
-from ..intelligence import build_sentiment_rows, preview_macro_rows, summarize_sentiment
+from ..intelligence import DEFAULT_NEWS_WHITELIST, build_document_intelligence_row, build_sentiment_rows, document_row_to_sentiment, enrich_external_news_item, external_news_to_sentiment_row, extract_links_from_html, is_report_or_corporate_document, preview_macro_rows, summarize_sentiment, validate_whitelisted_url
 from ..mock_data import DEMO_SYMBOLS, demo_prediction
 from ..ml.model_store import activate_bundle, latest_bundle
 from ..ml.predict import predict_next
@@ -535,6 +535,145 @@ def import_macro_rows(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     _storage.set_meta("last_macro_import_utc", date.today().isoformat())
     preview = preview_macro_rows(rows)
     return {"inserted": inserted, "preview": preview}
+
+def refresh_documents(limit: int = 120, symbol: Optional[str] = None, force: bool = False, max_pages: int = 12) -> Dict[str, Any]:
+    import requests
+
+    anns = _storage.get_announcements(symbol.upper() if symbol else None, limit=max(limit * 3, limit))
+    existing = {str(row.get("ann_id") or "") for row in _storage.get_document_intelligence(symbol=symbol, limit=5000)} if not force else set()
+    rows: List[Dict[str, Any]] = []
+    errors: List[Dict[str, Any]] = []
+    session = requests.Session()
+    session.headers.update({"User-Agent": "TradexaLK/1.0 document-intelligence"})
+    for ann in anns:
+        if len(rows) >= limit:
+            break
+        ann_id = str(ann.get("ann_id") or ann.get("id") or "")
+        title = str(ann.get("title") or "")
+        url = ann.get("url")
+        if not url or not is_report_or_corporate_document(title, url):
+            continue
+        if ann_id in existing:
+            continue
+        try:
+            res = session.get(url, timeout=25)
+            res.raise_for_status()
+            payload = res.content
+            if not payload or ("pdf" not in str(res.headers.get("content-type", "")).lower() and not str(url).lower().endswith(".pdf")):
+                # Some CSE endpoints return PDFs without content-type; keep .pdf URLs only.
+                if not str(url).lower().endswith(".pdf"):
+                    continue
+            row = build_document_intelligence_row(ann, payload, max_pages=max_pages)
+            rows.append(row)
+        except Exception as exc:
+            errors.append({"ann_id": ann_id, "symbol": ann.get("symbol"), "url": url, "error": str(exc)[:300]})
+    inserted = _storage.upsert_document_intelligence(rows, force=force)
+    sentiment_rows = [document_row_to_sentiment(row) for row in rows]
+    sentiment_inserted = _storage.upsert_news_sentiment(sentiment_rows)
+    _storage.set_meta("last_document_refresh_utc", datetime.utcnow().isoformat(timespec="seconds"))
+    return {
+        "announcements_scanned": len(anns),
+        "documents_analyzed": inserted,
+        "sentiment_rows_upserted": sentiment_inserted,
+        "errors": errors[:20],
+        "symbol": symbol.upper() if symbol else None,
+        "max_pages": max_pages,
+    }
+
+
+def stock_documents(symbol: str, limit: int = 50) -> Dict[str, Any]:
+    rows = _storage.get_document_intelligence(symbol=symbol.upper(), limit=limit)
+    return {"symbol": symbol.upper(), "documents": rows, "count": len(rows)}
+
+
+def seed_news_whitelist() -> Dict[str, Any]:
+    inserted = _storage.upsert_source_whitelist(DEFAULT_NEWS_WHITELIST)
+    return {"sources_upserted": inserted, "sources": _storage.list_source_whitelist(enabled_only=False)}
+
+
+def refresh_selected_news(lookback_days: int = 30, max_per_source: int = 40) -> Dict[str, Any]:
+    import requests
+
+    sources = _storage.list_source_whitelist(enabled_only=True)
+    if not sources:
+        _storage.upsert_source_whitelist(DEFAULT_NEWS_WHITELIST)
+        sources = _storage.list_source_whitelist(enabled_only=True)
+    companies_list = companies()
+    cutoff = (date.today() - timedelta(days=lookback_days)).isoformat()
+    rows: List[Dict[str, Any]] = []
+    source_stats: List[Dict[str, Any]] = []
+    session = requests.Session()
+    session.headers.update({"User-Agent": "TradexaLK/1.0 selected-news-ingestion"})
+    for source in sources:
+        base_url = str(source.get("base_url") or "")
+        domain = str(source.get("domain") or "")
+        if not validate_whitelisted_url(base_url, domain):
+            source_stats.append({"source_name": source.get("source_name"), "error": "base_url is outside whitelisted domain"})
+            continue
+        try:
+            res = session.get(base_url, timeout=25)
+            res.raise_for_status()
+            raw_items = extract_links_from_html(res.text, base_url, domain, str(source.get("source_name") or domain), limit=max_per_source)
+            enriched = []
+            for item in raw_items:
+                if str(item.get("published_date") or "") < cutoff:
+                    continue
+                item = {**item, "source_name": source.get("source_name"), "source_domain": domain, "scope_hint": source.get("scope_hint")}
+                enriched.append(enrich_external_news_item(item, companies_list))
+            rows.extend(enriched)
+            source_stats.append({"source_name": source.get("source_name"), "items": len(enriched)})
+        except Exception as exc:
+            source_stats.append({"source_name": source.get("source_name"), "error": str(exc)[:300]})
+    inserted = _storage.upsert_external_news_items(rows)
+    symbol_sentiment = [external_news_to_sentiment_row(row) for row in rows if row.get("symbol")]
+    sentiment_inserted = _storage.upsert_news_sentiment(symbol_sentiment)
+
+    # Broader market/economy news is converted into dated macro-style indicators so the existing feature pipeline can train on it.
+    by_date: Dict[str, List[Dict[str, Any]]] = {}
+    for row in rows:
+        dt = str(row.get("published_date") or "")[:10]
+        if dt:
+            by_date.setdefault(dt, []).append(row)
+    macro_rows: List[Dict[str, Any]] = []
+    for dt, bucket in by_date.items():
+        scores = [float(x.get("sentiment_score") or 0.0) for x in bucket]
+        impacts = [float(x.get("impact_score") or 0.0) for x in bucket]
+        macro_rows.extend([
+            {"indicator_key": "news_market_sentiment", "date": dt, "value": sum(scores) / max(1, len(scores)), "source": "selected_news", "label": "Selected news sentiment", "category": "news"},
+            {"indicator_key": "news_market_impact", "date": dt, "value": sum(impacts), "source": "selected_news", "label": "Selected news impact", "category": "news"},
+            {"indicator_key": "news_market_count", "date": dt, "value": len(bucket), "source": "selected_news", "label": "Selected news count", "category": "news"},
+        ])
+    macro_inserted = _storage.upsert_macro_indicators(macro_rows)
+    _storage.set_meta("last_selected_news_refresh_utc", datetime.utcnow().isoformat(timespec="seconds"))
+    return {
+        "sources": source_stats,
+        "news_items_upserted": inserted,
+        "symbol_sentiment_rows_upserted": sentiment_inserted,
+        "market_feature_points_upserted": macro_inserted,
+        "symbol_items": sum(1 for row in rows if row.get("symbol")),
+        "market_items": sum(1 for row in rows if not row.get("symbol")),
+    }
+
+
+def stock_news(symbol: str, limit: int = 40) -> Dict[str, Any]:
+    rows = _storage.get_external_news_items(symbol=symbol.upper(), limit=limit)
+    market = [row for row in _storage.get_external_news_items(limit=limit) if not row.get("symbol")][:limit]
+    return {"symbol": symbol.upper(), "linked_news": rows, "market_context": market}
+
+
+def compare_news_models(symbols: Optional[List[str]] = None, horizon_days: int = 1, max_symbols: int = 40) -> Dict[str, Any]:
+    from ..ml.compare import compare_official_vs_news
+
+    result = compare_official_vs_news(settings.database_url, symbols=symbols, horizon_days=horizon_days, max_symbols=max_symbols)
+    _storage.set_meta("last_news_model_comparison_utc", datetime.utcnow().isoformat(timespec="seconds"))
+    _storage.record_job_run(
+        job_name="model_comparison",
+        status="completed",
+        details=result,
+        started_at=datetime.utcnow().isoformat(timespec="seconds"),
+        finished_at=datetime.utcnow().isoformat(timespec="seconds"),
+    )
+    return result
 
 def stock_resources(symbol: str) -> Dict[str, Any]:
     sym = (symbol or '').upper()
@@ -1690,6 +1829,9 @@ def admin_status() -> Dict[str, Any]:
             "latest_announcements_sync": meta.get("last_announcements_sync_utc") or last_sync,
             "last_sentiment_refresh_utc": _storage.get_meta("last_sentiment_refresh_utc"),
             "last_macro_import_utc": _storage.get_meta("last_macro_import_utc"),
+            "last_document_refresh_utc": _storage.get_meta("last_document_refresh_utc"),
+            "last_selected_news_refresh_utc": _storage.get_meta("last_selected_news_refresh_utc"),
+            "last_news_model_comparison_utc": _storage.get_meta("last_news_model_comparison_utc"),
             "meta": meta,
         },
         "counts": {
@@ -1702,6 +1844,8 @@ def admin_status() -> Dict[str, Any]:
             "notifications": len(_storage.list_notifications(None)),
             "sentiment_items": len(_storage.get_news_sentiment(limit=2000)),
             "macro_points": len(_storage.get_macro_series(limit=5000)),
+            "document_intelligence": len(_storage.get_document_intelligence(limit=2000)),
+            "selected_news_items": len(_storage.get_external_news_items(limit=5000)),
         },
         "model": model_status(),
         "models": models,

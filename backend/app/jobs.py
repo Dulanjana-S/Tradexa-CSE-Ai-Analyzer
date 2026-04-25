@@ -179,8 +179,14 @@ def _run_daily_pipeline(params: Dict[str, Any], run_id: str) -> None:
         sentiment_result = data_service.refresh_sentiment_scores(limit=max(400, int(params.get("announcements") or params.get("dailyPipelineAnnouncements") or 100) * 4))
         details["sentiment"] = sentiment_result
         details["steps"].append("sentiment")
+        doc_result = data_service.refresh_documents(limit=int(params.get("document_limit") or 80), max_pages=int(params.get("document_max_pages") or 8))
+        details["documents"] = doc_result
+        details["steps"].append("documents")
+        news_result = data_service.refresh_selected_news(lookback_days=int(params.get("news_lookback_days") or 30), max_per_source=int(params.get("news_max_per_source") or 30))
+        details["selected_news"] = news_result
+        details["steps"].append("selected_news")
     except Exception as exc:
-        details["sentiment_error"] = str(exc)
+        details["intelligence_error"] = str(exc)
     if bool(params.get("train_after_sync", params.get("dailyPipelineTrain", True))):
         _run_train({
             "symbols": params.get("train_symbols") or params.get("symbols"),

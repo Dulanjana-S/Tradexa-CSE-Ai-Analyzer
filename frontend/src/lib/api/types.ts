@@ -397,3 +397,51 @@ export interface StockResources {
   quarterlyReports: StockResourceLink[];
   corporateDocuments: StockResourceLink[];
 }
+
+export interface DocumentIntelligence {
+  docId: string;
+  annId?: string;
+  symbol?: string;
+  date?: string;
+  title: string;
+  documentUrl?: string;
+  documentType?: string;
+  summary?: string;
+  pagesAnalyzed?: number;
+  sentimentScore?: number;
+  sentimentLabel?: string;
+  impactScore?: number;
+  eventType?: string;
+  confidence?: number;
+  keywords?: string[];
+}
+
+export interface StockDocuments {
+  symbol: string;
+  count: number;
+  documents: DocumentIntelligence[];
+}
+
+export interface ExternalNewsItem {
+  itemId: string;
+  sourceName: string;
+  sourceDomain: string;
+  url: string;
+  title: string;
+  publishedDate?: string;
+  scope?: string;
+  symbol?: string;
+  companyName?: string;
+  sentimentScore?: number;
+  sentimentLabel?: string;
+  impactScore?: number;
+  eventType?: string;
+  confidence?: number;
+  keywords?: string[];
+}
+
+export interface StockNews {
+  symbol: string;
+  linkedNews: ExternalNewsItem[];
+  marketContext: ExternalNewsItem[];
+}
