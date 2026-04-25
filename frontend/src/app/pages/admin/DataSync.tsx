@@ -25,6 +25,9 @@ export function DataSync() {
   const [uploadPreview, setUploadPreview] = useState<any>(null);
   const [schedulerSettings, setSchedulerSettings] = useState<any>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [macroFile, setMacroFile] = useState<File | null>(null);
+  const [macroPreview, setMacroPreview] = useState<any>(null);
+  const [sentimentResult, setSentimentResult] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const load = async () => {
@@ -92,6 +95,44 @@ export function DataSync() {
       setFiles([]);
       setUploadPreview(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
+      await load();
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const refreshSentiment = async () => {
+    setBusyAction("sentiment");
+    try {
+      const response = await adminApi.refreshSentiment(1600);
+      setSentimentResult(response?.result || response);
+      await load();
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const previewMacro = async (file: File | null) => {
+    setMacroFile(file);
+    if (!file) {
+      setMacroPreview(null);
+      return;
+    }
+    try {
+      const response = await adminApi.previewMacroData(file);
+      setMacroPreview(response?.preview || null);
+    } catch {
+      setMacroPreview(null);
+    }
+  };
+
+  const importMacro = async () => {
+    if (!macroFile) return;
+    setBusyAction("macro");
+    try {
+      const response = await adminApi.importMacroData(macroFile);
+      setMacroPreview(response?.preview || null);
+      setMacroFile(null);
       await load();
     } finally {
       setBusyAction(null);
@@ -277,6 +318,37 @@ export function DataSync() {
                   {status?.freshness?.last_sync_utc || "—"}
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-2">
+          <Card className="border-[#30363d] bg-[#161b22]">
+            <CardHeader>
+              <CardTitle className="text-[18px] text-[#e6edf3]">Sentiment intelligence</CardTitle>
+              <CardDescription className="text-[13px] text-[#768390]">Score official CSE announcements into event-aware sentiment features for training and stock pages.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="rounded-md border border-[#30363d] bg-[#0d1117] p-4 text-[13px] text-[#e6edf3]"><div className="mb-1 text-[#768390]">Sentiment rows</div>{status?.counts?.sentiment_items ?? 0}</div>
+                <div className="rounded-md border border-[#30363d] bg-[#0d1117] p-4 text-[13px] text-[#e6edf3]"><div className="mb-1 text-[#768390]">Last refresh</div>{status?.freshness?.last_sentiment_refresh_utc || "—"}</div>
+                <div className="rounded-md border border-[#30363d] bg-[#0d1117] p-4 text-[13px] text-[#e6edf3]"><div className="mb-1 text-[#768390]">Pipeline note</div>Runs automatically after daily sync</div>
+              </div>
+              <Button onClick={refreshSentiment} disabled={busyAction !== null} className="bg-violet-600 text-white hover:bg-violet-700">{busyAction === "sentiment" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Brain className="mr-2 h-4 w-4" />} Rebuild Sentiment from CSE Announcements</Button>
+              {sentimentResult ? <div className="rounded-md border border-violet-500/30 bg-violet-500/10 p-4 text-[13px] text-violet-100">Announcements scanned: {sentimentResult.announcements_scanned || 0} • Rows upserted: {sentimentResult.sentiment_rows_upserted || 0}</div> : null}
+            </CardContent>
+          </Card>
+
+          <Card className="border-[#30363d] bg-[#161b22]">
+            <CardHeader>
+              <CardTitle className="text-[18px] text-[#e6edf3]">Macro / global indicators</CardTitle>
+              <CardDescription className="text-[13px] text-[#768390]">Upload CSV rows like date, indicator_key, value to enrich training with Sri Lanka and global context.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Input type="file" accept=".csv" onChange={(e) => previewMacro(e.target.files?.[0] || null)} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
+              <div className="rounded-md border border-[#30363d] bg-[#0d1117] p-4 text-[12px] text-[#768390]">Suggested keys: usd_lkr, policy_rate, ccpi_yoy, ncpi_yoy, oil_brent, gold_usd, sp500, dxy</div>
+              {macroPreview ? <div className="rounded-md border border-[#30363d] bg-[#0d1117] p-4 text-[12px] text-[#e6edf3]">Rows: {macroPreview.totals?.rows || 0} • Indicators: {macroPreview.totals?.indicators || 0}<div className="mt-2 text-[#768390]">{(macroPreview.indicators || []).slice(0, 4).map((item: any) => `${item.indicator_key} (${item.rows})`).join(" • ")}</div></div> : null}
+              <div className="flex gap-3"><Button onClick={importMacro} disabled={busyAction !== null || !macroFile} className="bg-amber-600 text-white hover:bg-amber-700">{busyAction === "macro" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />} Import Macro CSV</Button></div>
             </CardContent>
           </Card>
         </div>

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import math
 import statistics
 from datetime import date, timedelta
@@ -11,6 +12,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 from fastapi import HTTPException, UploadFile
 
 from ..config import settings
+from ..intelligence import build_sentiment_rows, preview_macro_rows, summarize_sentiment
 from ..mock_data import DEMO_SYMBOLS, demo_prediction
 from ..ml.model_store import activate_bundle, latest_bundle
 from ..ml.predict import predict_next
@@ -496,6 +498,43 @@ def announcements(symbol: Optional[str], limit: int) -> List[Dict[str, Any]]:
 def _official_cse_profile_url(symbol: str) -> str:
     return f"https://www.cse.lk/pages/company-profile/company-profile.component.html?symbol={(symbol or '').upper()}"
 
+
+
+
+def refresh_sentiment_scores(limit: int = 1200) -> Dict[str, Any]:
+    anns = _storage.get_announcements(None, limit=limit)
+    rows = build_sentiment_rows(anns)
+    inserted = _storage.upsert_news_sentiment(rows)
+    _storage.set_meta("last_sentiment_refresh_utc", date.today().isoformat())
+    return {
+        "announcements_scanned": len(anns),
+        "sentiment_rows_upserted": inserted,
+        "symbols": len({str(r.get("symbol") or "") for r in rows if r.get("symbol")}),
+    }
+
+
+def sentiment_summary(symbol: str, days: int = 90) -> Dict[str, Any]:
+    rows = _storage.get_news_sentiment(symbol=symbol.upper(), limit=max(50, days * 4))
+    summary = summarize_sentiment(rows, days=days)
+    summary["symbol"] = symbol.upper()
+    return summary
+
+
+def macro_snapshot(limit: int = 800) -> Dict[str, Any]:
+    rows = _storage.get_macro_series(limit=limit)
+    latest: Dict[str, Dict[str, Any]] = {}
+    for row in rows:
+        key = str(row.get("indicator_key") or "")
+        if key and key not in latest:
+            latest[key] = row
+    return {"count": len(rows), "latest": latest, "rows": rows[-30:]}
+
+
+def import_macro_rows(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+    inserted = _storage.upsert_macro_indicators(rows)
+    _storage.set_meta("last_macro_import_utc", date.today().isoformat())
+    preview = preview_macro_rows(rows)
+    return {"inserted": inserted, "preview": preview}
 
 def stock_resources(symbol: str) -> Dict[str, Any]:
     sym = (symbol or '').upper()
@@ -1649,6 +1688,8 @@ def admin_status() -> Dict[str, Any]:
             "latest_price_date": coverage.get("latest_price_date"),
             "latest_history_date": coverage.get("latest_price_date"),
             "latest_announcements_sync": meta.get("last_announcements_sync_utc") or last_sync,
+            "last_sentiment_refresh_utc": _storage.get_meta("last_sentiment_refresh_utc"),
+            "last_macro_import_utc": _storage.get_meta("last_macro_import_utc"),
             "meta": meta,
         },
         "counts": {
@@ -1659,6 +1700,8 @@ def admin_status() -> Dict[str, Any]:
             "models": len(models),
             "alerts": len(_storage.list_alerts()),
             "notifications": len(_storage.list_notifications(None)),
+            "sentiment_items": len(_storage.get_news_sentiment(limit=2000)),
+            "macro_points": len(_storage.get_macro_series(limit=5000)),
         },
         "model": model_status(),
         "models": models,

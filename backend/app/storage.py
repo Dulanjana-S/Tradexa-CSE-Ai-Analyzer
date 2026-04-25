@@ -229,8 +229,41 @@ if metadata is not None:
         Column("source", Text, nullable=True),
         Column("created_at", DateTime, nullable=True),
     )
+
+
+    news_sentiment_t = Table(
+        "news_sentiment",
+        metadata,
+        Column("item_id", String(128), primary_key=True),
+        Column("ann_id", String(128), nullable=True, index=True),
+        Column("symbol", String(32), nullable=True, index=True),
+        Column("date", String(32), nullable=True, index=True),
+        Column("title", Text, nullable=True),
+        Column("source_url", Text, nullable=True),
+        Column("source_type", String(64), nullable=True),
+        Column("sentiment_score", Float, nullable=True),
+        Column("sentiment_label", String(32), nullable=True),
+        Column("impact_score", Float, nullable=True),
+        Column("event_type", String(64), nullable=True),
+        Column("confidence", Float, nullable=True),
+        Column("keywords", Text, nullable=True),
+        Column("meta", Text, nullable=True),
+        Column("created_at", DateTime, nullable=True),
+    )
+
+    macro_indicators_t = Table(
+        "macro_indicators",
+        metadata,
+        Column("indicator_key", String(64), primary_key=True),
+        Column("date", String(32), primary_key=True),
+        Column("value", Float, nullable=False),
+        Column("source", Text, nullable=True),
+        Column("label", Text, nullable=True),
+        Column("category", String(64), nullable=True),
+        Column("created_at", DateTime, nullable=True),
+    )
 else:  # pragma: no cover
-    companies_t = prices_t = indices_t = announcements_t = meta_t = watchlists_t = preferences_t = job_runs_t = users_t = sessions_t = password_reset_tokens_t = model_registry_t = alerts_t = notifications_t = portfolio_transactions_t = announcement_meta_t = corporate_actions_t = None  # type: ignore
+    companies_t = prices_t = indices_t = announcements_t = meta_t = watchlists_t = preferences_t = job_runs_t = users_t = sessions_t = password_reset_tokens_t = model_registry_t = alerts_t = notifications_t = portfolio_transactions_t = announcement_meta_t = corporate_actions_t = news_sentiment_t = macro_indicators_t = None  # type: ignore
 
 
 def _utc_now() -> str:
@@ -450,6 +483,36 @@ class Storage:
                         created_at TEXT
                     );
                     CREATE INDEX IF NOT EXISTS idx_corporate_actions_symbol ON corporate_actions(symbol, ex_date DESC);
+                    CREATE TABLE IF NOT EXISTS news_sentiment (
+                        item_id TEXT PRIMARY KEY,
+                        ann_id TEXT,
+                        symbol TEXT,
+                        date TEXT,
+                        title TEXT,
+                        source_url TEXT,
+                        source_type TEXT,
+                        sentiment_score REAL,
+                        sentiment_label TEXT,
+                        impact_score REAL,
+                        event_type TEXT,
+                        confidence REAL,
+                        keywords TEXT,
+                        meta TEXT,
+                        created_at TEXT
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_news_sentiment_symbol_date ON news_sentiment(symbol, date DESC);
+                    CREATE INDEX IF NOT EXISTS idx_news_sentiment_ann ON news_sentiment(ann_id);
+                    CREATE TABLE IF NOT EXISTS macro_indicators (
+                        indicator_key TEXT NOT NULL,
+                        date TEXT NOT NULL,
+                        value REAL NOT NULL,
+                        source TEXT,
+                        label TEXT,
+                        category TEXT,
+                        created_at TEXT,
+                        PRIMARY KEY(indicator_key, date)
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_macro_indicators_key_date ON macro_indicators(indicator_key, date DESC);
                     CREATE INDEX IF NOT EXISTS idx_prices_symbol_date ON prices(symbol, date DESC);
                     CREATE INDEX IF NOT EXISTS idx_indices_name_date ON indices(name, date DESC);
                     CREATE INDEX IF NOT EXISTS idx_job_runs_job_name ON job_runs(job_name, started_at DESC);
@@ -877,6 +940,188 @@ class Storage:
                 r['reviewed_by'] = None
                 r['reviewed_at'] = None
                 r['is_important'] = False
+        return out
+
+    # ---- Sentiment & Macro ----
+    def upsert_news_sentiment(self, rows: List[Dict[str, Any]]) -> int:
+        payload = []
+        for row in rows:
+            item_id = str(row.get("item_id") or row.get("ann_id") or "").strip()
+            if not item_id:
+                continue
+            payload.append({
+                "item_id": item_id,
+                "ann_id": row.get("ann_id"),
+                "symbol": (row.get("symbol") or "").upper() or None,
+                "date": str(row.get("date") or "")[:10] or None,
+                "title": row.get("title"),
+                "source_url": row.get("source_url"),
+                "source_type": row.get("source_type"),
+                "sentiment_score": row.get("sentiment_score"),
+                "sentiment_label": row.get("sentiment_label"),
+                "impact_score": row.get("impact_score"),
+                "event_type": row.get("event_type"),
+                "confidence": row.get("confidence"),
+                "keywords": _json_dumps(row.get("keywords") or []),
+                "meta": _json_dumps(row.get("meta") or {}),
+                "created_at": _utc_now(),
+            })
+        if not payload:
+            return 0
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.executemany(
+                    """
+                    INSERT OR REPLACE INTO news_sentiment
+                    (item_id, ann_id, symbol, date, title, source_url, source_type, sentiment_score, sentiment_label, impact_score, event_type, confidence, keywords, meta, created_at)
+                    VALUES (:item_id, :ann_id, :symbol, :date, :title, :source_url, :source_type, :sentiment_score, :sentiment_label, :impact_score, :event_type, :confidence, :keywords, :meta, :created_at)
+                    """,
+                    payload,
+                )
+            return len(payload)
+        with self.engine().begin() as conn:
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+            stmt = pg_insert(news_sentiment_t).values(payload)
+            update_cols = {c.name: getattr(stmt.excluded, c.name) for c in news_sentiment_t.c if c.name != "item_id"}
+            conn.execute(stmt.on_conflict_do_update(index_elements=[news_sentiment_t.c.item_id], set_=update_cols))
+        return len(payload)
+
+    def get_news_sentiment(self, symbol: Optional[str] = None, limit: int = 200) -> List[Dict[str, Any]]:
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                if symbol:
+                    rows = conn.execute(
+                        "SELECT item_id, ann_id, symbol, date, title, source_url, source_type, sentiment_score, sentiment_label, impact_score, event_type, confidence, keywords, meta, created_at FROM news_sentiment WHERE symbol = ? ORDER BY date DESC, created_at DESC LIMIT ?",
+                        (symbol.upper(), limit),
+                    ).fetchall()
+                else:
+                    rows = conn.execute(
+                        "SELECT item_id, ann_id, symbol, date, title, source_url, source_type, sentiment_score, sentiment_label, impact_score, event_type, confidence, keywords, meta, created_at FROM news_sentiment ORDER BY date DESC, created_at DESC LIMIT ?",
+                        (limit,),
+                    ).fetchall()
+            out = [dict(r) for r in rows]
+        else:
+            with self.engine().connect() as conn:
+                stmt = select(
+                    news_sentiment_t.c.item_id, news_sentiment_t.c.ann_id, news_sentiment_t.c.symbol, news_sentiment_t.c.date, news_sentiment_t.c.title,
+                    news_sentiment_t.c.source_url, news_sentiment_t.c.source_type, news_sentiment_t.c.sentiment_score, news_sentiment_t.c.sentiment_label,
+                    news_sentiment_t.c.impact_score, news_sentiment_t.c.event_type, news_sentiment_t.c.confidence, news_sentiment_t.c.keywords, news_sentiment_t.c.meta, news_sentiment_t.c.created_at
+                )
+                if symbol:
+                    stmt = stmt.where(news_sentiment_t.c.symbol == symbol.upper())
+                stmt = stmt.order_by(news_sentiment_t.c.date.desc(), news_sentiment_t.c.created_at.desc()).limit(limit)
+                out = [dict(r) for r in conn.execute(stmt).mappings().all()]
+        for row in out:
+            for key in ("keywords", "meta"):
+                value = row.get(key)
+                if isinstance(value, str):
+                    try:
+                        row[key] = json.loads(value)
+                    except Exception:
+                        row[key] = [] if key == "keywords" else {}
+        return out
+
+    def get_sentiment_feature_series(self, symbol: str, limit: int = 1500) -> List[Dict[str, Any]]:
+        rows = self.get_news_sentiment(symbol=symbol, limit=limit)
+        grouped: Dict[str, Dict[str, Any]] = {}
+        for row in rows:
+            dt = str(row.get("date") or "")[:10]
+            if not dt:
+                continue
+            bucket = grouped.setdefault(dt, {
+                "date": dt,
+                "sentiment_score": 0.0,
+                "impact_score": 0.0,
+                "doc_count": 0,
+                "positive_count": 0,
+                "negative_count": 0,
+                "neutral_count": 0,
+                "dividend_count": 0,
+                "earnings_count": 0,
+                "corporate_action_count": 0,
+                "regulatory_count": 0,
+            })
+            bucket["sentiment_score"] += float(row.get("sentiment_score") or 0.0)
+            bucket["impact_score"] += float(row.get("impact_score") or 0.0)
+            bucket["doc_count"] += 1
+            label = str(row.get("sentiment_label") or "neutral")
+            bucket[f"{label}_count"] = bucket.get(f"{label}_count", 0) + 1
+            event = str(row.get("event_type") or "general")
+            if event in {"dividend", "earnings", "corporate_action", "regulatory"}:
+                bucket[f"{event}_count"] = bucket.get(f"{event}_count", 0) + 1
+        out = []
+        for dt in sorted(grouped):
+            bucket = grouped[dt]
+            docs = max(1, int(bucket["doc_count"]))
+            bucket["sentiment_score"] = float(bucket["sentiment_score"]) / docs
+            out.append(bucket)
+        return out[-limit:]
+
+    def upsert_macro_indicators(self, rows: List[Dict[str, Any]]) -> int:
+        payload = []
+        for row in rows:
+            key = str(row.get("indicator_key") or "").strip().lower()
+            dt = str(row.get("date") or "")[:10]
+            if not key or not dt:
+                continue
+            payload.append({
+                "indicator_key": key,
+                "date": dt,
+                "value": row.get("value"),
+                "source": row.get("source"),
+                "label": row.get("label"),
+                "category": row.get("category"),
+                "created_at": _utc_now(),
+            })
+        if not payload:
+            return 0
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.executemany(
+                    """
+                    INSERT OR REPLACE INTO macro_indicators
+                    (indicator_key, date, value, source, label, category, created_at)
+                    VALUES (:indicator_key, :date, :value, :source, :label, :category, :created_at)
+                    """,
+                    payload,
+                )
+            return len(payload)
+        with self.engine().begin() as conn:
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+            stmt = pg_insert(macro_indicators_t).values(payload)
+            conn.execute(stmt.on_conflict_do_update(index_elements=[macro_indicators_t.c.indicator_key, macro_indicators_t.c.date], set_={
+                "value": stmt.excluded.value,
+                "source": stmt.excluded.source,
+                "label": stmt.excluded.label,
+                "category": stmt.excluded.category,
+                "created_at": stmt.excluded.created_at,
+            }))
+        return len(payload)
+
+    def get_macro_series(self, keys: Optional[List[str]] = None, limit: int = 5000) -> List[Dict[str, Any]]:
+        key_list = [k.strip().lower() for k in (keys or []) if k]
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                if key_list:
+                    placeholders = ",".join("?" for _ in key_list)
+                    rows = conn.execute(
+                        f"SELECT indicator_key, date, value, source, label, category, created_at FROM macro_indicators WHERE indicator_key IN ({placeholders}) ORDER BY date DESC LIMIT ?",
+                        (*key_list, limit),
+                    ).fetchall()
+                else:
+                    rows = conn.execute(
+                        "SELECT indicator_key, date, value, source, label, category, created_at FROM macro_indicators ORDER BY date DESC LIMIT ?",
+                        (limit,),
+                    ).fetchall()
+            out = [dict(r) for r in rows]
+        else:
+            with self.engine().connect() as conn:
+                stmt = select(macro_indicators_t.c.indicator_key, macro_indicators_t.c.date, macro_indicators_t.c.value, macro_indicators_t.c.source, macro_indicators_t.c.label, macro_indicators_t.c.category, macro_indicators_t.c.created_at)
+                if key_list:
+                    stmt = stmt.where(macro_indicators_t.c.indicator_key.in_(key_list))
+                stmt = stmt.order_by(macro_indicators_t.c.date.desc()).limit(limit)
+                out = [dict(r) for r in conn.execute(stmt).mappings().all()]
+        out.reverse()
         return out
 
     # ---- User state ----

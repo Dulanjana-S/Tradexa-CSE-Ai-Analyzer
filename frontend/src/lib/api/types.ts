@@ -350,6 +350,45 @@ export interface StockResourceLink {
   reportType?: string;
 }
 
+
+export interface SentimentTimelinePoint {
+  date: string;
+  score: number;
+  impact: number;
+  count: number;
+}
+
+export interface SentimentItem {
+  itemId: string;
+  annId?: string;
+  symbol?: string;
+  date: string;
+  title: string;
+  sourceUrl?: string;
+  sentimentScore: number;
+  sentimentLabel: "positive" | "neutral" | "negative";
+  impactScore: number;
+  eventType: string;
+  confidence: number;
+  keywords: string[];
+}
+
+export interface SentimentSummary {
+  symbol: string;
+  available: boolean;
+  latestLabel: string;
+  latestScore: number;
+  latestEventType?: string;
+  trend: string;
+  score7d: number;
+  score30d: number;
+  impact30d: number;
+  documents30d: number;
+  items: SentimentItem[];
+  eventBreakdown: Array<{ eventType: string; count: number }>;
+  timeline: SentimentTimelinePoint[];
+}
+
 export interface StockResources {
   symbol: string;
   officialProfileUrl: string;

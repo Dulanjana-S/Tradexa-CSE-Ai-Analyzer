@@ -17,6 +17,7 @@ from fastapi.templating import Jinja2Templates
 
 from .config import settings
 from .import_tools import persist_upload_zip, preview_dataset
+from .intelligence import parse_macro_csv_bytes, preview_macro_rows
 from .jobs import enqueue_daily_pipeline, enqueue_import, enqueue_sync, enqueue_sync_train, enqueue_train, run_daily_pipeline_now, run_import_now, run_sync_now, run_train_now, start_job_system
 from .services import data_service
 from .services.auth_service import SESSION_COOKIE, change_password, complete_password_reset, create_user, current_user_from_request, ensure_bootstrap_admin, is_staff_role, list_users, login, logout, require_admin, require_user, set_role, start_password_reset, update_profile
@@ -466,6 +467,26 @@ def api_admin_run_daily_pipeline(request: Request, payload: Dict[str, Any] = Bod
     return {"ok": True, "job": job}
 
 
+@app.post("/api/admin/actions/refresh-sentiment")
+def api_admin_refresh_sentiment(request: Request, payload: Dict[str, Any] = Body(default={}), x_admin_key: Optional[str] = Header(default=None)):
+    _check_admin_access(request, x_admin_key)
+    return {"ok": True, "result": data_service.refresh_sentiment_scores(limit=int(payload.get("limit") or 1200))}
+
+
+@app.post("/api/admin/macro/preview")
+def api_admin_macro_preview(request: Request, file: UploadFile = File(...), x_admin_key: Optional[str] = Header(default=None)):
+    _check_admin_access(request, x_admin_key)
+    rows = parse_macro_csv_bytes(file.file.read())
+    return {"ok": True, "preview": preview_macro_rows(rows)}
+
+
+@app.post("/api/admin/macro/import")
+def api_admin_macro_import(request: Request, file: UploadFile = File(...), x_admin_key: Optional[str] = Header(default=None)):
+    _check_admin_access(request, x_admin_key)
+    rows = parse_macro_csv_bytes(file.file.read())
+    return {"ok": True, **data_service.import_macro_rows(rows)}
+
+
 @app.post("/api/admin/data/preview")
 def api_admin_preview_data(
     request: Request,
@@ -526,6 +547,10 @@ def api_company_search(q: str = Query("", min_length=0, max_length=50), limit: i
 def api_stock_resources(symbol: str):
     return data_service.stock_resources(symbol)
 
+
+@app.get("/api/stocks/{symbol}/sentiment")
+def api_stock_sentiment(symbol: str, days: int = Query(90, ge=7, le=365)):
+    return data_service.sentiment_summary(symbol, days=days)
 
 @app.get("/api/stock/{symbol}")
 def api_stock(symbol: str):

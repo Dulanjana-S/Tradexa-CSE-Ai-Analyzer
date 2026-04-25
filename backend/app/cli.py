@@ -502,6 +502,23 @@ def cmd_smoke_test(args: argparse.Namespace) -> None:
     print(f"Smoke test passed using symbol {symbol}.")
 
 
+
+
+def cmd_refresh_sentiment(args: argparse.Namespace) -> None:
+    from .services import data_service
+
+    result = data_service.refresh_sentiment_scores(limit=args.limit)
+    print(json.dumps(result, indent=2))
+
+
+def cmd_import_macro_csv(args: argparse.Namespace) -> None:
+    from .services import data_service
+
+    payload = Path(args.file).read_bytes()
+    rows = parse_macro_csv_bytes(payload)
+    result = data_service.import_macro_rows(rows)
+    print(json.dumps(result, indent=2))
+
 def cmd_bootstrap_real_data(args: argparse.Namespace) -> None:
     st = Storage(settings.database_url)
     st.init()
@@ -546,6 +563,14 @@ def main(argv: Optional[List[str]] = None) -> None:
     s2.add_argument("--symbols", nargs="*", help="Train using specific symbols only")
     s2.add_argument("--horizon-days", type=int, default=1, help="Prediction horizon in trading days")
     s2.set_defaults(func=cmd_train)
+
+    ssent = sub.add_parser("refresh-sentiment", help="Analyze stored CSE announcements into sentiment/event features")
+    ssent.add_argument("--limit", type=int, default=1200)
+    ssent.set_defaults(func=cmd_refresh_sentiment)
+
+    smacro = sub.add_parser("import-macro-csv", help="Import macro / global indicator rows from CSV")
+    smacro.add_argument("--file", required=True)
+    smacro.set_defaults(func=cmd_import_macro_csv)
 
     s3 = sub.add_parser("import-eod-zip", help="Import vendor EOD CSVs from a .zip (one CSV per symbol)")
     s3.add_argument("--file", required=True, help="Path to zip file")

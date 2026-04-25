@@ -174,6 +174,13 @@ def _run_daily_pipeline(params: Dict[str, Any], run_id: str) -> None:
         "sleep_ms": int(params.get("sleep_ms") or params.get("dailyPipelineSleepMs") or 250),
     }, f"{run_id}:sync")
     details["steps"].append("sync")
+    try:
+        from .services import data_service
+        sentiment_result = data_service.refresh_sentiment_scores(limit=max(400, int(params.get("announcements") or params.get("dailyPipelineAnnouncements") or 100) * 4))
+        details["sentiment"] = sentiment_result
+        details["steps"].append("sentiment")
+    except Exception as exc:
+        details["sentiment_error"] = str(exc)
     if bool(params.get("train_after_sync", params.get("dailyPipelineTrain", True))):
         _run_train({
             "symbols": params.get("train_symbols") or params.get("symbols"),

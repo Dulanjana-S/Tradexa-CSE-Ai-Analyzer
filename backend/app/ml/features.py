@@ -20,11 +20,76 @@ def _ema(s: pd.Series, span: int) -> pd.Series:
     return s.ewm(span=span, adjust=False).mean()
 
 
+def _merge_sentiment(df: pd.DataFrame, sentiment_series: Optional[List[Dict]]) -> List[str]:
+    if not sentiment_series:
+        return []
+    sent = pd.DataFrame(sentiment_series).copy()
+    if sent.empty or "date" not in sent.columns:
+        return []
+    sent["date"] = pd.to_datetime(sent["date"])
+    sent = sent.sort_values("date")
+    rename = {
+        "doc_count": "sent_docs",
+        "impact_score": "sent_impact",
+        "sentiment_score": "sent_score",
+        "positive_count": "sent_positive",
+        "negative_count": "sent_negative",
+        "neutral_count": "sent_neutral",
+        "dividend_count": "sent_dividend",
+        "earnings_count": "sent_earnings",
+        "corporate_action_count": "sent_corpact",
+        "regulatory_count": "sent_regulatory",
+    }
+    sent = sent.rename(columns={k: v for k, v in rename.items() if k in sent.columns})
+    cols = [c for c in ["sent_score", "sent_impact", "sent_docs", "sent_positive", "sent_negative", "sent_neutral", "sent_dividend", "sent_earnings", "sent_corpact", "sent_regulatory"] if c in sent.columns]
+    keep = ["date", *cols]
+    sent = sent[keep]
+    df = df.merge(sent, on="date", how="left")
+    for c in cols:
+        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0.0)
+    if "sent_score" in df.columns:
+        df["sent_score_3d"] = df["sent_score"].rolling(3, min_periods=1).mean()
+        df["sent_score_7d"] = df["sent_score"].rolling(7, min_periods=1).mean()
+    if "sent_impact" in df.columns:
+        df["sent_impact_7d"] = df["sent_impact"].rolling(7, min_periods=1).sum()
+        df["sent_impact_30d"] = df["sent_impact"].rolling(30, min_periods=1).sum()
+    if "sent_docs" in df.columns:
+        df["sent_docs_7d"] = df["sent_docs"].rolling(7, min_periods=1).sum()
+        df["sent_docs_30d"] = df["sent_docs"].rolling(30, min_periods=1).sum()
+    for c in ["sent_positive", "sent_negative", "sent_dividend", "sent_earnings", "sent_corpact", "sent_regulatory"]:
+        if c in df.columns:
+            df[f"{c}_14d"] = df[c].rolling(14, min_periods=1).sum()
+    return [c for c in df.columns if c.startswith("sent_")]
+
+
+def _merge_macro(df: pd.DataFrame, macro_series: Optional[List[Dict]]) -> List[str]:
+    if not macro_series:
+        return []
+    macro = pd.DataFrame(macro_series).copy()
+    if macro.empty or not {"date", "indicator_key", "value"}.issubset(macro.columns):
+        return []
+    macro["date"] = pd.to_datetime(macro["date"])
+    macro["indicator_key"] = macro["indicator_key"].astype(str).str.lower().str.replace(r"[^a-z0-9]+", "_", regex=True)
+    macro["value"] = pd.to_numeric(macro["value"], errors="coerce")
+    pivot = macro.pivot_table(index="date", columns="indicator_key", values="value", aggfunc="last").sort_index().ffill()
+    pivot.columns = [f"macro_{c}" for c in pivot.columns]
+    pivot = pivot.reset_index()
+    df = df.merge(pivot, on="date", how="left")
+    macro_cols = [c for c in df.columns if c.startswith("macro_")]
+    for c in macro_cols:
+        df[c] = pd.to_numeric(df[c], errors="coerce").ffill().bfill()
+        df[f"{c}_ret_5d"] = df[c].pct_change(5, fill_method=None).replace([np.inf, -np.inf], np.nan)
+        df[f"{c}_z_20"] = (df[c] - df[c].rolling(20).mean()) / df[c].rolling(20).std().replace(0, np.nan)
+    return [c for c in df.columns if c.startswith("macro_")]
+
+
 def make_feature_frame(
     prices: List[Dict],
     index_series: Optional[List[Dict]] = None,
     symbol: Optional[str] = None,
     horizon_days: int = 1,
+    sentiment_series: Optional[List[Dict]] = None,
+    macro_series: Optional[List[Dict]] = None,
 ) -> Tuple[pd.DataFrame, List[str]]:
     if not prices or len(prices) < 80:
         return pd.DataFrame(), []
@@ -125,6 +190,9 @@ def make_feature_frame(
                 "beta_60",
             ]
 
+    sentiment_cols = _merge_sentiment(df, sentiment_series)
+    macro_cols = _merge_macro(df, macro_series)
+
     df["target_return"] = close.shift(-horizon_days) / close - 1.0
     df["target_up"] = (df["target_return"] > 0).astype(int)
     df["symbol"] = symbol
@@ -140,11 +208,19 @@ def make_feature_frame(
     for w in [5, 10, 20, 50]:
         feature_cols.extend([f"sma_ratio_{w}", f"ema_ratio_{w}"])
     if idx_feature_cols:
-        # Ignore index-derived features when the merged index history is too sparse,
-        # otherwise all rows can be dropped during feature cleaning.
         coverage = float(df[idx_feature_cols].notna().mean().mean())
         if coverage >= 0.6:
             feature_cols.extend([c for c in idx_feature_cols if c in df.columns])
+    if sentiment_cols:
+        sent_use = [c for c in sentiment_cols if c in df.columns]
+        coverage = float(df[sent_use].notna().mean().mean()) if sent_use else 0.0
+        if sent_use and coverage >= 0.2:
+            feature_cols.extend(sent_use)
+    if macro_cols:
+        macro_use = [c for c in macro_cols if c in df.columns]
+        coverage = float(df[macro_use].notna().mean().mean()) if macro_use else 0.0
+        if macro_use and coverage >= 0.5:
+            feature_cols.extend(macro_use)
 
     df = df.dropna(subset=["target_return"])
     df = df.dropna(subset=feature_cols, how="any")

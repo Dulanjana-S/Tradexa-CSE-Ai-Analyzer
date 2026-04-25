@@ -65,7 +65,16 @@ def predict_next(
 
     aspi = storage.get_index_series("ASPI", limit=900)
     idx_series = aspi if aspi else None
-    df, feat_cols = make_feature_frame(hist, index_series=idx_series, symbol=symbol.upper(), horizon_days=horizon_days)
+    sentiment_series = storage.get_sentiment_feature_series(symbol.upper(), limit=1600)
+    macro_series = storage.get_macro_series(limit=8000)
+    df, feat_cols = make_feature_frame(
+        hist,
+        index_series=idx_series,
+        symbol=symbol.upper(),
+        horizon_days=horizon_days,
+        sentiment_series=sentiment_series,
+        macro_series=macro_series,
+    )
     if df.empty:
         raise ValueError("Not enough clean rows after feature engineering.")
 
@@ -98,6 +107,7 @@ def predict_next(
     if conf["label"] == "low":
         flags.append("experimental")
 
+    blocks = bundle.meta.get("feature_blocks") or {}
     return {
         "symbol": symbol.upper(),
         "as_of": str(last["date"].date()),
@@ -111,6 +121,12 @@ def predict_next(
         "quality_flags": flags,
         "history_points": int(len(hist)),
         "features": drivers,
+        "intelligence": {
+            "sentiment_enabled": bool(blocks.get("sentiment")),
+            "macro_enabled": bool(blocks.get("macro")),
+            "latest_sentiment_items": len(sentiment_series),
+            "latest_macro_points": len(macro_series),
+        },
         "model": {
             "version": bundle.meta.get("model_version", "v1"),
             "trained_at_utc": bundle.meta.get("trained_at_utc"),

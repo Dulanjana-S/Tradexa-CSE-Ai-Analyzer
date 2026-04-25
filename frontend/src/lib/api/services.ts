@@ -26,6 +26,7 @@ import type {
   PortfolioSummary,
   PortfolioTransaction,
   PortfolioAnalytics,
+  SentimentSummary,
 } from "./types";
 
 function num(value: any, fallback = 0): number {
@@ -372,6 +373,43 @@ function mapAdminUser(raw: any): AdminUser {
   };
 }
 
+function mapSentimentSummary(raw: any): SentimentSummary {
+  return {
+    symbol: String(raw?.symbol || ""),
+    available: Boolean(raw?.available),
+    latestLabel: String(raw?.latest_label || raw?.latestLabel || "neutral"),
+    latestScore: num(raw?.latest_score ?? raw?.latestScore),
+    latestEventType: raw?.latest_event_type || raw?.latestEventType,
+    trend: String(raw?.trend || "flat"),
+    score7d: num(raw?.score_7d ?? raw?.score7d),
+    score30d: num(raw?.score_30d ?? raw?.score30d),
+    impact30d: num(raw?.impact_30d ?? raw?.impact30d),
+    documents30d: num(raw?.documents_30d ?? raw?.documents30d),
+    items: Array.isArray(raw?.items)
+      ? raw.items.map((item: any) => ({
+          itemId: String(item?.item_id || item?.itemId || item?.ann_id || item?.id || ""),
+          annId: item?.ann_id || item?.annId,
+          symbol: item?.symbol,
+          date: String(item?.date || ""),
+          title: String(item?.title || "Announcement"),
+          sourceUrl: item?.source_url || item?.sourceUrl,
+          sentimentScore: num(item?.sentiment_score ?? item?.sentimentScore),
+          sentimentLabel: String(item?.sentiment_label || item?.sentimentLabel || "neutral") as any,
+          impactScore: num(item?.impact_score ?? item?.impactScore),
+          eventType: String(item?.event_type || item?.eventType || "general"),
+          confidence: num(item?.confidence),
+          keywords: Array.isArray(item?.keywords) ? item.keywords.map(String) : [],
+        }))
+      : [],
+    eventBreakdown: Array.isArray(raw?.event_breakdown)
+      ? raw.event_breakdown.map((item: any) => ({ eventType: String(item?.event_type || item?.eventType || "general"), count: num(item?.count) }))
+      : [],
+    timeline: Array.isArray(raw?.timeline)
+      ? raw.timeline.map((item: any) => ({ date: String(item?.date || ""), score: num(item?.score), impact: num(item?.impact), count: num(item?.count) }))
+      : [],
+  };
+}
+
 function mapPrediction(raw: any, currentPrice = 0): PredictionCardData {
   if (!raw?.available) {
     return {
@@ -570,6 +608,11 @@ export const marketApi = {
   getStockPrediction: async (symbol: string, currentPrice = 0): Promise<PredictionCardData> => {
     const response = await api.get<any>(`/api/stock/${encodeURIComponent(symbol)}/prediction`);
     return mapPrediction(response, currentPrice);
+  },
+
+  getStockSentiment: async (symbol: string, days = 90): Promise<SentimentSummary> => {
+    const response = await api.get<any>(`/api/stocks/${encodeURIComponent(symbol)}/sentiment?days=${encodeURIComponent(String(days))}`);
+    return mapSentimentSummary(response);
   },
 };
 
@@ -827,6 +870,20 @@ export const adminApi = {
     form.append("train_after_import", String(Boolean(options?.trainAfterImport)));
     form.append("horizon_days", String(options?.horizonDays || 1));
     return api.post<any>("/api/admin/data/upload", form);
+  },
+
+  refreshSentiment: (limit = 1200) => api.post<any>("/api/admin/actions/refresh-sentiment", { limit }),
+
+  previewMacroData: async (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return api.post<any>("/api/admin/macro/preview", form);
+  },
+
+  importMacroData: async (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return api.post<any>("/api/admin/macro/import", form);
   },
 
   getJobs: async (): Promise<Job[]> => {

@@ -39,7 +39,16 @@ def _collect_training_data(
         hist = storage.get_price_history(sym, limit=1200)
         if len(hist) < 160:
             continue
-        df, feats = make_feature_frame(hist, index_series=index_series, symbol=sym.upper(), horizon_days=horizon_days)
+        sentiment_series = storage.get_sentiment_feature_series(sym, limit=1600)
+        macro_series = storage.get_macro_series(limit=8000)
+        df, feats = make_feature_frame(
+            hist,
+            index_series=index_series,
+            symbol=sym.upper(),
+            horizon_days=horizon_days,
+            sentiment_series=sentiment_series,
+            macro_series=macro_series,
+        )
         if df.empty:
             continue
         frames.append(df)
@@ -254,7 +263,7 @@ def train_from_db(
     train_dates = pd.to_datetime(train_df["date"])
     test_dates = pd.to_datetime(test_df["date"])
     meta = {
-        "model_version": "v6-fast",
+        "model_version": "v7-sentiment-macro",
         "model_id": f"model_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
         "trained_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "horizon_days": horizon_days,
@@ -264,6 +273,12 @@ def train_from_db(
         "train_period": {"start": str(train_dates.min().date()), "end": str(train_dates.max().date())},
         "test_period": {"start": str(test_dates.min().date()), "end": str(test_dates.max().date())},
         "models": {"mean": "Ridge", "quantiles": "ResidualOffset", "direction": best_name},
+        "feature_blocks": {
+            "price": True,
+            "index": bool(index_series),
+            "sentiment": any(name.startswith("sent_") for name in feat_cols),
+            "macro": any(name.startswith("macro_") for name in feat_cols),
+        },
         "model_comparison": comparison,
         "walk_forward": walk_forward,
         "per_symbol_holdout": per_symbol[:25],
