@@ -906,8 +906,69 @@ def activate_model(model_id: str) -> bool:
 
 
 
-def list_portfolio_transactions(username: str) -> List[Dict[str, Any]]:
-    return _storage.list_portfolio_transactions(username)
+def list_portfolios(username: str) -> List[Dict[str, Any]]:
+    _storage.ensure_default_portfolio(username)
+    portfolios = _storage.list_portfolios(username)
+    for pf in portfolios:
+        pf["summary"] = get_portfolio(username, pf["portfolio_id"])["summary"]
+    return portfolios
+
+
+def create_portfolio_account(username: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    name = str(payload.get("name") or "Portfolio").strip()
+    if len(name) < 2:
+        raise HTTPException(status_code=400, detail="Portfolio name is required")
+    pf = _storage.create_portfolio_account(username, name=name, description=str(payload.get("description") or "").strip() or None, currency=str(payload.get("currency") or "LKR"))
+    return {"portfolio": pf, "portfolios": list_portfolios(username)}
+
+
+def update_portfolio_account(username: str, portfolio_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    if not _storage.get_portfolio_account(username, portfolio_id):
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+    is_default = payload.get("is_default") if "is_default" in payload else None
+    is_archived = payload.get("is_archived") if "is_archived" in payload else None
+    if is_archived and (_storage.get_portfolio_account(username, portfolio_id) or {}).get("is_default"):
+        raise HTTPException(status_code=400, detail="Default portfolio cannot be archived")
+    _storage.update_portfolio_account(username, portfolio_id, name=payload.get("name"), description=payload.get("description"), is_default=is_default, is_archived=is_archived)
+    return {"portfolio": _storage.get_portfolio_account(username, portfolio_id), "portfolios": list_portfolios(username)}
+
+
+def create_cash_movement(username: str, payload: Dict[str, Any], portfolio_id: Optional[str] = None) -> Dict[str, Any]:
+    portfolio_id = _resolve_portfolio_id(username, portfolio_id or payload.get("portfolio_id"))
+    movement_type = str(payload.get("movement_type") or payload.get("type") or "deposit").lower().strip()
+    if movement_type not in {"deposit", "withdrawal"}:
+        raise HTTPException(status_code=400, detail="Cash movement type must be deposit or withdrawal")
+    amount = _to_float(payload.get("amount"))
+    if amount is None or amount <= 0:
+        raise HTTPException(status_code=400, detail="Cash amount must be greater than zero")
+    movement_date = str(payload.get("movement_date") or payload.get("date") or "").strip() or None
+    if movement_date:
+        try:
+            date.fromisoformat(movement_date[:10])
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail="Cash movement date must be YYYY-MM-DD") from exc
+    _storage.create_cash_movement(username, portfolio_id, movement_type, float(amount), movement_date=movement_date, notes=str(payload.get("notes") or "").strip() or None)
+    return get_portfolio(username, portfolio_id)
+
+
+def delete_cash_movement(username: str, cash_id: str, portfolio_id: Optional[str] = None) -> Dict[str, Any]:
+    portfolio_id = _resolve_portfolio_id(username, portfolio_id)
+    if not _storage.delete_cash_movement(username, cash_id, portfolio_id=portfolio_id):
+        raise HTTPException(status_code=404, detail="Cash movement not found")
+    return get_portfolio(username, portfolio_id)
+
+
+def _resolve_portfolio_id(username: str, portfolio_id: Optional[str] = None) -> str:
+    if portfolio_id:
+        pf = _storage.get_portfolio_account(username, portfolio_id)
+        if not pf or pf.get("is_archived"):
+            raise HTTPException(status_code=404, detail="Portfolio not found")
+        return portfolio_id
+    return _storage.ensure_default_portfolio(username)["portfolio_id"]
+
+
+def list_portfolio_transactions(username: str, portfolio_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    return _storage.list_portfolio_transactions(username, _resolve_portfolio_id(username, portfolio_id))
 
 
 def corporate_actions(symbol: Optional[str] = None, limit: int = 100) -> List[Dict[str, Any]]:
@@ -996,8 +1057,8 @@ def _portfolio_position_state_from_rows(rows: List[Dict[str, Any]], *, strict: b
     return state
 
 
-def _portfolio_position_state(username: str) -> Dict[str, Dict[str, Any]]:
-    return _portfolio_position_state_from_rows(_storage.list_portfolio_transactions(username))
+def _portfolio_position_state(username: str, portfolio_id: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
+    return _portfolio_position_state_from_rows(_storage.list_portfolio_transactions(username, _resolve_portfolio_id(username, portfolio_id)))
 
 
 def _validate_portfolio_transaction_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -1037,8 +1098,11 @@ def _validate_portfolio_sequence(next_rows: List[Dict[str, Any]]) -> None:
     _portfolio_position_state_from_rows(next_rows, strict=True, actions_by_symbol=actions)
 
 
-def get_portfolio(username: str) -> Dict[str, Any]:
-    transactions = _storage.list_portfolio_transactions(username)
+def get_portfolio(username: str, portfolio_id: Optional[str] = None) -> Dict[str, Any]:
+    portfolio_id = _resolve_portfolio_id(username, portfolio_id)
+    account = _storage.get_portfolio_account(username, portfolio_id) or {}
+    transactions = _storage.list_portfolio_transactions(username, portfolio_id)
+    cash_movements = _storage.list_cash_movements(username, portfolio_id)
     state = _portfolio_position_state_from_rows(transactions)
     open_symbols = [symbol for symbol, item in state.items() if float(item.get("quantity") or 0.0) > 0]
     snapshots = {item.get("symbol"): item for item in stock_snapshots(open_symbols)} if open_symbols else {}
@@ -1081,9 +1145,24 @@ def get_portfolio(username: str) -> Dict[str, Any]:
         })
     for row in positions:
         row["weight_pct"] = (row["market_value"] / total_market_value * 100.0) if total_market_value > 0 else 0.0
+    cash_deposits = sum(float(x.get("amount") or 0.0) for x in cash_movements if str(x.get("movement_type") or "").lower() == "deposit")
+    cash_withdrawals = sum(float(x.get("amount") or 0.0) for x in cash_movements if str(x.get("movement_type") or "").lower() == "withdrawal")
+    buy_cash_out = sum(float(tx.get("quantity") or 0.0) * float(tx.get("price") or 0.0) + float(tx.get("fees") or 0.0) for tx in transactions if str(tx.get("tx_type") or "").lower() == "buy")
+    sell_cash_in = sum(float(tx.get("quantity") or 0.0) * float(tx.get("price") or 0.0) - float(tx.get("fees") or 0.0) for tx in transactions if str(tx.get("tx_type") or "").lower() == "sell")
+    cash_balance = cash_deposits - cash_withdrawals - buy_cash_out + sell_cash_in + total_dividend_income
+    net_contributions = cash_deposits - cash_withdrawals
+    total_equity = total_market_value + cash_balance
     summary = {
+        "portfolio_id": portfolio_id,
+        "portfolio_name": account.get("name") or "Main Portfolio",
+        "cash_balance": cash_balance,
+        "cash_deposits": cash_deposits,
+        "cash_withdrawals": cash_withdrawals,
+        "net_contributions": net_contributions,
+        "total_equity": total_equity,
         "positions_count": len(positions),
         "transactions_count": len(transactions),
+        "cash_movements_count": len(cash_movements),
         "cost_basis": total_cost_basis,
         "market_value": total_market_value,
         "unrealized_pl": total_market_value - total_cost_basis,
@@ -1095,15 +1174,18 @@ def get_portfolio(username: str) -> Dict[str, Any]:
     }
     transactions_sorted = sorted(transactions, key=_portfolio_sort_key, reverse=True)
     return {
+        "portfolio": account,
         "summary": summary,
         "positions": positions,
         "transactions": transactions_sorted,
+        "cash_movements": cash_movements,
         "recent_actions": recent_actions,
     }
 
 
-def get_portfolio_performance(username: str, days: int = 365) -> Dict[str, Any]:
-    transactions = _storage.list_portfolio_transactions(username)
+def get_portfolio_performance(username: str, days: int = 365, portfolio_id: Optional[str] = None) -> Dict[str, Any]:
+    portfolio_id = _resolve_portfolio_id(username, portfolio_id)
+    transactions = _storage.list_portfolio_transactions(username, portfolio_id)
     if not transactions:
         return {"days": days, "series": []}
 
@@ -1348,8 +1430,8 @@ def _merge_benchmark_lines(portfolio_series: List[Dict[str, Any]], benchmarks: L
     return merged
 
 
-def get_portfolio_analytics(username: str, days: int = 365) -> Dict[str, Any]:
-    portfolio = get_portfolio(username)
+def get_portfolio_analytics(username: str, days: int = 365, portfolio_id: Optional[str] = None) -> Dict[str, Any]:
+    portfolio = get_portfolio(username, portfolio_id=portfolio_id)
     positions = portfolio.get("positions") or []
     summary = portfolio.get("summary") or {}
 
@@ -1508,18 +1590,67 @@ def get_portfolio_analytics(username: str, days: int = 365) -> Dict[str, Any]:
     }
 
 
-def create_portfolio_transaction(username: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+def get_portfolio_period_performance(username: str, portfolio_id: Optional[str] = None) -> Dict[str, Any]:
+    portfolio_id = _resolve_portfolio_id(username, portfolio_id)
+    txs = _storage.list_portfolio_transactions(username, portfolio_id)
+    days_needed = 1825
+    if txs:
+        dates = [str(tx.get("traded_at") or tx.get("created_at") or "")[:10] for tx in txs]
+        dates = [d for d in dates if d]
+        if dates:
+            try:
+                earliest = min(date.fromisoformat(d) for d in dates)
+                days_needed = min(3650, max(30, (date.today() - earliest).days + 30))
+            except Exception:
+                pass
+    series = get_portfolio_performance(username, days=days_needed, portfolio_id=portfolio_id).get("series") or []
+    if not series:
+        periods = []
+    else:
+        latest = series[-1]
+        latest_date = date.fromisoformat(str(latest.get("date"))[:10])
+        defs = [("1D", 1), ("1W", 7), ("1M", 30), ("3M", 90), ("6M", 180), ("1Y", 365), ("Since inception", None)]
+        periods = []
+        for label, delta_days in defs:
+            if delta_days is None:
+                start = series[0]
+            else:
+                cutoff = latest_date - timedelta(days=delta_days)
+                eligible = [p for p in series if date.fromisoformat(str(p.get("date"))[:10]) <= cutoff]
+                start = eligible[-1] if eligible else series[0]
+            start_val = float(start.get("market_value") or 0.0) + float(start.get("total_pl") or 0.0)
+            end_val = float(latest.get("market_value") or 0.0) + float(latest.get("total_pl") or 0.0)
+            ret = _safe_pct(end_val - start_val, start_val)
+            benchmark_days = delta_days or max(30, (latest_date - date.fromisoformat(str(start.get("date"))[:10])).days)
+            aspi = _benchmark_series("ASPI", latest_date - timedelta(days=benchmark_days), benchmark_days + 1)
+            sp20 = _benchmark_series("S&P SL20", latest_date - timedelta(days=benchmark_days), benchmark_days + 1)
+            periods.append({
+                "label": label,
+                "start_date": start.get("date"),
+                "end_date": latest.get("date"),
+                "portfolio_return_pct": round(ret, 2),
+                "aspi_return_pct": round(float(aspi.get("return_pct") or 0.0), 2),
+                "sp20_return_pct": round(float(sp20.get("return_pct") or 0.0), 2),
+                "alpha_vs_aspi_pct": round(ret - float(aspi.get("return_pct") or 0.0), 2),
+                "alpha_vs_sp20_pct": round(ret - float(sp20.get("return_pct") or 0.0), 2),
+            })
+    return {"portfolio_id": portfolio_id, "periods": periods}
+
+
+def create_portfolio_transaction(username: str, payload: Dict[str, Any], portfolio_id: Optional[str] = None) -> Dict[str, Any]:
+    portfolio_id = _resolve_portfolio_id(username, portfolio_id or payload.get("portfolio_id"))
     clean = _validate_portfolio_transaction_payload(payload)
-    current_rows = _storage.list_portfolio_transactions(username)
+    current_rows = _storage.list_portfolio_transactions(username, portfolio_id)
     next_rows = list(current_rows) + [clean]
     _validate_portfolio_sequence(next_rows)
-    _storage.create_portfolio_transaction(username, clean["symbol"], clean["tx_type"], clean["quantity"], clean["price"], fees=clean["fees"], traded_at=clean["traded_at"], notes=clean["notes"])
-    return get_portfolio(username)
+    _storage.create_portfolio_transaction(username, clean["symbol"], clean["tx_type"], clean["quantity"], clean["price"], fees=clean["fees"], traded_at=clean["traded_at"], notes=clean["notes"], portfolio_id=portfolio_id)
+    return get_portfolio(username, portfolio_id)
 
 
-def update_portfolio_transaction(username: str, tx_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+def update_portfolio_transaction(username: str, tx_id: str, payload: Dict[str, Any], portfolio_id: Optional[str] = None) -> Dict[str, Any]:
+    portfolio_id = _resolve_portfolio_id(username, portfolio_id or payload.get("portfolio_id"))
     clean = _validate_portfolio_transaction_payload(payload)
-    current_rows = _storage.list_portfolio_transactions(username)
+    current_rows = _storage.list_portfolio_transactions(username, portfolio_id)
     found = False
     next_rows: List[Dict[str, Any]] = []
     for row in current_rows:
@@ -1529,22 +1660,24 @@ def update_portfolio_transaction(username: str, tx_id: str, payload: Dict[str, A
             replacement = dict(row)
             replacement.update(clean)
             replacement["tx_id"] = tx_id
+            replacement["portfolio_id"] = portfolio_id
             next_rows.append(replacement)
         else:
             next_rows.append(dict(row))
     if not found:
         raise HTTPException(status_code=404, detail="Portfolio transaction not found")
     _validate_portfolio_sequence(next_rows)
-    updated = _storage.update_portfolio_transaction(tx_id, username, clean["symbol"], clean["tx_type"], clean["quantity"], clean["price"], fees=clean["fees"], traded_at=clean["traded_at"], notes=clean["notes"])
+    updated = _storage.update_portfolio_transaction(tx_id, username, clean["symbol"], clean["tx_type"], clean["quantity"], clean["price"], fees=clean["fees"], traded_at=clean["traded_at"], notes=clean["notes"], portfolio_id=portfolio_id)
     if not updated:
         raise HTTPException(status_code=404, detail="Portfolio transaction not found")
-    return get_portfolio(username)
+    return get_portfolio(username, portfolio_id)
 
 
-def delete_portfolio_transaction(username: str, tx_id: str) -> Dict[str, Any]:
-    if not _storage.delete_portfolio_transaction(tx_id, username):
+def delete_portfolio_transaction(username: str, tx_id: str, portfolio_id: Optional[str] = None) -> Dict[str, Any]:
+    portfolio_id = _resolve_portfolio_id(username, portfolio_id)
+    if not _storage.delete_portfolio_transaction(tx_id, username, portfolio_id=portfolio_id):
         raise HTTPException(status_code=404, detail="Portfolio transaction not found")
-    return get_portfolio(username)
+    return get_portfolio(username, portfolio_id)
 
 
 def _parse_portfolio_csv(file: UploadFile) -> List[Dict[str, Any]]:
@@ -1595,7 +1728,8 @@ def preview_portfolio_import(file: UploadFile) -> Dict[str, Any]:
     return {"ok": len(errors) == 0, "preview": preview}
 
 
-def import_portfolio_transactions(username: str, file: UploadFile) -> Dict[str, Any]:
+def import_portfolio_transactions(username: str, file: UploadFile, portfolio_id: Optional[str] = None) -> Dict[str, Any]:
+    portfolio_id = _resolve_portfolio_id(username, portfolio_id)
     preview = preview_portfolio_import(file)
     valid_rows = list(preview.get("preview", {}).get("sample") or [])
     if preview.get("preview", {}).get("valid_rows") != len(valid_rows):
@@ -1608,14 +1742,14 @@ def import_portfolio_transactions(username: str, file: UploadFile) -> Dict[str, 
                 pass
     if preview.get("preview", {}).get("invalid_rows"):
         raise HTTPException(status_code=400, detail="Fix invalid rows before importing portfolio transactions")
-    existing = _storage.list_portfolio_transactions(username)
+    existing = _storage.list_portfolio_transactions(username, portfolio_id)
     next_rows = list(existing) + valid_rows
     _validate_portfolio_sequence(next_rows)
     imported = 0
     for row in valid_rows:
-        _storage.create_portfolio_transaction(username, row["symbol"], row["tx_type"], row["quantity"], row["price"], fees=row["fees"], traded_at=row["traded_at"], notes=row["notes"])
+        _storage.create_portfolio_transaction(username, row["symbol"], row["tx_type"], row["quantity"], row["price"], fees=row["fees"], traded_at=row["traded_at"], notes=row["notes"], portfolio_id=portfolio_id)
         imported += 1
-    result = get_portfolio(username)
+    result = get_portfolio(username, portfolio_id)
     result["imported_rows"] = imported
     return result
 

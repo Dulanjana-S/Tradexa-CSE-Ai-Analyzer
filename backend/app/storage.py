@@ -188,10 +188,38 @@ if metadata is not None:
         Column("meta", Text, nullable=True),
     )
 
+    portfolio_accounts_t = Table(
+        "portfolio_accounts",
+        metadata,
+        Column("portfolio_id", String(128), primary_key=True),
+        Column("username", String(64), nullable=False, index=True),
+        Column("name", String(128), nullable=False),
+        Column("description", Text, nullable=True),
+        Column("currency", String(16), nullable=True),
+        Column("is_default", Integer, nullable=False),
+        Column("is_archived", Integer, nullable=False),
+        Column("created_at", DateTime, nullable=True),
+        Column("updated_at", DateTime, nullable=True),
+    )
+
+    portfolio_cash_movements_t = Table(
+        "portfolio_cash_movements",
+        metadata,
+        Column("cash_id", String(128), primary_key=True),
+        Column("portfolio_id", String(128), nullable=False, index=True),
+        Column("username", String(64), nullable=False, index=True),
+        Column("movement_type", String(32), nullable=False),
+        Column("amount", Float, nullable=False),
+        Column("movement_date", String(32), nullable=True),
+        Column("notes", Text, nullable=True),
+        Column("created_at", DateTime, nullable=True),
+    )
+
     portfolio_transactions_t = Table(
         "portfolio_transactions",
         metadata,
         Column("tx_id", String(128), primary_key=True),
+        Column("portfolio_id", String(128), nullable=True, index=True),
         Column("username", String(64), nullable=False, index=True),
         Column("symbol", String(32), nullable=False, index=True),
         Column("tx_type", String(16), nullable=False),
@@ -323,7 +351,7 @@ if metadata is not None:
         Column("created_at", DateTime, nullable=True),
     )
 else:  # pragma: no cover
-    companies_t = prices_t = indices_t = announcements_t = meta_t = watchlists_t = preferences_t = job_runs_t = users_t = sessions_t = password_reset_tokens_t = model_registry_t = alerts_t = notifications_t = portfolio_transactions_t = announcement_meta_t = corporate_actions_t = news_sentiment_t = macro_indicators_t = document_intelligence_t = source_whitelist_t = external_news_items_t = None  # type: ignore
+    companies_t = prices_t = indices_t = announcements_t = meta_t = watchlists_t = preferences_t = job_runs_t = users_t = sessions_t = password_reset_tokens_t = model_registry_t = alerts_t = notifications_t = portfolio_accounts_t = portfolio_cash_movements_t = portfolio_transactions_t = announcement_meta_t = corporate_actions_t = news_sentiment_t = macro_indicators_t = document_intelligence_t = source_whitelist_t = external_news_items_t = None  # type: ignore
 
 
 def _utc_now() -> str:
@@ -507,8 +535,32 @@ class Storage:
                     );
                     CREATE INDEX IF NOT EXISTS idx_notifications_username ON notifications(username);
                     CREATE INDEX IF NOT EXISTS idx_notifications_symbol ON notifications(symbol);
+                    CREATE TABLE IF NOT EXISTS portfolio_accounts (
+                        portfolio_id TEXT PRIMARY KEY,
+                        username TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        description TEXT,
+                        currency TEXT,
+                        is_default INTEGER NOT NULL DEFAULT 0,
+                        is_archived INTEGER NOT NULL DEFAULT 0,
+                        created_at TEXT,
+                        updated_at TEXT
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_portfolio_accounts_username ON portfolio_accounts(username, is_archived, is_default);
+                    CREATE TABLE IF NOT EXISTS portfolio_cash_movements (
+                        cash_id TEXT PRIMARY KEY,
+                        portfolio_id TEXT NOT NULL,
+                        username TEXT NOT NULL,
+                        movement_type TEXT NOT NULL,
+                        amount REAL NOT NULL,
+                        movement_date TEXT,
+                        notes TEXT,
+                        created_at TEXT
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_portfolio_cash_portfolio ON portfolio_cash_movements(portfolio_id, movement_date DESC);
                     CREATE TABLE IF NOT EXISTS portfolio_transactions (
                         tx_id TEXT PRIMARY KEY,
+                        portfolio_id TEXT,
                         username TEXT NOT NULL,
                         symbol TEXT NOT NULL,
                         tx_type TEXT NOT NULL,
@@ -633,6 +685,23 @@ class Storage:
                     CREATE INDEX IF NOT EXISTS idx_job_runs_job_name ON job_runs(job_name, started_at DESC);
                     """
                 )
+                cols = {row[1] for row in conn.execute("PRAGMA table_info(portfolio_transactions)").fetchall()}
+                if "portfolio_id" not in cols:
+                    conn.execute("ALTER TABLE portfolio_transactions ADD COLUMN portfolio_id TEXT")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_portfolio_transactions_portfolio ON portfolio_transactions(portfolio_id, traded_at DESC)")
+                tx_rows = conn.execute("SELECT DISTINCT username FROM portfolio_transactions WHERE portfolio_id IS NULL OR portfolio_id = ''").fetchall()
+                for row in tx_rows:
+                    uname = str(row[0]).lower()
+                    pid = f"pf_{uname}_default".replace("@", "_").replace(".", "_")
+                    now = _utc_now()
+                    conn.execute(
+                        """
+                        INSERT OR IGNORE INTO portfolio_accounts (portfolio_id, username, name, description, currency, is_default, is_archived, created_at, updated_at)
+                        VALUES (?, ?, 'Main Portfolio', 'Default portfolio', 'LKR', 1, 0, ?, ?)
+                        """,
+                        (pid, uname, now, now),
+                    )
+                    conn.execute("UPDATE portfolio_transactions SET portfolio_id=? WHERE username=? AND (portfolio_id IS NULL OR portfolio_id='')", (pid, uname))
             return
 
         if metadata is None:
@@ -2125,43 +2194,159 @@ class Storage:
 
     # ---- Notifications ----
     # ---- Portfolio ----
-    def list_portfolio_transactions(self, username: str) -> List[Dict[str, Any]]:
+    def _default_portfolio_id(self, username: str) -> str:
+        return f"pf_{username.lower()}_default".replace("@", "_").replace(".", "_")
+
+    def ensure_default_portfolio(self, username: str) -> Dict[str, Any]:
         uname = username.lower()
+        existing = self.list_portfolios(uname, include_archived=False)
+        default = next((p for p in existing if p.get("is_default")), None)
+        if default:
+            return default
+        pid = self._default_portfolio_id(uname)
+        row = {
+            "portfolio_id": pid,
+            "username": uname,
+            "name": "Main Portfolio",
+            "description": "Default portfolio",
+            "currency": "LKR",
+            "is_default": 1,
+            "is_archived": 0,
+            "created_at": _utc_now(),
+            "updated_at": _utc_now(),
+        }
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO portfolio_accounts
+                    (portfolio_id, username, name, description, currency, is_default, is_archived, created_at, updated_at)
+                    VALUES (:portfolio_id, :username, :name, :description, :currency, :is_default, :is_archived, :created_at, :updated_at)
+                    """,
+                    row,
+                )
+                conn.execute("UPDATE portfolio_transactions SET portfolio_id=? WHERE username=? AND (portfolio_id IS NULL OR portfolio_id='')", (pid, uname))
+        else:
+            with self.engine().begin() as conn:
+                if conn.execute(select(portfolio_accounts_t).where(portfolio_accounts_t.c.portfolio_id == pid)).mappings().first() is None:
+                    conn.execute(portfolio_accounts_t.insert().values(row))
+                conn.execute(portfolio_transactions_t.update().where((portfolio_transactions_t.c.username == uname) & ((portfolio_transactions_t.c.portfolio_id == None) | (portfolio_transactions_t.c.portfolio_id == ''))).values(portfolio_id=pid))
+        return self.get_portfolio_account(uname, pid) or row
+
+    def list_portfolios(self, username: str, include_archived: bool = False) -> List[Dict[str, Any]]:
+        uname = username.lower()
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                if include_archived:
+                    rows = conn.execute("SELECT portfolio_id, username, name, description, currency, is_default, is_archived, created_at, updated_at FROM portfolio_accounts WHERE username=? ORDER BY is_default DESC, created_at ASC", (uname,)).fetchall()
+                else:
+                    rows = conn.execute("SELECT portfolio_id, username, name, description, currency, is_default, is_archived, created_at, updated_at FROM portfolio_accounts WHERE username=? AND is_archived=0 ORDER BY is_default DESC, created_at ASC", (uname,)).fetchall()
+            out = [dict(r) for r in rows]
+        else:
+            stmt = select(portfolio_accounts_t).where(portfolio_accounts_t.c.username == uname)
+            if not include_archived:
+                stmt = stmt.where(portfolio_accounts_t.c.is_archived == 0)
+            stmt = stmt.order_by(portfolio_accounts_t.c.is_default.desc(), portfolio_accounts_t.c.created_at.asc())
+            with self.engine().connect() as conn:
+                out = [dict(r) for r in conn.execute(stmt).mappings().all()]
+        for row in out:
+            row["is_default"] = bool(row.get("is_default"))
+            row["is_archived"] = bool(row.get("is_archived"))
+        return out
+
+    def get_portfolio_account(self, username: str, portfolio_id: str) -> Optional[Dict[str, Any]]:
+        uname = username.lower()
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                row = conn.execute("SELECT portfolio_id, username, name, description, currency, is_default, is_archived, created_at, updated_at FROM portfolio_accounts WHERE username=? AND portfolio_id=?", (uname, portfolio_id)).fetchone()
+            if not row:
+                return None
+            out = dict(row)
+        else:
+            with self.engine().connect() as conn:
+                row = conn.execute(select(portfolio_accounts_t).where((portfolio_accounts_t.c.username == uname) & (portfolio_accounts_t.c.portfolio_id == portfolio_id))).mappings().first()
+            if not row:
+                return None
+            out = dict(row)
+        out["is_default"] = bool(out.get("is_default"))
+        out["is_archived"] = bool(out.get("is_archived"))
+        return out
+
+    def create_portfolio_account(self, username: str, name: str, description: Optional[str] = None, currency: str = "LKR") -> Dict[str, Any]:
+        uname = username.lower()
+        self.ensure_default_portfolio(uname)
+        row = {
+            "portfolio_id": f"pf_{secrets.token_hex(8)}",
+            "username": uname,
+            "name": (name or "Portfolio").strip()[:128],
+            "description": description,
+            "currency": (currency or "LKR").upper()[:16],
+            "is_default": 0,
+            "is_archived": 0,
+            "created_at": _utc_now(),
+            "updated_at": _utc_now(),
+        }
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.execute("INSERT INTO portfolio_accounts (portfolio_id, username, name, description, currency, is_default, is_archived, created_at, updated_at) VALUES (:portfolio_id, :username, :name, :description, :currency, :is_default, :is_archived, :created_at, :updated_at)", row)
+        else:
+            with self.engine().begin() as conn:
+                conn.execute(portfolio_accounts_t.insert().values(row))
+        return self.get_portfolio_account(uname, row["portfolio_id"]) or row
+
+    def update_portfolio_account(self, username: str, portfolio_id: str, *, name: Optional[str] = None, description: Optional[str] = None, is_default: Optional[bool] = None, is_archived: Optional[bool] = None) -> bool:
+        uname = username.lower()
+        values = {"updated_at": _utc_now()}
+        if name is not None:
+            values["name"] = name.strip()[:128] or "Portfolio"
+        if description is not None:
+            values["description"] = description
+        if is_default is not None:
+            values["is_default"] = 1 if is_default else 0
+        if is_archived is not None:
+            values["is_archived"] = 1 if is_archived else 0
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                if is_default:
+                    conn.execute("UPDATE portfolio_accounts SET is_default=0 WHERE username=?", (uname,))
+                cur = conn.execute(f"UPDATE portfolio_accounts SET {', '.join(k+'=:'+k for k in values)} WHERE username=:username AND portfolio_id=:portfolio_id", {**values, "username": uname, "portfolio_id": portfolio_id})
+                return (cur.rowcount or 0) > 0
+        with self.engine().begin() as conn:
+            if is_default:
+                conn.execute(portfolio_accounts_t.update().where(portfolio_accounts_t.c.username == uname).values(is_default=0))
+            res = conn.execute(portfolio_accounts_t.update().where((portfolio_accounts_t.c.username == uname) & (portfolio_accounts_t.c.portfolio_id == portfolio_id)).values(**values))
+        return (res.rowcount or 0) > 0
+
+    def list_portfolio_transactions(self, username: str, portfolio_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        uname = username.lower()
+        pid = portfolio_id or self.ensure_default_portfolio(uname)["portfolio_id"]
         if self._is_sqlite():
             with self._sqlite() as conn:
                 rows = conn.execute(
                     """
-                    SELECT tx_id, username, symbol, tx_type, quantity, price, fees, traded_at, notes, created_at
+                    SELECT tx_id, portfolio_id, username, symbol, tx_type, quantity, price, fees, traded_at, notes, created_at
                     FROM portfolio_transactions
-                    WHERE username = ?
+                    WHERE username = ? AND portfolio_id = ?
                     ORDER BY COALESCE(traded_at, created_at) DESC, created_at DESC
                     """,
-                    (uname,),
+                    (uname, pid),
                 ).fetchall()
             return [dict(r) for r in rows]
         with self.engine().connect() as conn:
             rows = conn.execute(
                 select(portfolio_transactions_t)
-                .where(portfolio_transactions_t.c.username == uname)
+                .where((portfolio_transactions_t.c.username == uname) & (portfolio_transactions_t.c.portfolio_id == pid))
                 .order_by(portfolio_transactions_t.c.traded_at.desc(), portfolio_transactions_t.c.created_at.desc())
             ).mappings().all()
         return [dict(r) for r in rows]
 
-    def create_portfolio_transaction(
-        self,
-        username: str,
-        symbol: str,
-        tx_type: str,
-        quantity: float,
-        price: float,
-        *,
-        fees: float = 0.0,
-        traded_at: Optional[str] = None,
-        notes: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    def create_portfolio_transaction(self, username: str, symbol: str, tx_type: str, quantity: float, price: float, *, fees: float = 0.0, traded_at: Optional[str] = None, notes: Optional[str] = None, portfolio_id: Optional[str] = None) -> Dict[str, Any]:
+        uname = username.lower()
+        pid = portfolio_id or self.ensure_default_portfolio(uname)["portfolio_id"]
         row = {
             "tx_id": secrets.token_hex(12),
-            "username": username.lower(),
+            "portfolio_id": pid,
+            "username": uname,
             "symbol": symbol.upper(),
             "tx_type": tx_type.lower(),
             "quantity": float(quantity),
@@ -2173,73 +2358,83 @@ class Storage:
         }
         if self._is_sqlite():
             with self._sqlite() as conn:
-                conn.execute(
-                    """
-                    INSERT INTO portfolio_transactions (tx_id, username, symbol, tx_type, quantity, price, fees, traded_at, notes, created_at)
-                    VALUES (:tx_id, :username, :symbol, :tx_type, :quantity, :price, :fees, :traded_at, :notes, :created_at)
-                    """,
-                    row,
-                )
+                conn.execute("INSERT INTO portfolio_transactions (tx_id, portfolio_id, username, symbol, tx_type, quantity, price, fees, traded_at, notes, created_at) VALUES (:tx_id, :portfolio_id, :username, :symbol, :tx_type, :quantity, :price, :fees, :traded_at, :notes, :created_at)", row)
             return row
         with self.engine().begin() as conn:
             conn.execute(portfolio_transactions_t.insert().values(row))
         return row
 
-    def update_portfolio_transaction(
-        self,
-        tx_id: str,
-        username: str,
-        symbol: str,
-        tx_type: str,
-        quantity: float,
-        price: float,
-        *,
-        fees: float = 0.0,
-        traded_at: Optional[str] = None,
-        notes: Optional[str] = None,
-    ) -> bool:
+    def update_portfolio_transaction(self, tx_id: str, username: str, symbol: str, tx_type: str, quantity: float, price: float, *, fees: float = 0.0, traded_at: Optional[str] = None, notes: Optional[str] = None, portfolio_id: Optional[str] = None) -> bool:
         uname = username.lower()
-        values = {
-            "symbol": symbol.upper(),
-            "tx_type": tx_type.lower(),
-            "quantity": float(quantity),
-            "price": float(price),
-            "fees": float(fees or 0.0),
-            "traded_at": traded_at,
-            "notes": notes,
-        }
+        values = {"symbol": symbol.upper(), "tx_type": tx_type.lower(), "quantity": float(quantity), "price": float(price), "fees": float(fees or 0.0), "traded_at": traded_at, "notes": notes}
+        pid_filter = portfolio_id
         if self._is_sqlite():
             with self._sqlite() as conn:
-                cur = conn.execute(
-                    """
-                    UPDATE portfolio_transactions
-                    SET symbol = :symbol, tx_type = :tx_type, quantity = :quantity, price = :price,
-                        fees = :fees, traded_at = :traded_at, notes = :notes
-                    WHERE tx_id = :tx_id AND username = :username
-                    """,
-                    {**values, "tx_id": tx_id, "username": uname},
-                )
+                sql = "UPDATE portfolio_transactions SET symbol=:symbol, tx_type=:tx_type, quantity=:quantity, price=:price, fees=:fees, traded_at=:traded_at, notes=:notes WHERE tx_id=:tx_id AND username=:username"
+                params = {**values, "tx_id": tx_id, "username": uname}
+                if pid_filter:
+                    sql += " AND portfolio_id=:portfolio_id"
+                    params["portfolio_id"] = pid_filter
+                cur = conn.execute(sql, params)
                 return (cur.rowcount or 0) > 0
         with self.engine().begin() as conn:
-            res = conn.execute(
-                portfolio_transactions_t.update()
-                .where((portfolio_transactions_t.c.tx_id == tx_id) & (portfolio_transactions_t.c.username == uname))
-                .values(**values)
-            )
+            where = (portfolio_transactions_t.c.tx_id == tx_id) & (portfolio_transactions_t.c.username == uname)
+            if pid_filter:
+                where = where & (portfolio_transactions_t.c.portfolio_id == pid_filter)
+            res = conn.execute(portfolio_transactions_t.update().where(where).values(**values))
         return (res.rowcount or 0) > 0
 
-    def delete_portfolio_transaction(self, tx_id: str, username: str) -> bool:
+    def delete_portfolio_transaction(self, tx_id: str, username: str, portfolio_id: Optional[str] = None) -> bool:
         uname = username.lower()
         if self._is_sqlite():
             with self._sqlite() as conn:
-                cur = conn.execute("DELETE FROM portfolio_transactions WHERE tx_id = ? AND username = ?", (tx_id, uname))
+                if portfolio_id:
+                    cur = conn.execute("DELETE FROM portfolio_transactions WHERE tx_id=? AND username=? AND portfolio_id=?", (tx_id, uname, portfolio_id))
+                else:
+                    cur = conn.execute("DELETE FROM portfolio_transactions WHERE tx_id=? AND username=?", (tx_id, uname))
                 return (cur.rowcount or 0) > 0
         with self.engine().begin() as conn:
-            res = conn.execute(
-                portfolio_transactions_t.delete().where(
-                    (portfolio_transactions_t.c.tx_id == tx_id) & (portfolio_transactions_t.c.username == uname)
-                )
-            )
+            where = (portfolio_transactions_t.c.tx_id == tx_id) & (portfolio_transactions_t.c.username == uname)
+            if portfolio_id:
+                where = where & (portfolio_transactions_t.c.portfolio_id == portfolio_id)
+            res = conn.execute(portfolio_transactions_t.delete().where(where))
+        return (res.rowcount or 0) > 0
+
+    def list_cash_movements(self, username: str, portfolio_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        uname = username.lower()
+        pid = portfolio_id or self.ensure_default_portfolio(uname)["portfolio_id"]
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                rows = conn.execute("SELECT cash_id, portfolio_id, username, movement_type, amount, movement_date, notes, created_at FROM portfolio_cash_movements WHERE username=? AND portfolio_id=? ORDER BY COALESCE(movement_date, created_at) DESC, created_at DESC", (uname, pid)).fetchall()
+            return [dict(r) for r in rows]
+        with self.engine().connect() as conn:
+            rows = conn.execute(select(portfolio_cash_movements_t).where((portfolio_cash_movements_t.c.username == uname) & (portfolio_cash_movements_t.c.portfolio_id == pid)).order_by(portfolio_cash_movements_t.c.movement_date.desc(), portfolio_cash_movements_t.c.created_at.desc())).mappings().all()
+        return [dict(r) for r in rows]
+
+    def create_cash_movement(self, username: str, portfolio_id: str, movement_type: str, amount: float, movement_date: Optional[str] = None, notes: Optional[str] = None) -> Dict[str, Any]:
+        row = {"cash_id": secrets.token_hex(12), "portfolio_id": portfolio_id, "username": username.lower(), "movement_type": movement_type.lower(), "amount": float(amount), "movement_date": movement_date, "notes": notes, "created_at": _utc_now()}
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.execute("INSERT INTO portfolio_cash_movements (cash_id, portfolio_id, username, movement_type, amount, movement_date, notes, created_at) VALUES (:cash_id, :portfolio_id, :username, :movement_type, :amount, :movement_date, :notes, :created_at)", row)
+            return row
+        with self.engine().begin() as conn:
+            conn.execute(portfolio_cash_movements_t.insert().values(row))
+        return row
+
+    def delete_cash_movement(self, username: str, cash_id: str, portfolio_id: Optional[str] = None) -> bool:
+        uname = username.lower()
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                if portfolio_id:
+                    cur = conn.execute("DELETE FROM portfolio_cash_movements WHERE username=? AND cash_id=? AND portfolio_id=?", (uname, cash_id, portfolio_id))
+                else:
+                    cur = conn.execute("DELETE FROM portfolio_cash_movements WHERE username=? AND cash_id=?", (uname, cash_id))
+                return (cur.rowcount or 0) > 0
+        with self.engine().begin() as conn:
+            where = (portfolio_cash_movements_t.c.username == uname) & (portfolio_cash_movements_t.c.cash_id == cash_id)
+            if portfolio_id:
+                where = where & (portfolio_cash_movements_t.c.portfolio_id == portfolio_id)
+            res = conn.execute(portfolio_cash_movements_t.delete().where(where))
         return (res.rowcount or 0) > 0
 
     def list_notifications(self, username: Optional[str] = None, unread_only: bool = False) -> List[Dict[str, Any]]:

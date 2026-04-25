@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { marketApi, portfolioApi, watchlistApi } from "../../lib/api/services";
-import type { PortfolioAnalytics, PortfolioData, PortfolioPerformancePoint, PortfolioTransaction, Stock, Watchlist } from "../../lib/api/types";
+import type { PortfolioAccount, PortfolioAnalytics, PortfolioData, PortfolioPerformancePoint, PortfolioPeriodPerformance, PortfolioTransaction, Stock, Watchlist } from "../../lib/api/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -23,6 +23,11 @@ const emptyPortfolio: PortfolioData = {
     unrealizedPlPct: 0,
     realizedPl: 0,
     totalPl: 0,
+    cashBalance: 0,
+    cashDeposits: 0,
+    cashWithdrawals: 0,
+    netContributions: 0,
+    totalEquity: 0,
   },
   positions: [],
   transactions: [],
@@ -72,7 +77,12 @@ export function Portfolio() {
   const [portfolio, setPortfolio] = useState<PortfolioData>(emptyPortfolio);
   const [watchlist, setWatchlist] = useState<Watchlist>(emptyWatchlist);
   const [performance, setPerformance] = useState<PortfolioPerformancePoint[]>([]);
+  const [periodPerformance, setPeriodPerformance] = useState<PortfolioPeriodPerformance[]>([]);
   const [analytics, setAnalytics] = useState<PortfolioAnalytics>(emptyAnalytics);
+  const [portfolios, setPortfolios] = useState<PortfolioAccount[]>([]);
+  const [selectedPortfolioId, setSelectedPortfolioId] = useState<string>("");
+  const [newPortfolioName, setNewPortfolioName] = useState("");
+  const [cashForm, setCashForm] = useState({ movementType: "deposit" as "deposit" | "withdrawal", amount: "", movementDate: new Date().toISOString().slice(0, 10), notes: "" });
   const [loading, setLoading] = useState(true);
   const [chartLoading, setChartLoading] = useState(true);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
@@ -90,26 +100,32 @@ export function Portfolio() {
   const [symbolSearchOpen, setSymbolSearchOpen] = useState(false);
   const [symbolSearchLoading, setSymbolSearchLoading] = useState(false);
 
-  const loadPortfolio = async () => {
-    const [portfolioData, watchlistData] = await Promise.all([portfolioApi.get(), watchlistApi.get()]);
+  const loadPortfolio = async (portfolioId = selectedPortfolioId) => {
+    const [portfolioRows, watchlistData] = await Promise.all([portfolioApi.listPortfolios(), watchlistApi.get()]);
+    setPortfolios(portfolioRows);
+    const activeId = portfolioId || portfolioRows.find((item) => item.isDefault)?.portfolioId || portfolioRows[0]?.portfolioId || "";
+    if (activeId && activeId !== selectedPortfolioId) setSelectedPortfolioId(activeId);
+    const portfolioData = await portfolioApi.get(activeId || undefined);
     setPortfolio(portfolioData);
     setWatchlist(watchlistData);
+    return activeId;
   };
 
-  const loadPerformance = async (days: number) => {
+  const loadPerformance = async (days: number, portfolioId = selectedPortfolioId) => {
     setChartLoading(true);
     try {
-      const series = await portfolioApi.getPerformance(days);
+      const [series, periods] = await Promise.all([portfolioApi.getPerformance(days, portfolioId || undefined), portfolioApi.getPeriodPerformance(portfolioId || undefined)]);
       setPerformance(series);
+      setPeriodPerformance(periods);
     } finally {
       setChartLoading(false);
     }
   };
 
-  const loadAnalytics = async (days: number) => {
+  const loadAnalytics = async (days: number, portfolioId = selectedPortfolioId) => {
     setAnalyticsLoading(true);
     try {
-      const payload = await portfolioApi.getAnalytics(days);
+      const payload = await portfolioApi.getAnalytics(days, portfolioId || undefined);
       setAnalytics(payload);
     } finally {
       setAnalyticsLoading(false);
@@ -117,12 +133,16 @@ export function Portfolio() {
   };
 
   useEffect(() => {
-    Promise.all([loadPortfolio(), loadPerformance(chartDays), loadAnalytics(chartDays)]).finally(() => setLoading(false));
+    (async () => {
+      const activeId = await loadPortfolio();
+      await Promise.all([loadPerformance(chartDays, activeId), loadAnalytics(chartDays, activeId)]);
+    })().finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    Promise.all([loadPerformance(chartDays).catch(() => setPerformance([])), loadAnalytics(chartDays).catch(() => setAnalytics(emptyAnalytics))]);
-  }, [chartDays]);
+    if (!selectedPortfolioId) return;
+    Promise.all([loadPortfolio(selectedPortfolioId), loadPerformance(chartDays, selectedPortfolioId).catch(() => setPerformance([])), loadAnalytics(chartDays, selectedPortfolioId).catch(() => setAnalytics(emptyAnalytics))]);
+  }, [selectedPortfolioId, chartDays]);
 
   useEffect(() => {
     let alive = true;
@@ -221,9 +241,9 @@ export function Portfolio() {
         tradedAt: form.tradedAt,
         notes: form.notes.trim() || undefined,
       };
-      const updated = editingId ? await portfolioApi.updateTransaction(editingId, payload) : await portfolioApi.addTransaction(payload);
+      const updated = editingId ? await portfolioApi.updateTransaction(editingId, payload, selectedPortfolioId || undefined) : await portfolioApi.addTransaction(payload, selectedPortfolioId || undefined);
       setPortfolio(updated);
-      await Promise.all([loadPerformance(chartDays), loadAnalytics(chartDays), watchlistApi.get().then(setWatchlist)]);
+      await Promise.all([loadPerformance(chartDays, selectedPortfolioId), loadAnalytics(chartDays, selectedPortfolioId), watchlistApi.get().then(setWatchlist), loadPortfolio(selectedPortfolioId)]);
       resetDialog();
     } catch (err: any) {
       setError(err?.message || "Could not save portfolio transaction");
@@ -233,9 +253,9 @@ export function Portfolio() {
   };
 
   const deleteTransaction = async (transactionId: string) => {
-    const updated = await portfolioApi.deleteTransaction(transactionId);
+    const updated = await portfolioApi.deleteTransaction(transactionId, selectedPortfolioId || undefined);
     setPortfolio(updated);
-    await Promise.all([loadPerformance(chartDays), loadAnalytics(chartDays)]);
+    await Promise.all([loadPerformance(chartDays, selectedPortfolioId), loadAnalytics(chartDays, selectedPortfolioId), loadPortfolio(selectedPortfolioId)]);
   };
 
   const previewCsvImport = async (file: File) => {
@@ -249,14 +269,47 @@ export function Portfolio() {
     }
   };
 
+  const createPortfolio = async () => {
+    const name = newPortfolioName.trim();
+    if (!name) return;
+    const result = await portfolioApi.createPortfolio({ name });
+    setPortfolios(result.portfolios);
+    setSelectedPortfolioId(result.portfolio.portfolioId);
+    setNewPortfolioName("");
+  };
+
+  const setDefaultPortfolio = async () => {
+    if (!selectedPortfolioId) return;
+    const result = await portfolioApi.updatePortfolio(selectedPortfolioId, { isDefault: true });
+    setPortfolios(result.portfolios);
+  };
+
+  const archivePortfolio = async () => {
+    if (!selectedPortfolioId) return;
+    const active = portfolios.find((item) => item.portfolioId === selectedPortfolioId);
+    if (active?.isDefault) return;
+    const result = await portfolioApi.updatePortfolio(selectedPortfolioId, { isArchived: true });
+    setPortfolios(result.portfolios);
+    setSelectedPortfolioId(result.portfolios.find((item) => item.isDefault)?.portfolioId || result.portfolios[0]?.portfolioId || "");
+  };
+
+  const addCashMovement = async () => {
+    const amount = Number(cashForm.amount || 0);
+    if (!amount || amount <= 0) return;
+    const updated = await portfolioApi.addCashMovement({ movementType: cashForm.movementType, amount, movementDate: cashForm.movementDate, notes: cashForm.notes || undefined }, selectedPortfolioId || undefined);
+    setPortfolio(updated);
+    setCashForm({ movementType: "deposit", amount: "", movementDate: new Date().toISOString().slice(0, 10), notes: "" });
+    await Promise.all([loadPerformance(chartDays, selectedPortfolioId), loadAnalytics(chartDays, selectedPortfolioId), loadPortfolio(selectedPortfolioId)]);
+  };
+
   const importCsvTransactions = async () => {
     if (!csvFile) return;
     setImportingCsv(true);
     setImportError(null);
     try {
-      const updated = await portfolioApi.importTransactions(csvFile);
+      const updated = await portfolioApi.importTransactions(csvFile, selectedPortfolioId || undefined);
       setPortfolio(updated);
-      await Promise.all([loadPerformance(chartDays), loadAnalytics(chartDays)]);
+      await Promise.all([loadPerformance(chartDays, selectedPortfolioId), loadAnalytics(chartDays, selectedPortfolioId), loadPortfolio(selectedPortfolioId)]);
       setCsvFile(null);
       setCsvPreview(null);
     } catch (err: any) {
@@ -269,10 +322,22 @@ export function Portfolio() {
   return (
     <div className="min-h-screen bg-[#08090c]">
       <div className="mx-auto max-w-[1680px] space-y-8 px-6 py-8 lg:px-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="space-y-1.5">
             <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[#e6edf3]">Portfolio</h1>
-            <p className="text-[13px] text-[#768390]">Track positions, edit trade mistakes safely, and see how your portfolio changed over time.</p>
+            <p className="text-[13px] text-[#768390]">Track multiple portfolios, cash, performance periods, and benchmark alpha.</p>
+          </div>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <Select value={selectedPortfolioId} onValueChange={setSelectedPortfolioId}>
+              <SelectTrigger className="w-[220px] border-[#30363d] bg-[#0d1117] text-[#e6edf3]"><SelectValue placeholder="Select portfolio" /></SelectTrigger>
+              <SelectContent className="border-[#30363d] bg-[#161b22]">
+                {portfolios.map((item) => <SelectItem key={item.portfolioId} value={item.portfolioId}>{item.name}{item.isDefault ? " · Default" : ""}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Input value={newPortfolioName} onChange={(e) => setNewPortfolioName(e.target.value)} placeholder="New portfolio name" className="w-[210px] border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
+            <Button variant="outline" onClick={createPortfolio} disabled={!newPortfolioName.trim()} className="border-[#30363d] text-[#e6edf3]">Create</Button>
+            <Button variant="outline" onClick={setDefaultPortfolio} disabled={!selectedPortfolioId} className="border-[#30363d] text-[#e6edf3]">Set Default</Button>
+            <Button variant="outline" onClick={archivePortfolio} disabled={!selectedPortfolioId || portfolios.find((item) => item.portfolioId === selectedPortfolioId)?.isDefault} className="border-[#30363d] text-[#e6edf3]">Archive</Button>
           </div>
           <Dialog open={dialogOpen} onOpenChange={(open) => (open ? setDialogOpen(true) : resetDialog())}>
             <DialogTrigger asChild>
@@ -376,6 +441,31 @@ export function Portfolio() {
           <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-violet-500/10"><Landmark className="h-5 w-5 text-violet-500" /></div><div><p className="text-[13px] text-[#768390]">Cost basis</p><p className="text-[24px] font-bold text-[#e6edf3]">{money(portfolio.summary.costBasis)}</p></div></div></CardContent></Card>
           <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className={`flex h-10 w-10 items-center justify-center rounded-md ${portfolio.summary.unrealizedPl >= 0 ? "bg-emerald-500/10" : "bg-red-500/10"}`}>{portfolio.summary.unrealizedPl >= 0 ? <TrendingUp className="h-5 w-5 text-emerald-500" /> : <TrendingDown className="h-5 w-5 text-red-500" />}</div><div><p className="text-[13px] text-[#768390]">Unrealized P/L</p><p className={`text-[24px] font-bold ${portfolio.summary.unrealizedPl >= 0 ? "text-emerald-400" : "text-red-400"}`}>{money(portfolio.summary.unrealizedPl)}</p><p className="text-[12px] text-[#768390]">{signedPercent(portfolio.summary.unrealizedPlPct)}</p></div></div></CardContent></Card>
           <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className={`flex h-10 w-10 items-center justify-center rounded-md ${portfolio.summary.realizedPl >= 0 ? "bg-amber-500/10" : "bg-red-500/10"}`}>{portfolio.summary.realizedPl >= 0 ? <TrendingUp className="h-5 w-5 text-amber-500" /> : <TrendingDown className="h-5 w-5 text-red-500" />}</div><div><p className="text-[13px] text-[#768390]">Realized P/L</p><p className={`text-[24px] font-bold ${portfolio.summary.realizedPl >= 0 ? "text-amber-400" : "text-red-400"}`}>{money(portfolio.summary.realizedPl)}</p><p className="text-[12px] text-[#768390]">{portfolio.summary.positionsCount} open positions</p></div></div></CardContent></Card>
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-3">
+          <Card className="border-[#30363d] bg-[#161b22] xl:col-span-2">
+            <CardHeader><CardTitle className="text-[18px] text-[#e6edf3]">Cash management</CardTitle><CardDescription className="text-[13px] text-[#768390]">Deposits, withdrawals, and available cash for this portfolio.</CardDescription></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                <div className="rounded-lg border border-[#30363d] bg-[#0d1117] p-4"><p className="text-[12px] text-[#768390]">Cash balance</p><p className="text-[20px] font-bold text-[#e6edf3]">{money(portfolio.summary.cashBalance || 0)}</p></div>
+                <div className="rounded-lg border border-[#30363d] bg-[#0d1117] p-4"><p className="text-[12px] text-[#768390]">Total equity</p><p className="text-[20px] font-bold text-[#e6edf3]">{money(portfolio.summary.totalEquity || portfolio.summary.marketValue)}</p></div>
+                <div className="rounded-lg border border-[#30363d] bg-[#0d1117] p-4"><p className="text-[12px] text-[#768390]">Deposits</p><p className="text-[20px] font-bold text-emerald-400">{money(portfolio.summary.cashDeposits || 0)}</p></div>
+                <div className="rounded-lg border border-[#30363d] bg-[#0d1117] p-4"><p className="text-[12px] text-[#768390]">Withdrawals</p><p className="text-[20px] font-bold text-red-400">{money(portfolio.summary.cashWithdrawals || 0)}</p></div>
+              </div>
+              <div className="grid gap-3 md:grid-cols-5">
+                <Select value={cashForm.movementType} onValueChange={(value: "deposit" | "withdrawal") => setCashForm((prev) => ({ ...prev, movementType: value }))}><SelectTrigger className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]"><SelectValue /></SelectTrigger><SelectContent className="border-[#30363d] bg-[#161b22]"><SelectItem value="deposit">Deposit</SelectItem><SelectItem value="withdrawal">Withdrawal</SelectItem></SelectContent></Select>
+                <Input type="number" value={cashForm.amount} onChange={(e) => setCashForm((prev) => ({ ...prev, amount: e.target.value }))} placeholder="Amount" className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
+                <Input type="date" value={cashForm.movementDate} onChange={(e) => setCashForm((prev) => ({ ...prev, movementDate: e.target.value }))} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
+                <Input value={cashForm.notes} onChange={(e) => setCashForm((prev) => ({ ...prev, notes: e.target.value }))} placeholder="Note" className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
+                <Button onClick={addCashMovement} className="bg-blue-600 text-white hover:bg-blue-700">Add Cash</Button>
+              </div>
+              <div className="max-h-52 overflow-y-auto rounded-lg border border-[#30363d]">
+                {(portfolio.cashMovements || []).length ? (portfolio.cashMovements || []).map((item) => <div key={item.id} className="flex items-center justify-between border-b border-[#30363d] px-4 py-3 text-[13px] last:border-b-0"><div><div className="font-medium text-[#e6edf3] capitalize">{item.movementType}</div><div className="text-[#768390]">{item.movementDate || item.createdAt || "—"} {item.notes ? `· ${item.notes}` : ""}</div></div><div className={item.movementType === "deposit" ? "font-semibold text-emerald-400" : "font-semibold text-red-400"}>{item.movementType === "deposit" ? "+" : "-"}{money(item.amount)}</div></div>) : <div className="px-4 py-6 text-center text-[13px] text-[#768390]">No cash movements yet.</div>}
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-[#30363d] bg-[#161b22]"><CardHeader><CardTitle className="text-[18px] text-[#e6edf3]">Performance by period</CardTitle><CardDescription className="text-[13px] text-[#768390]">Portfolio returns vs ASPI and S&P SL20.</CardDescription></CardHeader><CardContent className="space-y-3">{periodPerformance.length ? periodPerformance.map((row) => <div key={row.label} className="rounded-lg border border-[#30363d] bg-[#0d1117] p-3"><div className="flex items-center justify-between"><span className="font-medium text-[#e6edf3]">{row.label}</span><span className={row.portfolioReturnPct >= 0 ? "text-emerald-400" : "text-red-400"}>{signedPercent(row.portfolioReturnPct)}</span></div><div className="mt-1 flex justify-between text-[12px] text-[#768390]"><span>ASPI {signedPercent(row.aspiReturnPct)}</span><span>Alpha {signedPercent(row.alphaVsAspiPct)}</span></div><div className="mt-1 flex justify-between text-[12px] text-[#768390]"><span>S&P SL20 {signedPercent(row.sp20ReturnPct)}</span><span>Alpha {signedPercent(row.alphaVsSp20Pct)}</span></div></div>) : <p className="text-[13px] text-[#768390]">Add positions to calculate period performance.</p>}</CardContent></Card>
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">

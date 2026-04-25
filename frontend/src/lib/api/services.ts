@@ -137,6 +137,30 @@ function mapStockResources(raw: any): StockResources {
   };
 }
 
+function mapPortfolioAccount(raw: any): PortfolioAccount {
+  return {
+    portfolioId: String(raw?.portfolio_id || raw?.portfolioId || ""),
+    name: String(raw?.name || "Portfolio"),
+    description: raw?.description || undefined,
+    currency: raw?.currency || "LKR",
+    isDefault: Boolean(raw?.is_default ?? raw?.isDefault),
+    isArchived: Boolean(raw?.is_archived ?? raw?.isArchived),
+    summary: raw?.summary ? mapPortfolioSummary(raw.summary) : undefined,
+  };
+}
+
+function mapPortfolioCashMovement(raw: any): PortfolioCashMovement {
+  return {
+    id: String(raw?.cash_id || raw?.id || ""),
+    portfolioId: String(raw?.portfolio_id || raw?.portfolioId || ""),
+    movementType: String(raw?.movement_type || raw?.movementType || "deposit").toLowerCase() === "withdrawal" ? "withdrawal" : "deposit",
+    amount: num(raw?.amount),
+    movementDate: raw?.movement_date || raw?.movementDate,
+    notes: raw?.notes || undefined,
+    createdAt: raw?.created_at || raw?.createdAt,
+  };
+}
+
 function mapPortfolioTransaction(raw: any): PortfolioTransaction {
   return {
     id: String(raw?.tx_id || raw?.id || ""),
@@ -171,8 +195,16 @@ function mapPortfolioPosition(raw: any): PortfolioPosition {
 
 function mapPortfolioSummary(raw: any): PortfolioSummary {
   return {
+    portfolioId: raw?.portfolio_id || raw?.portfolioId,
+    portfolioName: raw?.portfolio_name || raw?.portfolioName,
+    cashBalance: raw?.cash_balance !== undefined ? num(raw?.cash_balance) : undefined,
+    cashDeposits: raw?.cash_deposits !== undefined ? num(raw?.cash_deposits) : undefined,
+    cashWithdrawals: raw?.cash_withdrawals !== undefined ? num(raw?.cash_withdrawals) : undefined,
+    netContributions: raw?.net_contributions !== undefined ? num(raw?.net_contributions) : undefined,
+    totalEquity: raw?.total_equity !== undefined ? num(raw?.total_equity) : undefined,
     positionsCount: num(raw?.positions_count ?? raw?.positionsCount),
     transactionsCount: num(raw?.transactions_count ?? raw?.transactionsCount),
+    cashMovementsCount: raw?.cash_movements_count !== undefined ? num(raw?.cash_movements_count) : undefined,
     costBasis: num(raw?.cost_basis ?? raw?.costBasis),
     marketValue: num(raw?.market_value ?? raw?.marketValue),
     unrealizedPl: num(raw?.unrealized_pl ?? raw?.unrealizedPl),
@@ -186,9 +218,11 @@ function mapPortfolioSummary(raw: any): PortfolioSummary {
 
 function mapPortfolioData(raw: any): PortfolioData {
   return {
+    portfolio: raw?.portfolio ? mapPortfolioAccount(raw.portfolio) : undefined,
     summary: mapPortfolioSummary(raw?.summary || {}),
     positions: Array.isArray(raw?.positions) ? raw.positions.map(mapPortfolioPosition) : [],
     transactions: Array.isArray(raw?.transactions) ? raw.transactions.map(mapPortfolioTransaction) : [],
+    cashMovements: Array.isArray(raw?.cash_movements) ? raw.cash_movements.map(mapPortfolioCashMovement) : [],
     recentActions: Array.isArray(raw?.recent_actions) ? raw.recent_actions.map(mapCorporateAction) : [],
   };
 }
@@ -500,6 +534,21 @@ function mapPrediction(raw: any, currentPrice = 0): PredictionCardData {
     },
     topFeatures: features,
     lastUpdated: raw?.as_of || raw?.created_at || formatRelativeTime(new Date().toISOString()),
+    explanation: raw?.explanation
+      ? {
+          direction: String(raw.explanation.direction || "uncertain"),
+          summary: String(raw.explanation.summary || ""),
+          reasons: Array.isArray(raw.explanation.reasons)
+            ? raw.explanation.reasons.map((item: any) => ({
+                feature: String(item?.feature || ""),
+                group: String(item?.group || "Model feature"),
+                direction: String(item?.direction || "neutral"),
+                impact: num(item?.impact),
+                text: String(item?.text || ""),
+              }))
+            : [],
+        }
+      : undefined,
   };
 }
 
@@ -726,15 +775,60 @@ export const watchlistApi = {
 };
 
 export const portfolioApi = {
-  get: async (): Promise<PortfolioData> => mapPortfolioData(await api.get<any>("/api/portfolio")),
+  listPortfolios: async (): Promise<PortfolioAccount[]> => {
+    const response = await api.get<any>("/api/portfolios");
+    return Array.isArray(response?.portfolios) ? response.portfolios.map(mapPortfolioAccount) : [];
+  },
 
-  getPerformance: async (days = 365): Promise<PortfolioPerformancePoint[]> => {
-    const response = await api.get<any>(`/api/portfolio/performance?days=${encodeURIComponent(String(days))}`);
+  createPortfolio: async (payload: { name: string; description?: string; currency?: string }) => {
+    const response = await api.post<any>("/api/portfolios", payload);
+    return { portfolio: mapPortfolioAccount(response?.portfolio || {}), portfolios: Array.isArray(response?.portfolios) ? response.portfolios.map(mapPortfolioAccount) : [] };
+  },
+
+  updatePortfolio: async (portfolioId: string, payload: { name?: string; description?: string; isDefault?: boolean; isArchived?: boolean }) => {
+    const response = await api.patch<any>(`/api/portfolios/${encodeURIComponent(portfolioId)}`, {
+      name: payload.name,
+      description: payload.description,
+      is_default: payload.isDefault,
+      is_archived: payload.isArchived,
+    });
+    return { portfolio: mapPortfolioAccount(response?.portfolio || {}), portfolios: Array.isArray(response?.portfolios) ? response.portfolios.map(mapPortfolioAccount) : [] };
+  },
+
+  get: async (portfolioId?: string): Promise<PortfolioData> => mapPortfolioData(await api.get<any>(`/api/portfolio${portfolioId ? `?portfolio_id=${encodeURIComponent(portfolioId)}` : ""}`)),
+
+  getPerformance: async (days = 365, portfolioId?: string): Promise<PortfolioPerformancePoint[]> => {
+    const response = await api.get<any>(`/api/portfolio/performance?days=${encodeURIComponent(String(days))}${portfolioId ? `&portfolio_id=${encodeURIComponent(portfolioId)}` : ""}`);
     return Array.isArray(response?.series) ? response.series.map(mapPortfolioPerformancePoint) : [];
   },
 
-  getAnalytics: async (days = 365): Promise<PortfolioAnalytics> =>
-    mapPortfolioAnalytics(await api.get<any>(`/api/portfolio/analytics?days=${encodeURIComponent(String(days))}`)),
+  getPeriodPerformance: async (portfolioId?: string): Promise<PortfolioPeriodPerformance[]> => {
+    const response = await api.get<any>(`/api/portfolio/period-performance${portfolioId ? `?portfolio_id=${encodeURIComponent(portfolioId)}` : ""}`);
+    return Array.isArray(response?.periods) ? response.periods.map((item: any) => ({
+      label: String(item?.label || ""),
+      startDate: item?.start_date || item?.startDate,
+      endDate: item?.end_date || item?.endDate,
+      portfolioReturnPct: num(item?.portfolio_return_pct ?? item?.portfolioReturnPct),
+      aspiReturnPct: num(item?.aspi_return_pct ?? item?.aspiReturnPct),
+      sp20ReturnPct: num(item?.sp20_return_pct ?? item?.sp20ReturnPct),
+      alphaVsAspiPct: num(item?.alpha_vs_aspi_pct ?? item?.alphaVsAspiPct),
+      alphaVsSp20Pct: num(item?.alpha_vs_sp20_pct ?? item?.alphaVsSp20Pct),
+    })) : [];
+  },
+
+  getAnalytics: async (days = 365, portfolioId?: string): Promise<PortfolioAnalytics> =>
+    mapPortfolioAnalytics(await api.get<any>(`/api/portfolio/analytics?days=${encodeURIComponent(String(days))}${portfolioId ? `&portfolio_id=${encodeURIComponent(portfolioId)}` : ""}`)),
+
+  addCashMovement: async (payload: { movementType: "deposit" | "withdrawal"; amount: number; movementDate?: string; notes?: string }, portfolioId?: string): Promise<PortfolioData> =>
+    mapPortfolioData(await api.post<any>(`/api/portfolio/cash${portfolioId ? `?portfolio_id=${encodeURIComponent(portfolioId)}` : ""}`, {
+      movement_type: payload.movementType,
+      amount: payload.amount,
+      movement_date: payload.movementDate,
+      notes: payload.notes,
+    })),
+
+  deleteCashMovement: async (cashId: string, portfolioId?: string): Promise<PortfolioData> =>
+    mapPortfolioData(await api.delete<any>(`/api/portfolio/cash/${encodeURIComponent(cashId)}${portfolioId ? `?portfolio_id=${encodeURIComponent(portfolioId)}` : ""}`)),
 
   addTransaction: async (payload: {
     symbol: string;
@@ -744,9 +838,9 @@ export const portfolioApi = {
     fees?: number;
     tradedAt?: string;
     notes?: string;
-  }): Promise<PortfolioData> =>
+  }, portfolioId?: string): Promise<PortfolioData> =>
     mapPortfolioData(
-      await api.post<any>("/api/portfolio/transactions", {
+      await api.post<any>(`/api/portfolio/transactions${portfolioId ? `?portfolio_id=${encodeURIComponent(portfolioId)}` : ""}`, {
         symbol: payload.symbol,
         tx_type: payload.txType,
         quantity: payload.quantity,
@@ -765,9 +859,9 @@ export const portfolioApi = {
     fees?: number;
     tradedAt?: string;
     notes?: string;
-  }): Promise<PortfolioData> =>
+  }, portfolioId?: string): Promise<PortfolioData> =>
     mapPortfolioData(
-      await api.patch<any>(`/api/portfolio/transactions/${encodeURIComponent(transactionId)}`, {
+      await api.patch<any>(`/api/portfolio/transactions/${encodeURIComponent(transactionId)}${portfolioId ? `?portfolio_id=${encodeURIComponent(portfolioId)}` : ""}`, {
         symbol: payload.symbol,
         tx_type: payload.txType,
         quantity: payload.quantity,
@@ -778,8 +872,8 @@ export const portfolioApi = {
       })
     ),
 
-  deleteTransaction: async (transactionId: string): Promise<PortfolioData> =>
-    mapPortfolioData(await api.delete<any>(`/api/portfolio/transactions/${encodeURIComponent(transactionId)}`)),
+  deleteTransaction: async (transactionId: string, portfolioId?: string): Promise<PortfolioData> =>
+    mapPortfolioData(await api.delete<any>(`/api/portfolio/transactions/${encodeURIComponent(transactionId)}${portfolioId ? `?portfolio_id=${encodeURIComponent(portfolioId)}` : ""}`)),
 
   previewImport: async (file: File) => {
     const form = new FormData();
@@ -787,10 +881,10 @@ export const portfolioApi = {
     return api.post<any>("/api/portfolio/import/preview", form);
   },
 
-  importTransactions: async (file: File): Promise<PortfolioData & { importedRows?: number }> => {
+  importTransactions: async (file: File, portfolioId?: string): Promise<PortfolioData & { importedRows?: number }> => {
     const form = new FormData();
     form.append("file", file);
-    const response = await api.post<any>("/api/portfolio/import", form);
+    const response = await api.post<any>(`/api/portfolio/import${portfolioId ? `?portfolio_id=${encodeURIComponent(portfolioId)}` : ""}`, form);
     const mapped = mapPortfolioData(response) as PortfolioData & { importedRows?: number };
     mapped.importedRows = response?.imported_rows;
     return mapped;

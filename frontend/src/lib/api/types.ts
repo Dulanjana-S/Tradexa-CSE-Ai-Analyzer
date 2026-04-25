@@ -56,6 +56,20 @@ export interface HistoricalDataPoint {
   volume: number;
 }
 
+export interface PredictionExplanationReason {
+  feature: string;
+  group: string;
+  direction: string;
+  impact: number;
+  text: string;
+}
+
+export interface PredictionExplanation {
+  direction: string;
+  summary: string;
+  reasons: PredictionExplanationReason[];
+}
+
 export interface PredictionCardData {
   predictedPrice: number;
   currentPrice: number;
@@ -66,6 +80,7 @@ export interface PredictionCardData {
   expectedRange: { low: number; high: number };
   topFeatures: Array<{ feature: string; importance: number }>;
   lastUpdated: string;
+  explanation?: PredictionExplanation;
   error?: string;
 }
 
@@ -131,9 +146,37 @@ export interface PortfolioPosition {
   weightPct: number;
 }
 
+export interface PortfolioAccount {
+  portfolioId: string;
+  name: string;
+  description?: string;
+  currency?: string;
+  isDefault: boolean;
+  isArchived?: boolean;
+  summary?: PortfolioSummary;
+}
+
+export interface PortfolioCashMovement {
+  id: string;
+  portfolioId: string;
+  movementType: "deposit" | "withdrawal";
+  amount: number;
+  movementDate?: string;
+  notes?: string;
+  createdAt?: string;
+}
+
 export interface PortfolioSummary {
+  portfolioId?: string;
+  portfolioName?: string;
+  cashBalance?: number;
+  cashDeposits?: number;
+  cashWithdrawals?: number;
+  netContributions?: number;
+  totalEquity?: number;
   positionsCount: number;
   transactionsCount: number;
+  cashMovementsCount?: number;
   costBasis: number;
   marketValue: number;
   unrealizedPl: number;
@@ -157,10 +200,23 @@ export interface CorporateAction {
 }
 
 export interface PortfolioData {
+  portfolio?: PortfolioAccount;
   summary: PortfolioSummary;
   positions: PortfolioPosition[];
   transactions: PortfolioTransaction[];
+  cashMovements?: PortfolioCashMovement[];
   recentActions?: CorporateAction[];
+}
+
+export interface PortfolioPeriodPerformance {
+  label: string;
+  startDate?: string;
+  endDate?: string;
+  portfolioReturnPct: number;
+  aspiReturnPct: number;
+  sp20ReturnPct: number;
+  alphaVsAspiPct: number;
+  alphaVsSp20Pct: number;
 }
 
 export interface PortfolioPerformancePoint {

@@ -717,40 +717,76 @@ def api_settings_update(request: Request, payload: Dict[str, Any] = Body(...)):
     return data_service.update_user_settings(user['username'], values)
 
 
-@app.get("/api/portfolio")
-def api_portfolio(request: Request):
+@app.get("/api/portfolios")
+def api_portfolios(request: Request):
     user = require_user(request)
-    return data_service.get_portfolio(user['username'])
+    return {"portfolios": data_service.list_portfolios(user['username'])}
+
+
+@app.post("/api/portfolios")
+def api_create_portfolio(request: Request, payload: Dict[str, Any] = Body(...)):
+    user = require_user(request)
+    return data_service.create_portfolio_account(user['username'], payload)
+
+
+@app.patch("/api/portfolios/{portfolio_id}")
+def api_update_portfolio(portfolio_id: str, request: Request, payload: Dict[str, Any] = Body(...)):
+    user = require_user(request)
+    return data_service.update_portfolio_account(user['username'], portfolio_id, payload)
+
+
+@app.get("/api/portfolio")
+def api_portfolio(request: Request, portfolio_id: Optional[str] = Query(None)):
+    user = require_user(request)
+    return data_service.get_portfolio(user['username'], portfolio_id=portfolio_id)
 
 
 @app.get("/api/portfolio/performance")
-def api_portfolio_performance(request: Request, days: int = Query(365, ge=30, le=1825)):
+def api_portfolio_performance(request: Request, portfolio_id: Optional[str] = Query(None), days: int = Query(365, ge=30, le=1825)):
     user = require_user(request)
-    return data_service.get_portfolio_performance(user['username'], days=days)
+    return data_service.get_portfolio_performance(user['username'], days=days, portfolio_id=portfolio_id)
+
+
+@app.get("/api/portfolio/period-performance")
+def api_portfolio_period_performance(request: Request, portfolio_id: Optional[str] = Query(None)):
+    user = require_user(request)
+    return data_service.get_portfolio_period_performance(user['username'], portfolio_id=portfolio_id)
 
 
 @app.get("/api/portfolio/analytics")
-def api_portfolio_analytics(request: Request, days: int = Query(365, ge=30, le=1825)):
+def api_portfolio_analytics(request: Request, portfolio_id: Optional[str] = Query(None), days: int = Query(365, ge=30, le=1825)):
     user = require_user(request)
-    return data_service.get_portfolio_analytics(user['username'], days=days)
+    return data_service.get_portfolio_analytics(user['username'], days=days, portfolio_id=portfolio_id)
+
+
+@app.post("/api/portfolio/cash")
+def api_portfolio_create_cash(request: Request, payload: Dict[str, Any] = Body(...), portfolio_id: Optional[str] = Query(None)):
+    user = require_user(request)
+    return data_service.create_cash_movement(user['username'], payload, portfolio_id=portfolio_id)
+
+
+@app.delete("/api/portfolio/cash/{cash_id}")
+def api_portfolio_delete_cash(cash_id: str, request: Request, portfolio_id: Optional[str] = Query(None)):
+    user = require_user(request)
+    return data_service.delete_cash_movement(user['username'], cash_id, portfolio_id=portfolio_id)
 
 
 @app.post("/api/portfolio/transactions")
-def api_portfolio_create_transaction(request: Request, payload: Dict[str, Any] = Body(...)):
+def api_portfolio_create_transaction(request: Request, payload: Dict[str, Any] = Body(...), portfolio_id: Optional[str] = Query(None)):
     user = require_user(request)
-    return data_service.create_portfolio_transaction(user['username'], payload)
+    return data_service.create_portfolio_transaction(user['username'], payload, portfolio_id=portfolio_id)
 
 
 @app.patch("/api/portfolio/transactions/{tx_id}")
-def api_portfolio_update_transaction(tx_id: str, request: Request, payload: Dict[str, Any] = Body(...)):
+def api_portfolio_update_transaction(tx_id: str, request: Request, payload: Dict[str, Any] = Body(...), portfolio_id: Optional[str] = Query(None)):
     user = require_user(request)
-    return data_service.update_portfolio_transaction(user['username'], tx_id, payload)
+    return data_service.update_portfolio_transaction(user['username'], tx_id, payload, portfolio_id=portfolio_id)
 
 
 @app.delete("/api/portfolio/transactions/{tx_id}")
-def api_portfolio_delete_transaction(tx_id: str, request: Request):
+def api_portfolio_delete_transaction(tx_id: str, request: Request, portfolio_id: Optional[str] = Query(None)):
     user = require_user(request)
-    return data_service.delete_portfolio_transaction(user['username'], tx_id)
+    return data_service.delete_portfolio_transaction(user['username'], tx_id, portfolio_id=portfolio_id)
 
 
 @app.post("/api/portfolio/import/preview")
@@ -761,9 +797,9 @@ def api_portfolio_import_preview(request: Request, file: UploadFile = File(...))
 
 
 @app.post("/api/portfolio/import")
-def api_portfolio_import(request: Request, file: UploadFile = File(...)):
+def api_portfolio_import(request: Request, file: UploadFile = File(...), portfolio_id: Optional[str] = Query(None)):
     user = require_user(request)
-    return data_service.import_portfolio_transactions(user['username'], file)
+    return data_service.import_portfolio_transactions(user['username'], file, portfolio_id=portfolio_id)
 
 
 @app.get("/api/corporate-actions")

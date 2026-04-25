@@ -23,6 +23,45 @@ def _top_drivers(feature_names: List[str], x: np.ndarray, importances: np.ndarra
     return out
 
 
+
+def _feature_label(name: str) -> str:
+    n = name.lower()
+    if n.startswith("sent_"):
+        return "Sentiment / disclosures"
+    if n.startswith("macro_"):
+        return "Macro / economy"
+    if "idx" in n or "rel_" in n or "beta" in n:
+        return "Market benchmark"
+    if "vol" in n or "liquidity" in n or "turnover" in n:
+        return "Volume / liquidity"
+    if "rsi" in n or "macd" in n or "sma" in n or "ema" in n or "trend" in n or "ret" in n:
+        return "Price momentum"
+    return "Model feature"
+
+
+def _explain_prediction(signal: str, pred_ret: float, up_prob: float, conf: Dict[str, Any], drivers: List[Dict[str, Any]], sentiment_count: int, macro_count: int) -> Dict[str, Any]:
+    direction = "up" if signal == "bullish" else "down" if signal == "bearish" else "sideways / uncertain"
+    strength = "strong" if conf.get("label") == "high" else "moderate" if conf.get("label") == "moderate" else "weak"
+    reasons = []
+    for driver in drivers[:6]:
+        name = str(driver.get("name") or "feature")
+        impact = float(driver.get("impact") or 0.0)
+        reasons.append({
+            "feature": name,
+            "group": _feature_label(name),
+            "direction": "supports upside" if impact > 0 else "supports downside" if impact < 0 else "neutral",
+            "impact": round(impact, 4),
+            "text": f"{_feature_label(name)} signal `{name}` is {'positive' if impact > 0 else 'negative' if impact < 0 else 'mixed'} in the current model snapshot.",
+        })
+    plain = f"The model currently expects the stock to move {direction}. The signal strength is {strength}, with an up probability of {up_prob*100:.0f}% and an expected return of {pred_ret*100:.2f}%."
+    if sentiment_count:
+        plain += f" Recent disclosure/news sentiment is included using {sentiment_count} stored sentiment items."
+    if macro_count:
+        plain += f" Macro context is included using {macro_count} stored macro points."
+    if conf.get("label") == "low":
+        plain += " Confidence is low, so treat this as a watch signal rather than a high-conviction forecast."
+    return {"direction": direction, "summary": plain, "reasons": reasons}
+
 def _signal_label(pred_ret: float, up_prob: float) -> str:
     if up_prob >= 0.65 and pred_ret > 0:
         return "bullish"
@@ -108,6 +147,8 @@ def predict_next(
         flags.append("experimental")
 
     blocks = bundle.meta.get("feature_blocks") or {}
+    signal = _signal_label(pred_ret, up_prob)
+    explanation = _explain_prediction(signal, pred_ret, up_prob, conf, drivers, len(sentiment_series), len(macro_series))
     return {
         "symbol": symbol.upper(),
         "as_of": str(last["date"].date()),
@@ -116,7 +157,8 @@ def predict_next(
         "up_probability": up_prob,
         "predicted_price": pred_price,
         "price_band": price_band,
-        "signal": _signal_label(pred_ret, up_prob),
+        "signal": signal,
+        "explanation": explanation,
         "confidence": conf,
         "quality_flags": flags,
         "history_points": int(len(hist)),
