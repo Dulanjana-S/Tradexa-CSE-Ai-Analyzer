@@ -115,6 +115,21 @@ if metadata is not None:
         Column("details", Text, nullable=True),
     )
 
+    audit_logs_t = Table(
+        "audit_logs",
+        metadata,
+        Column("audit_id", String(128), primary_key=True),
+        Column("username", String(64), nullable=True, index=True),
+        Column("role", String(32), nullable=True),
+        Column("action", String(128), nullable=False, index=True),
+        Column("target_type", String(64), nullable=True),
+        Column("target_id", String(128), nullable=True),
+        Column("status", String(32), nullable=True),
+        Column("ip_address", String(64), nullable=True),
+        Column("details", Text, nullable=True),
+        Column("created_at", DateTime, nullable=True),
+    )
+
     users_t = Table(
         "users",
         metadata,
@@ -351,7 +366,7 @@ if metadata is not None:
         Column("created_at", DateTime, nullable=True),
     )
 else:  # pragma: no cover
-    companies_t = prices_t = indices_t = announcements_t = meta_t = watchlists_t = preferences_t = job_runs_t = users_t = sessions_t = password_reset_tokens_t = model_registry_t = alerts_t = notifications_t = portfolio_accounts_t = portfolio_cash_movements_t = portfolio_transactions_t = announcement_meta_t = corporate_actions_t = news_sentiment_t = macro_indicators_t = document_intelligence_t = source_whitelist_t = external_news_items_t = None  # type: ignore
+    companies_t = prices_t = indices_t = announcements_t = meta_t = watchlists_t = preferences_t = job_runs_t = users_t = sessions_t = password_reset_tokens_t = model_registry_t = alerts_t = notifications_t = portfolio_accounts_t = portfolio_cash_movements_t = portfolio_transactions_t = announcement_meta_t = corporate_actions_t = news_sentiment_t = macro_indicators_t = document_intelligence_t = source_whitelist_t = external_news_items_t = audit_logs_t = None  # type: ignore
 
 
 def _utc_now() -> str:
@@ -475,6 +490,21 @@ class Storage:
                         status TEXT,
                         details TEXT
                     );
+                    CREATE TABLE IF NOT EXISTS audit_logs (
+                        audit_id TEXT PRIMARY KEY,
+                        username TEXT,
+                        role TEXT,
+                        action TEXT NOT NULL,
+                        target_type TEXT,
+                        target_id TEXT,
+                        status TEXT,
+                        ip_address TEXT,
+                        details TEXT,
+                        created_at TEXT
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at DESC);
+                    CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action, created_at DESC);
+                    CREATE INDEX IF NOT EXISTS idx_audit_logs_username ON audit_logs(username, created_at DESC);
                     CREATE TABLE IF NOT EXISTS users (
                         username TEXT PRIMARY KEY,
                         password_hash TEXT NOT NULL,
@@ -1690,6 +1720,81 @@ class Storage:
             if str(row.get("run_id") or row.get("id") or "") == run_id:
                 return row
         return None
+
+    # ---- Audit Logs ----
+    def record_audit_log(
+        self,
+        *,
+        username: Optional[str],
+        role: Optional[str],
+        action: str,
+        target_type: Optional[str] = None,
+        target_id: Optional[str] = None,
+        status: str = "success",
+        ip_address: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None,
+        audit_id: Optional[str] = None,
+    ) -> str:
+        aid = audit_id or f"audit_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
+        row = {
+            "audit_id": aid,
+            "username": username,
+            "role": role,
+            "action": action,
+            "target_type": target_type,
+            "target_id": target_id,
+            "status": status,
+            "ip_address": ip_address,
+            "details": _json_dumps(details or {}),
+            "created_at": _utc_now(),
+        }
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO audit_logs
+                    (audit_id, username, role, action, target_type, target_id, status, ip_address, details, created_at)
+                    VALUES (:audit_id, :username, :role, :action, :target_type, :target_id, :status, :ip_address, :details, :created_at)
+                    """,
+                    row,
+                )
+            return aid
+        with self.engine().begin() as conn:
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+            stmt = pg_insert(audit_logs_t).values(row)
+            conn.execute(stmt.on_conflict_do_update(index_elements=[audit_logs_t.c.audit_id], set_={c.name: getattr(stmt.excluded, c.name) for c in audit_logs_t.c if c.name != 'audit_id'}))
+        return aid
+
+    def list_audit_logs(self, limit: int = 200, username: Optional[str] = None, action: Optional[str] = None) -> List[Dict[str, Any]]:
+        if self._is_sqlite():
+            clauses = []
+            params = []
+            if username:
+                clauses.append('username = ?')
+                params.append(username)
+            if action:
+                clauses.append('action = ?')
+                params.append(action)
+            where = f"WHERE {' AND '.join(clauses)}" if clauses else ''
+            with self._sqlite() as conn:
+                rows = conn.execute(f"SELECT audit_id, username, role, action, target_type, target_id, status, ip_address, details, created_at FROM audit_logs {where} ORDER BY created_at DESC LIMIT ?", (*params, limit)).fetchall()
+            out = [dict(r) for r in rows]
+        else:
+            stmt = select(audit_logs_t.c.audit_id, audit_logs_t.c.username, audit_logs_t.c.role, audit_logs_t.c.action, audit_logs_t.c.target_type, audit_logs_t.c.target_id, audit_logs_t.c.status, audit_logs_t.c.ip_address, audit_logs_t.c.details, audit_logs_t.c.created_at).order_by(audit_logs_t.c.created_at.desc()).limit(limit)
+            if username:
+                stmt = stmt.where(audit_logs_t.c.username == username)
+            if action:
+                stmt = stmt.where(audit_logs_t.c.action == action)
+            with self.engine().connect() as conn:
+                out = [dict(r) for r in conn.execute(stmt).mappings().all()]
+        for r in out:
+            if hasattr(r.get('created_at'), 'isoformat'):
+                r['created_at'] = r['created_at'].isoformat()
+            try:
+                r['details'] = json.loads(r.get('details') or '{}')
+            except Exception:
+                r['details'] = {'raw': r.get('details')}
+        return out
 
     # ---- Meta ----
     def set_meta(self, key: str, value: str) -> None:

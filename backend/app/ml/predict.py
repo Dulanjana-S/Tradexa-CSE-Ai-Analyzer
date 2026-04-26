@@ -62,6 +62,31 @@ def _explain_prediction(signal: str, pred_ret: float, up_prob: float, conf: Dict
         plain += " Confidence is low, so treat this as a watch signal rather than a high-conviction forecast."
     return {"direction": direction, "summary": plain, "reasons": reasons}
 
+
+
+def _reliability_summary(model_meta: Dict[str, Any], conf: Dict[str, Any], flags: List[str]) -> Dict[str, Any]:
+    metrics = model_meta.get("metrics_holdout") or {}
+    auc = metrics.get("auc_up")
+    acc = metrics.get("acc_up")
+    baseline = metrics.get("baseline_acc_up")
+    note = "Prediction quality should be judged with confidence, holdout metrics, and data freshness."
+    if isinstance(acc, (int, float)) and isinstance(baseline, (int, float)):
+        edge = float(acc) - float(baseline)
+    else:
+        edge = None
+    if conf.get("label") == "low":
+        note += " Current signal confidence is low."
+    if flags:
+        note += " Quality flags: " + ", ".join(flags[:4]) + "."
+    return {
+        "holdout_auc": float(auc) if isinstance(auc, (int, float)) else None,
+        "holdout_accuracy": float(acc) if isinstance(acc, (int, float)) else None,
+        "baseline_accuracy": float(baseline) if isinstance(baseline, (int, float)) else None,
+        "edge_vs_baseline": round(edge, 4) if isinstance(edge, float) else None,
+        "confidence_label": conf.get("label"),
+        "note": note,
+    }
+
 def _signal_label(pred_ret: float, up_prob: float) -> str:
     if up_prob >= 0.65 and pred_ret > 0:
         return "bullish"
@@ -149,6 +174,7 @@ def predict_next(
     blocks = bundle.meta.get("feature_blocks") or {}
     signal = _signal_label(pred_ret, up_prob)
     explanation = _explain_prediction(signal, pred_ret, up_prob, conf, drivers, len(sentiment_series), len(macro_series))
+    reliability = _reliability_summary(bundle.meta, conf, flags)
     return {
         "symbol": symbol.upper(),
         "as_of": str(last["date"].date()),
@@ -169,6 +195,7 @@ def predict_next(
             "latest_sentiment_items": len(sentiment_series),
             "latest_macro_points": len(macro_series),
         },
+        "reliability": reliability,
         "model": {
             "version": bundle.meta.get("model_version", "v1"),
             "trained_at_utc": bundle.meta.get("trained_at_utc"),

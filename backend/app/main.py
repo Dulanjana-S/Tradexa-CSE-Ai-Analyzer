@@ -219,6 +219,22 @@ def _check_admin_access(request: Request, x_admin_key: Optional[str] = None) -> 
     raise HTTPException(status_code=401, detail="Admin access required")
 
 
+def _audit_admin_action(request: Request, actor: Dict[str, Any], action: str, *, target_type: Optional[str] = None, target_id: Optional[str] = None, status: str = 'success', details: Optional[Dict[str, Any]] = None) -> None:
+    try:
+        data_service._storage.record_audit_log(
+            username=str(actor.get('username') or ''),
+            role=str(actor.get('role') or ''),
+            action=action,
+            target_type=target_type,
+            target_id=target_id,
+            status=status,
+            ip_address=(request.client.host if request.client else None),
+            details=details or {},
+        )
+    except Exception:
+        pass
+
+
 # ---- Pages ----
 @app.get("/", response_class=HTMLResponse)
 def page_home(request: Request):
@@ -385,6 +401,18 @@ def api_admin_status(request: Request, x_admin_key: Optional[str] = Header(defau
     return data_service.admin_status()
 
 
+@app.get("/api/admin/model-health")
+def api_admin_model_health(request: Request, x_admin_key: Optional[str] = Header(default=None)):
+    _check_admin_access(request, x_admin_key)
+    return data_service.admin_model_health()
+
+
+@app.get("/api/admin/audit-logs")
+def api_admin_audit_logs(request: Request, x_admin_key: Optional[str] = Header(default=None), limit: int = Query(200, ge=1, le=1000)):
+    _check_admin_access(request, x_admin_key)
+    return {"logs": data_service._storage.list_audit_logs(limit=limit)}
+
+
 @app.get("/api/admin/models")
 def api_admin_models(request: Request, x_admin_key: Optional[str] = Header(default=None)):
     _check_admin_access(request, x_admin_key)
@@ -416,7 +444,7 @@ def api_admin_set_role(username: str, request: Request, payload: Dict[str, Any] 
 
 @app.post("/api/admin/actions/sync")
 def api_admin_run_sync(request: Request, payload: Dict[str, Any] = Body(default={}), x_admin_key: Optional[str] = Header(default=None)):
-    _check_admin_access(request, x_admin_key)
+    actor = _check_admin_access(request, x_admin_key)
     job = enqueue_sync({
         "symbols": payload.get("symbols"),
         "top_n": int(payload.get("top_n") or 50),
@@ -425,19 +453,21 @@ def api_admin_run_sync(request: Request, payload: Dict[str, Any] = Body(default=
         "skip_prices": bool(payload.get("skip_prices", False)),
         "sleep_ms": int(payload.get("sleep_ms") or 250),
     })
+    _audit_admin_action(request, actor, 'data.sync', target_type='job', target_id=str(job.get('run_id') or 'sync'), details=payload)
     return {"ok": True, "job": job}
 
 
 @app.post("/api/admin/actions/train")
 def api_admin_run_train(request: Request, payload: Dict[str, Any] = Body(default={}), x_admin_key: Optional[str] = Header(default=None)):
-    _check_admin_access(request, x_admin_key)
+    actor = _check_admin_access(request, x_admin_key)
     job = run_train_now({"symbols": payload.get("symbols"), "horizon_days": int(payload.get("horizon_days") or 1)})
+    _audit_admin_action(request, actor, 'model.train', target_type='job', target_id=str(job.get('run_id') or 'train'), details=payload)
     return {"ok": True, "job": job}
 
 
 @app.post("/api/admin/actions/sync-train")
 def api_admin_run_sync_train(request: Request, payload: Dict[str, Any] = Body(default={}), x_admin_key: Optional[str] = Header(default=None)):
-    _check_admin_access(request, x_admin_key)
+    actor = _check_admin_access(request, x_admin_key)
     job = enqueue_sync_train({
         "symbols": payload.get("symbols"),
         "top_n": int(payload.get("top_n") or 50),
@@ -449,12 +479,13 @@ def api_admin_run_sync_train(request: Request, payload: Dict[str, Any] = Body(de
         "horizon_days": int(payload.get("horizon_days") or 1),
         "train_after_sync": True,
     })
+    _audit_admin_action(request, actor, 'data.sync_train', target_type='job', target_id=str(job.get('run_id') or 'sync-train'), details=payload)
     return {"ok": True, "job": job}
 
 
 @app.post("/api/admin/actions/daily-pipeline")
 def api_admin_run_daily_pipeline(request: Request, payload: Dict[str, Any] = Body(default={}), x_admin_key: Optional[str] = Header(default=None)):
-    _check_admin_access(request, x_admin_key)
+    actor = _check_admin_access(request, x_admin_key)
     job = enqueue_daily_pipeline({
         "symbols": payload.get("symbols"),
         "top_n": int(payload.get("top_n") or 80),
@@ -464,49 +495,60 @@ def api_admin_run_daily_pipeline(request: Request, payload: Dict[str, Any] = Bod
         "horizon_days": int(payload.get("horizon_days") or 1),
         "train_after_sync": _to_bool(payload.get("train_after_sync"), True),
     })
+    _audit_admin_action(request, actor, 'pipeline.daily_run', target_type='job', target_id=str(job.get('run_id') or 'daily-pipeline'), details=payload)
     return {"ok": True, "job": job}
 
 
 @app.post("/api/admin/actions/refresh-sentiment")
 def api_admin_refresh_sentiment(request: Request, payload: Dict[str, Any] = Body(default={}), x_admin_key: Optional[str] = Header(default=None)):
-    _check_admin_access(request, x_admin_key)
-    return {"ok": True, "result": data_service.refresh_sentiment_scores(limit=int(payload.get("limit") or 1200))}
+    actor = _check_admin_access(request, x_admin_key)
+    result = data_service.refresh_sentiment_scores(limit=int(payload.get("limit") or 1200))
+    _audit_admin_action(request, actor, 'sentiment.refresh', details={'limit': int(payload.get('limit') or 1200), 'result': result})
+    return {"ok": True, "result": result}
 
 
 @app.post("/api/admin/actions/refresh-documents")
 def api_admin_refresh_documents(request: Request, payload: Dict[str, Any] = Body(default={}), x_admin_key: Optional[str] = Header(default=None)):
-    _check_admin_access(request, x_admin_key)
-    return {"ok": True, "result": data_service.refresh_documents(
+    actor = _check_admin_access(request, x_admin_key)
+    result = data_service.refresh_documents(
         limit=int(payload.get("limit") or 120),
         symbol=payload.get("symbol"),
         force=_to_bool(payload.get("force"), False),
         max_pages=int(payload.get("max_pages") or 12),
-    )}
+    )
+    _audit_admin_action(request, actor, 'documents.refresh', details={**payload, 'result': result})
+    return {"ok": True, "result": result}
 
 
 @app.post("/api/admin/actions/seed-news-whitelist")
 def api_admin_seed_news_whitelist(request: Request, x_admin_key: Optional[str] = Header(default=None)):
-    _check_admin_access(request, x_admin_key)
-    return {"ok": True, "result": data_service.seed_news_whitelist()}
+    actor = _check_admin_access(request, x_admin_key)
+    result = data_service.seed_news_whitelist()
+    _audit_admin_action(request, actor, 'news.seed_whitelist', details=result)
+    return {"ok": True, "result": result}
 
 
 @app.post("/api/admin/actions/refresh-selected-news")
 def api_admin_refresh_selected_news(request: Request, payload: Dict[str, Any] = Body(default={}), x_admin_key: Optional[str] = Header(default=None)):
-    _check_admin_access(request, x_admin_key)
-    return {"ok": True, "result": data_service.refresh_selected_news(
+    actor = _check_admin_access(request, x_admin_key)
+    result = data_service.refresh_selected_news(
         lookback_days=int(payload.get("lookback_days") or 30),
         max_per_source=int(payload.get("max_per_source") or 40),
-    )}
+    )
+    _audit_admin_action(request, actor, 'news.refresh_selected', details={**payload, 'result': result})
+    return {"ok": True, "result": result}
 
 
 @app.post("/api/admin/actions/compare-news-models")
 def api_admin_compare_news_models(request: Request, payload: Dict[str, Any] = Body(default={}), x_admin_key: Optional[str] = Header(default=None)):
-    _check_admin_access(request, x_admin_key)
-    return {"ok": True, "result": data_service.compare_news_models(
+    actor = _check_admin_access(request, x_admin_key)
+    result = data_service.compare_news_models(
         symbols=payload.get("symbols"),
         horizon_days=int(payload.get("horizon_days") or 1),
         max_symbols=int(payload.get("max_symbols") or 40),
-    )}
+    )
+    _audit_admin_action(request, actor, 'model.compare_news', details={**payload, 'result': result})
+    return {"ok": True, "result": result}
 
 
 @app.post("/api/admin/macro/preview")
@@ -518,9 +560,11 @@ def api_admin_macro_preview(request: Request, file: UploadFile = File(...), x_ad
 
 @app.post("/api/admin/macro/import")
 def api_admin_macro_import(request: Request, file: UploadFile = File(...), x_admin_key: Optional[str] = Header(default=None)):
-    _check_admin_access(request, x_admin_key)
+    actor = _check_admin_access(request, x_admin_key)
     rows = parse_macro_csv_bytes(file.file.read())
-    return {"ok": True, **data_service.import_macro_rows(rows)}
+    result = data_service.import_macro_rows(rows)
+    _audit_admin_action(request, actor, 'macro.import', details={'file': file.filename, 'rows': len(rows), 'result': result})
+    return {"ok": True, **result}
 
 
 @app.post("/api/admin/data/preview")
@@ -607,6 +651,13 @@ def api_stock(symbol: str):
 @app.get("/api/stock/{symbol}/history")
 def api_stock_history(symbol: str, days: int = Query(180, ge=20, le=780)):
     return data_service.stock_history_chart(symbol, days=days)
+
+
+@app.get("/api/calendar/events")
+def api_calendar_events(request: Request, symbol: Optional[str] = Query(None), portfolio_id: Optional[str] = Query(None), days: int = Query(120, ge=30, le=730)):
+    user = current_user_from_request(request)
+    username = user.get('username') if user else None
+    return data_service.event_calendar(symbol=symbol, portfolio_id=portfolio_id, username=username, days=days)
 
 
 @app.get("/api/stock/{symbol}/prediction")
@@ -814,6 +865,19 @@ def api_portfolio_import(request: Request, file: UploadFile = File(...), portfol
     return data_service.import_portfolio_transactions(user['username'], file, portfolio_id=portfolio_id)
 
 
+@app.post("/api/portfolio/import/broker-preview")
+def api_portfolio_broker_preview(request: Request, file: UploadFile = File(...)):
+    user = require_user(request)
+    _ = user
+    return data_service.preview_portfolio_import(file)
+
+
+@app.post("/api/portfolio/import/broker")
+def api_portfolio_broker_import(request: Request, file: UploadFile = File(...), portfolio_id: Optional[str] = Query(None)):
+    user = require_user(request)
+    return data_service.import_portfolio_transactions(user['username'], file, portfolio_id=portfolio_id)
+
+
 @app.get("/api/corporate-actions")
 def api_corporate_actions(symbol: Optional[str] = Query(None), limit: int = Query(100, ge=1, le=500)):
     return {"actions": data_service.corporate_actions(symbol=symbol, limit=limit)}
@@ -875,9 +939,10 @@ def api_admin_provider(request: Request, x_admin_key: Optional[str] = Header(def
 
 @app.post("/api/admin/provider")
 def api_admin_provider_set(request: Request, payload: Dict[str, Any] = Body(...), x_admin_key: Optional[str] = Header(default=None)):
-    _check_admin_access(request, x_admin_key)
+    actor = _check_admin_access(request, x_admin_key)
     active = data_service.set_effective_provider_name(str(payload.get('provider') or 'hybrid'))
     data_service.clear_runtime_cache()
+    _audit_admin_action(request, actor, 'provider.change', details={'provider': active})
     return {'ok': True, 'active_provider': active}
 
 
@@ -909,7 +974,9 @@ def api_admin_ann_triage(request: Request, x_admin_key: Optional[str] = Header(d
 def api_admin_ann_update(ann_id: str, request: Request, payload: Dict[str, Any] = Body(...), x_admin_key: Optional[str] = Header(default=None)):
     admin = _check_admin_access(request, x_admin_key)
     tags = payload.get('tags') if isinstance(payload.get('tags'), list) else None
-    return data_service.review_announcement(ann_id, importance=payload.get('importance'), review_status=payload.get('review_status'), tags=tags, review_notes=payload.get('review_notes'), reviewed_by=str(admin.get('username') or 'admin'))
+    result = data_service.review_announcement(ann_id, importance=payload.get('importance'), review_status=payload.get('review_status'), tags=tags, review_notes=payload.get('review_notes'), reviewed_by=str(admin.get('username') or 'admin'))
+    _audit_admin_action(request, admin, 'announcement.review', target_type='announcement', target_id=ann_id, details=payload)
+    return result
 
 
 
@@ -922,7 +989,7 @@ def api_admin_system_settings(request: Request, x_admin_key: Optional[str] = Hea
 
 @app.post('/api/admin/system-settings')
 def api_admin_system_settings_update(request: Request, payload: Dict[str, Any] = Body(...), x_admin_key: Optional[str] = Header(default=None)):
-    _check_admin_access(request, x_admin_key)
+    actor = _check_admin_access(request, x_admin_key)
     values = payload.get('settings') if isinstance(payload.get('settings'), dict) else payload
     current = _system_settings()
     current.update(values or {})
@@ -933,6 +1000,7 @@ def api_admin_system_settings_update(request: Request, payload: Dict[str, Any] =
     except Exception:
         pass
     data_service.set_preferences(current, profile='__system__')
+    _audit_admin_action(request, actor, 'system.settings_update', details={'keys': sorted(list((values or {}).keys()))})
     return {'ok': True, 'settings': _system_settings()}
 
 def _safe_num(v: Any) -> Optional[float]:

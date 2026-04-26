@@ -15,6 +15,7 @@ import {
   Activity,
   Shield,
   BellRing,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "../ui/utils";
 import { Separator } from "../ui/separator";
@@ -50,6 +51,7 @@ const adminNavItems = [
   { to: "/admin/announcements", label: "Announcement Triage", icon: Megaphone },
   { to: "/admin/alerts", label: "Alert Monitor", icon: BellRing },
   { to: "/admin/settings", label: "System Settings", icon: Shield },
+  { to: "/admin/audit", label: "Audit Logs", icon: ClipboardList },
 ];
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {

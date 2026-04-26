@@ -48,6 +48,8 @@ const emptyAnalytics: PortfolioAnalytics = {
   benchmark: { periodDays: 365, portfolioReturnPct: 0, aspiReturnPct: 0, sp20ReturnPct: 0, alphaVsAspiPct: 0, alphaVsSp20Pct: 0, series: [] },
 };
 
+const emptyCalendar: EventCalendar = { symbols: [], upcoming: [], recent: [], count: 0 };
+
 const emptyIntelligence: PortfolioIntelligence = {
   portfolioId: "",
   health: { score: 0, label: "Needs attention", attentionCount: 0, watchCount: 0 },
@@ -100,6 +102,7 @@ export function Portfolio() {
   const [analytics, setAnalytics] = useState<PortfolioAnalytics>(emptyAnalytics);
   const [intelligence, setIntelligence] = useState<PortfolioIntelligence>(emptyIntelligence);
   const [tradePreview, setTradePreview] = useState<TradeFitPreview | null>(null);
+  const [calendar, setCalendar] = useState<EventCalendar>(emptyCalendar);
   const [tradePreviewLoading, setTradePreviewLoading] = useState(false);
   const [portfolios, setPortfolios] = useState<PortfolioAccount[]>([]);
   const [selectedPortfolioId, setSelectedPortfolioId] = useState<string>("");
@@ -157,6 +160,11 @@ export function Portfolio() {
   const loadIntelligence = async (portfolioId = selectedPortfolioId) => {
     const payload = await portfolioApi.getIntelligence(portfolioId || undefined);
     setIntelligence(payload);
+  };
+
+  const loadCalendar = async (portfolioId = selectedPortfolioId) => {
+    const payload = await marketApi.getCalendar({ portfolioId: portfolioId || undefined, days: 180 });
+    setCalendar(payload);
   };
 
   useEffect(() => {
@@ -299,7 +307,7 @@ export function Portfolio() {
       };
       const updated = editingId ? await portfolioApi.updateTransaction(editingId, payload, selectedPortfolioId || undefined) : await portfolioApi.addTransaction(payload, selectedPortfolioId || undefined);
       setPortfolio(updated);
-      await Promise.all([loadPerformance(chartDays, selectedPortfolioId), loadAnalytics(chartDays, selectedPortfolioId), watchlistApi.get().then(setWatchlist), loadPortfolio(selectedPortfolioId), loadIntelligence(selectedPortfolioId)]);
+      await Promise.all([loadPerformance(chartDays, selectedPortfolioId), loadAnalytics(chartDays, selectedPortfolioId), watchlistApi.get().then(setWatchlist), loadPortfolio(selectedPortfolioId), loadIntelligence(selectedPortfolioId), loadCalendar(selectedPortfolioId)]);
       resetDialog();
     } catch (err: any) {
       setError(err?.message || "Could not save portfolio transaction");
@@ -311,7 +319,7 @@ export function Portfolio() {
   const deleteTransaction = async (transactionId: string) => {
     const updated = await portfolioApi.deleteTransaction(transactionId, selectedPortfolioId || undefined);
     setPortfolio(updated);
-    await Promise.all([loadPerformance(chartDays, selectedPortfolioId), loadAnalytics(chartDays, selectedPortfolioId), loadPortfolio(selectedPortfolioId), loadIntelligence(selectedPortfolioId)]);
+    await Promise.all([loadPerformance(chartDays, selectedPortfolioId), loadAnalytics(chartDays, selectedPortfolioId), loadPortfolio(selectedPortfolioId), loadIntelligence(selectedPortfolioId), loadCalendar(selectedPortfolioId)]);
   };
 
   const previewCsvImport = async (file: File) => {
@@ -355,7 +363,7 @@ export function Portfolio() {
     const updated = await portfolioApi.addCashMovement({ movementType: cashForm.movementType, amount, movementDate: cashForm.movementDate, notes: cashForm.notes || undefined }, selectedPortfolioId || undefined);
     setPortfolio(updated);
     setCashForm({ movementType: "deposit", amount: "", movementDate: new Date().toISOString().slice(0, 10), notes: "" });
-    await Promise.all([loadPerformance(chartDays, selectedPortfolioId), loadAnalytics(chartDays, selectedPortfolioId), loadPortfolio(selectedPortfolioId), loadIntelligence(selectedPortfolioId)]);
+    await Promise.all([loadPerformance(chartDays, selectedPortfolioId), loadAnalytics(chartDays, selectedPortfolioId), loadPortfolio(selectedPortfolioId), loadIntelligence(selectedPortfolioId), loadCalendar(selectedPortfolioId)]);
   };
 
   const importCsvTransactions = async () => {
@@ -365,7 +373,7 @@ export function Portfolio() {
     try {
       const updated = await portfolioApi.importTransactions(csvFile, selectedPortfolioId || undefined);
       setPortfolio(updated);
-      await Promise.all([loadPerformance(chartDays, selectedPortfolioId), loadAnalytics(chartDays, selectedPortfolioId), loadPortfolio(selectedPortfolioId), loadIntelligence(selectedPortfolioId)]);
+      await Promise.all([loadPerformance(chartDays, selectedPortfolioId), loadAnalytics(chartDays, selectedPortfolioId), loadPortfolio(selectedPortfolioId), loadIntelligence(selectedPortfolioId), loadCalendar(selectedPortfolioId)]);
       setCsvFile(null);
       setCsvPreview(null);
     } catch (err: any) {
@@ -847,6 +855,49 @@ export function Portfolio() {
                 {!(portfolio.recentActions || []).length && <TableRow><TableCell colSpan={4} className="py-8 text-center text-[#768390]">No corporate actions stored yet.</TableCell></TableRow>}
               </TableBody>
             </Table>
+          </CardContent>
+        </Card>
+
+        <Card className="border-[#30363d] bg-[#161b22]">
+          <CardHeader>
+            <CardTitle className="text-[18px] text-[#e6edf3]">Broker statement import</CardTitle>
+            <CardDescription className="text-[13px] text-[#768390]">Import broker contract notes / statement CSVs or your TradexaLK transaction CSV. We auto-detect common broker statement formats.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="space-y-3">
+                <Input type="file" accept=".csv,text/csv" onChange={(e) => { const file = e.target.files?.[0] || null; setCsvFile(file); if (file) previewCsvImport(file); else setCsvPreview(null); }} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
+                {importError ? <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-[13px] text-red-300">{importError}</div> : null}
+                <div className="text-[12px] text-[#768390]">Supported columns include generic fields like <span className="text-[#e6edf3]">symbol, type, quantity, price, fees, date</span> and broker statement fields like <span className="text-[#e6edf3]">trade date, side, rate, brokerage, contract no</span>.</div>
+              </div>
+              <div className="rounded-lg border border-[#30363d] bg-[#0d1117] p-4 text-[13px]">
+                <div className="mb-2 font-semibold text-[#e6edf3]">Preview</div>
+                {csvPreview ? <div className="space-y-2 text-[#768390]"><div className="flex justify-between"><span>Detected broker</span><span className="text-[#e6edf3]">{csvPreview.detected_broker || 'Auto'}</span></div><div className="flex justify-between"><span>Detected format</span><span className="text-[#e6edf3]">{csvPreview.detected_format || 'generic_csv'}</span></div><div className="flex justify-between"><span>Rows</span><span className="text-[#e6edf3]">{csvPreview.rows || 0}</span></div><div className="flex justify-between"><span>Valid rows</span><span className="text-emerald-400">{csvPreview.valid_rows || 0}</span></div><div className="flex justify-between"><span>Invalid rows</span><span className={(csvPreview.invalid_rows || 0) > 0 ? 'text-red-400' : 'text-[#e6edf3]'}>{csvPreview.invalid_rows || 0}</span></div>{(csvPreview.symbols || []).length ? <div><div className="mb-1 text-[#768390]">Symbols</div><div className="text-[#e6edf3]">{csvPreview.symbols.slice(0, 8).join(', ')}{csvPreview.symbols.length > 8 ? '…' : ''}</div></div> : null}</div> : <div className="text-[#768390]">Choose a statement CSV to preview the mapped trades.</div>}
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <Button onClick={importCsvTransactions} disabled={!csvFile || importingCsv} className="bg-blue-600 text-white hover:bg-blue-700">{importingCsv ? 'Importing…' : 'Import broker statement'}</Button>
+              {csvPreview?.invalid_rows ? <div className="self-center text-[12px] text-red-400">Fix invalid rows before importing.</div> : null}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-[#30363d] bg-[#161b22]">
+          <CardHeader>
+            <CardTitle className="text-[18px] text-[#e6edf3]">Earnings / dividend / event calendar</CardTitle>
+            <CardDescription className="text-[13px] text-[#768390]">Upcoming and recent event markers for symbols currently held in this portfolio.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div className="space-y-3">
+                <div className="text-[13px] font-semibold uppercase tracking-wide text-emerald-400">Upcoming</div>
+                {calendar.upcoming.length ? calendar.upcoming.slice(0, 10).map((item, idx) => <div key={`up-${idx}-${item.date}-${item.symbol}`} className="rounded-lg border border-[#30363d] bg-[#0d1117] p-3"><div className="flex items-center justify-between gap-3"><div><div className="font-medium text-[#e6edf3]">{item.symbol} · {item.title}</div><div className="text-[12px] text-[#768390]">{compactDate(item.date)} · {item.eventType}</div></div><div className="text-[12px] text-emerald-400">{item.daysFromNow === 0 ? 'Today' : `${item.daysFromNow}d`}</div></div></div>) : <div className="text-[13px] text-[#768390]">No upcoming held-stock events stored yet.</div>}
+              </div>
+              <div className="space-y-3">
+                <div className="text-[13px] font-semibold uppercase tracking-wide text-blue-400">Recent</div>
+                {calendar.recent.length ? calendar.recent.slice(0, 10).map((item, idx) => <div key={`rc-${idx}-${item.date}-${item.symbol}`} className="rounded-lg border border-[#30363d] bg-[#0d1117] p-3"><div className="font-medium text-[#e6edf3]">{item.symbol} · {item.title}</div><div className="text-[12px] text-[#768390]">{compactDate(item.date)} · {item.eventType} · {item.sourceType}</div></div>) : <div className="text-[13px] text-[#768390]">No recent held-stock events stored yet.</div>}
+              </div>
+            </div>
           </CardContent>
         </Card>
 

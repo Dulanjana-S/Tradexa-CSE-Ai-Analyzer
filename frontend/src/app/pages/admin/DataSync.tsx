@@ -31,15 +31,17 @@ export function DataSync() {
   const [documentResult, setDocumentResult] = useState<any>(null);
   const [selectedNewsResult, setSelectedNewsResult] = useState<any>(null);
   const [comparisonResult, setComparisonResult] = useState<any>(null);
+  const [modelHealth, setModelHealth] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const load = async () => {
     setLoading(true);
     try {
-      const [jobsData, statusData, systemSettings] = await Promise.all([adminApi.getJobs(), adminApi.getStatus(), adminApi.getSystemSettings()]);
+      const [jobsData, statusData, systemSettings, healthData] = await Promise.all([adminApi.getJobs(), adminApi.getStatus(), adminApi.getSystemSettings(), adminApi.getModelHealth()]);
       setJobs(jobsData);
       setStatus(statusData);
       setSchedulerSettings(systemSettings?.settings || null);
+      setModelHealth(healthData);
     } finally {
       setLoading(false);
     }
@@ -381,6 +383,7 @@ export function DataSync() {
               {documentResult ? <div className="rounded-md border border-indigo-500/30 bg-indigo-500/10 p-4 text-[13px] text-indigo-100">Documents analyzed: {documentResult.documents_analyzed || 0} • Document sentiment rows: {documentResult.sentiment_rows_upserted || 0}</div> : null}
               {selectedNewsResult ? <div className="rounded-md border border-sky-500/30 bg-sky-500/10 p-4 text-[13px] text-sky-100">News items: {selectedNewsResult.news_items_upserted || 0} • Symbol rows: {selectedNewsResult.symbol_sentiment_rows_upserted || 0} • Market features: {selectedNewsResult.market_feature_points_upserted || 0}</div> : null}
               {comparisonResult ? <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-4 text-[13px] text-emerald-100">Recommendation: {comparisonResult.recommendation || "—"} • Accuracy delta: {comparisonResult.deltas?.acc_up ?? "—"} • Added features: {comparisonResult.deltas?.added_features ?? 0}</div> : null}
+              {modelHealth ? <div className="rounded-md border border-[#30363d] bg-[#0d1117] p-4 text-[13px]"><div className="flex items-center justify-between"><span className="text-[#768390]">Model health</span><span className="font-semibold text-[#e6edf3]">{modelHealth.healthScore || 0}/100 · {modelHealth.healthLabel || 'needs_attention'}</span></div><div className="mt-2 text-[#768390]">{modelHealth.note}</div>{modelHealth.model?.metricsHoldout ? null : null}</div> : null}
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="rounded-md border border-[#30363d] bg-[#0d1117] p-4 text-[13px] text-[#e6edf3]"><div className="mb-1 text-[#768390]">PDF docs</div>{status?.counts?.document_intelligence ?? 0}</div>
                 <div className="rounded-md border border-[#30363d] bg-[#0d1117] p-4 text-[13px] text-[#e6edf3]"><div className="mb-1 text-[#768390]">Selected news</div>{status?.counts?.selected_news_items ?? 0}</div>

@@ -23,6 +23,7 @@ import { JobLogs } from "./pages/admin/JobLogs";
 import { AnnouncementReview } from "./pages/admin/AnnouncementReview";
 import { AlertMonitor } from "./pages/admin/AlertMonitor";
 import { SystemSettings } from "./pages/admin/SystemSettings";
+import { AuditLogs } from "./pages/admin/AuditLogs";
 import { NotFound } from "./pages/NotFound";
 
 // Wrapper to provide AuthContext to all routes
@@ -154,6 +155,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute requireAdmin>
             <SystemSettings />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "admin/audit",
+        element: (
+          <ProtectedRoute requireAdmin>
+            <AuditLogs />
           </ProtectedRoute>
         ),
       },

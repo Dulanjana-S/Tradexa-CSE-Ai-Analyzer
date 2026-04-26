@@ -81,6 +81,14 @@ export interface PredictionCardData {
   topFeatures: Array<{ feature: string; importance: number }>;
   lastUpdated: string;
   explanation?: PredictionExplanation;
+  reliability?: {
+    holdoutAuc?: number | null;
+    holdoutAccuracy?: number | null;
+    baselineAccuracy?: number | null;
+    edgeVsBaseline?: number | null;
+    confidenceLabel?: string;
+    note?: string;
+  };
   error?: string;
 }
 
@@ -217,6 +225,47 @@ export interface PortfolioPeriodPerformance {
   sp20ReturnPct: number;
   alphaVsAspiPct: number;
   alphaVsSp20Pct: number;
+}
+
+export interface CalendarEvent {
+  date: string;
+  symbol: string;
+  title: string;
+  eventType: string;
+  sourceType: string;
+  daysFromNow: number;
+  status: string;
+  meta?: Record<string, any>;
+}
+
+export interface EventCalendar {
+  symbols: string[];
+  upcoming: CalendarEvent[];
+  recent: CalendarEvent[];
+  count: number;
+}
+
+export interface AuditLog {
+  auditId: string;
+  username?: string;
+  role?: string;
+  action: string;
+  targetType?: string;
+  targetId?: string;
+  status?: string;
+  ipAddress?: string;
+  details?: Record<string, any>;
+  createdAt?: string;
+}
+
+export interface AdminModelHealth {
+  healthScore: number;
+  healthLabel: string;
+  note: string;
+  model: Record<string, any>;
+  latestComparison?: any;
+  featureStore: Record<string, number>;
+  coverage: Record<string, any>;
 }
 
 export interface PortfolioPerformancePoint {

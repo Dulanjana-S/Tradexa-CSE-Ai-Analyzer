@@ -2030,34 +2030,85 @@ def delete_portfolio_transaction(username: str, tx_id: str, portfolio_id: Option
     return get_portfolio(username, portfolio_id)
 
 
-def _parse_portfolio_csv(file: UploadFile) -> List[Dict[str, Any]]:
+def _normalize_tx_type_token(raw: Any) -> str:
+    token = str(raw or "buy").strip().lower()
+    mapping = {
+        "b": "buy", "buy": "buy", "bought": "buy", "purchase": "buy", "trade buy": "buy",
+        "s": "sell", "sell": "sell", "sold": "sell", "dispose": "sell", "trade sell": "sell",
+    }
+    return mapping.get(token, token)
+
+
+def _detect_broker_statement(file_name: str, headers: List[str]) -> Dict[str, Any]:
+    normalized = {str(h or '').strip().lower().replace(' ', '_') for h in headers}
+    name = (file_name or '').lower()
+    broker = None
+    fmt = 'generic_csv'
+    if {'symbol', 'quantity', 'price'}.issubset(normalized):
+        fmt = 'tradexalk_generic'
+    if {'trade_date', 'settlement_date', 'side', 'rate'}.intersection(normalized):
+        fmt = 'broker_statement'
+    if 'reference_no' in normalized or 'contract_no' in normalized or 'contract note' in name:
+        fmt = 'contract_note'
+    if 'cdax' in name or 'central depository' in name:
+        broker = 'CDAX'
+    if 'softlogic' in name:
+        broker = 'Softlogic Stockbrokers'
+    elif 'sampath' in name:
+        broker = 'Sampath Securities'
+    elif 'capital' in name and 'trust' in name:
+        broker = 'CT CLSA / Capital Alliance'
+    elif 'asia securities' in name or 'asiasecurities' in name:
+        broker = 'Asia Securities'
+    elif 'first capital' in name:
+        broker = 'First Capital'
+    elif 'ndb' in name:
+        broker = 'NDB Securities'
+    return {'format': fmt, 'broker': broker or 'Detected automatically'}
+
+
+def _parse_portfolio_csv_with_meta(file: UploadFile) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     if hasattr(file.file, "seek"):
         file.file.seek(0)
     payload = file.file.read()
     text = payload.decode("utf-8", errors="replace") if isinstance(payload, (bytes, bytearray)) else str(payload)
     reader = csv.DictReader(io.StringIO(text))
+    headers = list(reader.fieldnames or [])
+    meta = _detect_broker_statement(file.filename or '', headers)
     rows: List[Dict[str, Any]] = []
     for row in reader:
-        symbol = str(row.get("symbol") or row.get("Symbol") or row.get("ticker") or row.get("Ticker") or "").upper().strip()
-        tx_type = str(row.get("tx_type") or row.get("type") or row.get("Type") or row.get("side") or row.get("Side") or "buy").lower().strip()
-        if tx_type in {"b", "buy"}:
-            tx_type = "buy"
-        elif tx_type in {"s", "sell"}:
-            tx_type = "sell"
+        symbol = str(row.get("symbol") or row.get("Symbol") or row.get("ticker") or row.get("Ticker") or row.get("instrument") or row.get("Instrument") or row.get("security") or row.get("Security") or "").upper().strip()
+        tx_type = _normalize_tx_type_token(row.get("tx_type") or row.get("type") or row.get("Type") or row.get("side") or row.get("Side") or row.get("transaction_type") or row.get("Transaction Type"))
+        quantity = _to_float(row.get("quantity") or row.get("Quantity") or row.get("qty") or row.get("Qty") or row.get("trade_qty") or row.get("Trade Qty") or row.get("executed_qty") or row.get("Executed Qty"))
+        price = _to_float(row.get("price") or row.get("Price") or row.get("rate") or row.get("Rate") or row.get("avg_price") or row.get("Average Price") or row.get("trade_price") or row.get("Trade Price"))
+        fees = _to_float(row.get("fees") or row.get("Fees") or row.get("commission") or row.get("Commission") or row.get("charges") or row.get("Charges") or row.get("brokerage") or row.get("Brokerage") or 0)
+        traded_at = str(row.get("traded_at") or row.get("trade_date") or row.get("Trade Date") or row.get("date") or row.get("Date") or row.get("contract_date") or row.get("Contract Date") or "").strip() or None
+        notes_parts = []
+        for key in ("notes", "Notes", "reference_no", "Reference No", "contract_no", "Contract No"):
+            val = str(row.get(key) or '').strip()
+            if val:
+                notes_parts.append(f"{key}: {val}")
         rows.append({
             "symbol": symbol,
             "tx_type": tx_type,
-            "quantity": _to_float(row.get("quantity") or row.get("Quantity") or row.get("qty") or row.get("Qty")),
-            "price": _to_float(row.get("price") or row.get("Price") or row.get("rate") or row.get("Rate")),
-            "fees": _to_float(row.get("fees") or row.get("Fees") or row.get("commission") or row.get("Commission") or 0),
-            "traded_at": str(row.get("traded_at") or row.get("trade_date") or row.get("Trade Date") or row.get("date") or row.get("Date") or "").strip() or None,
-            "notes": str(row.get("notes") or row.get("Notes") or "").strip() or None,
+            "quantity": quantity,
+            "price": price,
+            "fees": fees,
+            "traded_at": traded_at,
+            "notes": " | ".join(notes_parts) or None,
         })
+    meta['headers'] = headers
+    meta['rows'] = len(rows)
+    return rows, meta
+
+
+def _parse_portfolio_csv(file: UploadFile) -> List[Dict[str, Any]]:
+    rows, _ = _parse_portfolio_csv_with_meta(file)
     return rows
 
 
 def preview_portfolio_import(file: UploadFile) -> Dict[str, Any]:
-    rows = _parse_portfolio_csv(file)
+    rows, detected = _parse_portfolio_csv_with_meta(file)
     valid_rows: List[Dict[str, Any]] = []
     errors: List[Dict[str, Any]] = []
     for idx, row in enumerate(rows, start=2):
@@ -2074,6 +2125,9 @@ def preview_portfolio_import(file: UploadFile) -> Dict[str, Any]:
         "symbols": sorted({str(item.get("symbol") or "") for item in valid_rows if item.get("symbol")}),
         "sample": valid_rows[:20],
         "errors": errors[:50],
+        "detected_format": detected.get("format"),
+        "detected_broker": detected.get("broker"),
+        "headers": detected.get("headers") or [],
     }
     return {"ok": len(errors) == 0, "preview": preview}
 
@@ -2294,6 +2348,101 @@ def admin_notifications() -> List[Dict[str, Any]]:
 def get_provider_settings() -> Dict[str, Any]:
     return {'active_provider': get_effective_provider_name(), 'configured_provider': settings.data_provider}
 
+
+def event_calendar(symbol: Optional[str] = None, portfolio_id: Optional[str] = None, username: Optional[str] = None, days: int = 120) -> Dict[str, Any]:
+    today = date.today()
+    since = today - timedelta(days=max(days, 30))
+    symbols: List[str] = []
+    if symbol:
+        symbols = [symbol.upper()]
+    elif username:
+        pf = get_portfolio(username, portfolio_id=portfolio_id)
+        symbols = [str(p.get('symbol') or '').upper() for p in (pf.get('positions') or []) if p.get('symbol')]
+    symbols = sorted({s for s in symbols if s})
+    events: List[Dict[str, Any]] = []
+    def add_event(raw_date: Optional[str], symbol_val: str, title: str, event_type: str, source_type: str, meta: Optional[Dict[str, Any]] = None):
+        dt = str(raw_date or '')[:10]
+        if not dt:
+            return
+        try:
+            d = date.fromisoformat(dt)
+        except Exception:
+            return
+        if d < since:
+            return
+        days_from_now = (d - today).days
+        events.append({
+            'date': dt,
+            'symbol': symbol_val,
+            'title': title,
+            'event_type': event_type,
+            'source_type': source_type,
+            'days_from_now': days_from_now,
+            'status': 'upcoming' if days_from_now > 0 else 'today' if days_from_now == 0 else 'past',
+            'meta': meta or {},
+        })
+    for sym in symbols or []:
+        for action in _storage.list_corporate_actions(sym, limit=80):
+            label = str(action.get('action_type') or 'corporate_action').replace('_', ' ').title()
+            detail = str(action.get('description') or '')
+            add_event(action.get('ex_date'), sym, f"{label} {detail}".strip(), str(action.get('action_type') or 'corporate_action'), 'corporate_action', {'amount': action.get('amount')})
+        for doc in _storage.get_document_intelligence(sym, limit=80):
+            d_type = str(doc.get('document_type') or doc.get('event_type') or 'report')
+            add_event(doc.get('date'), sym, str(doc.get('title') or 'Report document'), d_type, 'document', {'url': doc.get('document_url')})
+        for ann in announcements(sym, 80):
+            title = str(ann.get('title') or '')
+            title_l = title.lower()
+            if any(token in title_l for token in ('agm', 'egm', 'board meeting', 'results', 'interim', 'annual report', 'dividend')):
+                e_type = 'event_notice'
+                if 'dividend' in title_l:
+                    e_type = 'dividend_notice'
+                elif any(t in title_l for t in ('results','interim','annual report')):
+                    e_type = 'earnings_report'
+                add_event(ann.get('date'), sym, title, e_type, 'announcement', {'url': ann.get('url')})
+    events.sort(key=lambda x: (x['date'], x['symbol'], x['title']))
+    upcoming = [e for e in events if e['days_from_now'] >= 0][:50]
+    recent = [e for e in events if e['days_from_now'] < 0][-50:]
+    return {'symbols': symbols, 'upcoming': upcoming, 'recent': list(reversed(recent)), 'count': len(events)}
+
+
+def admin_model_health() -> Dict[str, Any]:
+    model = model_status()
+    latest_compare = None
+    for row in _storage.list_job_runs(job_name='model_comparison', limit=10):
+        latest_compare = row
+        break
+    coverage = _storage.data_coverage()
+    sentiment_count = len(_storage.get_news_sentiment(limit=5000))
+    docs_count = len(_storage.get_document_intelligence(limit=5000))
+    news_count = len(_storage.get_external_news_items(limit=5000))
+    macro_count = len(_storage.get_macro_series(limit=8000))
+    score = 0
+    if model.get('available'):
+        score += 35
+    if coverage.get('symbols_ready_for_prediction'):
+        score += min(25, int(coverage.get('symbols_ready_for_prediction') or 0))
+    if sentiment_count:
+        score += 10
+    if docs_count:
+        score += 10
+    if news_count:
+        score += 10
+    if macro_count:
+        score += 10
+    return {
+        'model': model,
+        'latest_comparison': latest_compare,
+        'feature_store': {
+            'sentiment_items': sentiment_count,
+            'document_intelligence': docs_count,
+            'selected_news_items': news_count,
+            'macro_points': macro_count,
+        },
+        'coverage': coverage,
+        'health_score': min(100, score),
+        'health_label': 'healthy' if score >= 75 else 'warming_up' if score >= 50 else 'needs_attention',
+        'note': 'Predictions are probabilistic. Use model health, confidence, and comparison results to judge reliability rather than assuming guaranteed correctness.',
+    }
 
 def admin_status() -> Dict[str, Any]:
     coverage = _storage.data_coverage()

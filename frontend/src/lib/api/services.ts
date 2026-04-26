@@ -31,6 +31,9 @@ import type {
   PortfolioIntelligence,
   TradeFitPreview,
   SentimentSummary,
+  EventCalendar,
+  AuditLog,
+  AdminModelHealth,
 } from "./types";
 
 function num(value: any, fallback = 0): number {
@@ -485,6 +488,40 @@ function mapAdminUser(raw: any): AdminUser {
   };
 }
 
+function mapCalendarEvent(raw: any): EventCalendar {
+  const mapItem = (item: any) => ({
+    date: String(item?.date || ""),
+    symbol: String(item?.symbol || ""),
+    title: String(item?.title || ""),
+    eventType: String(item?.event_type || item?.eventType || "event"),
+    sourceType: String(item?.source_type || item?.sourceType || "system"),
+    daysFromNow: num(item?.days_from_now ?? item?.daysFromNow),
+    status: String(item?.status || "past"),
+    meta: item?.meta || {},
+  });
+  return {
+    symbols: Array.isArray(raw?.symbols) ? raw.symbols.map(String) : [],
+    upcoming: Array.isArray(raw?.upcoming) ? raw.upcoming.map(mapItem) : [],
+    recent: Array.isArray(raw?.recent) ? raw.recent.map(mapItem) : [],
+    count: num(raw?.count),
+  };
+}
+
+function mapAuditLog(raw: any): AuditLog {
+  return {
+    auditId: String(raw?.audit_id || raw?.auditId || ''),
+    username: raw?.username || undefined,
+    role: raw?.role || undefined,
+    action: String(raw?.action || ''),
+    targetType: raw?.target_type || raw?.targetType,
+    targetId: raw?.target_id || raw?.targetId,
+    status: raw?.status || undefined,
+    ipAddress: raw?.ip_address || raw?.ipAddress,
+    details: raw?.details || {},
+    createdAt: raw?.created_at || raw?.createdAt,
+  };
+}
+
 function mapSentimentSummary(raw: any): SentimentSummary {
   return {
     symbol: String(raw?.symbol || ""),
@@ -790,6 +827,15 @@ export const marketApi = {
   getStockNews: async (symbol: string, limit = 40): Promise<StockNews> => {
     const response = await api.get<any>(`/api/stocks/${encodeURIComponent(symbol)}/news?limit=${encodeURIComponent(String(limit))}`);
     return { symbol: String(response?.symbol || symbol), linkedNews: Array.isArray(response?.linked_news) ? response.linked_news.map(mapExternalNewsItem) : [], marketContext: Array.isArray(response?.market_context) ? response.market_context.map(mapExternalNewsItem) : [] };
+  },
+
+  getCalendar: async (params?: { symbol?: string; portfolioId?: string; days?: number }): Promise<EventCalendar> => {
+    const query = new URLSearchParams();
+    if (params?.symbol) query.set('symbol', params.symbol);
+    if (params?.portfolioId) query.set('portfolio_id', params.portfolioId);
+    if (params?.days) query.set('days', String(params.days));
+    const response = await api.get<any>(`/api/calendar/events${query.toString() ? `?${query.toString()}` : ''}`);
+    return mapCalendarEvent(response);
   },
 };
 
@@ -1173,6 +1219,24 @@ export const adminApi = {
   getAllNotifications: async (): Promise<Notification[]> => {
     const response = await api.get<any>("/api/admin/notifications");
     return Array.isArray(response?.notifications) ? response.notifications.map(mapNotification) : [];
+  },
+
+  getAuditLogs: async (limit = 200): Promise<AuditLog[]> => {
+    const response = await api.get<any>(`/api/admin/audit-logs?limit=${encodeURIComponent(String(limit))}`);
+    return Array.isArray(response?.logs) ? response.logs.map(mapAuditLog) : [];
+  },
+
+  getModelHealth: async (): Promise<AdminModelHealth> => {
+    const response = await api.get<any>("/api/admin/model-health");
+    return {
+      healthScore: num(response?.health_score ?? response?.healthScore),
+      healthLabel: String(response?.health_label || response?.healthLabel || 'needs_attention'),
+      note: String(response?.note || ''),
+      model: response?.model || {},
+      latestComparison: response?.latest_comparison || response?.latestComparison,
+      featureStore: response?.feature_store || response?.featureStore || {},
+      coverage: response?.coverage || {},
+    };
   },
 
   getProviderSettings: () => api.get<any>("/api/admin/provider"),
