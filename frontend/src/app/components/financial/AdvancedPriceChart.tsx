@@ -134,6 +134,7 @@ export function AdvancedPriceChart({
         textColor: '#768390',
         fontSize: 12,
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        attributionLogo: false,
       },
       grid: {
         vertLines: { color: '#161b2233' },

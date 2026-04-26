@@ -58,6 +58,7 @@ export function IndexChart({
       layout: {
         background: { color: '#0d1117' },
         textColor: '#768390',
+        attributionLogo: false,
       },
       grid: {
         vertLines: { color: '#161b2244' },

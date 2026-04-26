@@ -56,6 +56,7 @@ export function ProfessionalChart({
       layout: {
         background: { color: '#08090c' },
         textColor: '#768390',
+        attributionLogo: false,
       },
       grid: {
         vertLines: { color: '#161b2244' },
