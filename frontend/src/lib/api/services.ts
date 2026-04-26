@@ -218,6 +218,7 @@ function mapPortfolioSummary(raw: any): PortfolioSummary {
     dividendIncome: raw?.dividend_income !== undefined ? num(raw?.dividend_income) : undefined,
     totalPl: num(raw?.total_pl ?? raw?.totalPl),
     totalReturn: raw?.total_return !== undefined ? num(raw?.total_return) : undefined,
+    returnPct: raw?.return_pct !== undefined ? num(raw?.return_pct) : undefined,
   };
 }
 
@@ -236,12 +237,16 @@ function mapPortfolioPerformancePoint(raw: any): PortfolioPerformancePoint {
   return {
     date: String(raw?.date || ""),
     marketValue: num(raw?.market_value ?? raw?.marketValue),
+    cashBalance: raw?.cash_balance !== undefined ? num(raw?.cash_balance ?? raw?.cashBalance) : undefined,
+    totalEquity: raw?.total_equity !== undefined ? num(raw?.total_equity ?? raw?.totalEquity) : undefined,
+    netContributions: raw?.net_contributions !== undefined ? num(raw?.net_contributions ?? raw?.netContributions) : undefined,
     costBasis: num(raw?.cost_basis ?? raw?.costBasis),
     realizedPl: num(raw?.realized_pl ?? raw?.realizedPl),
     unrealizedPl: num(raw?.unrealized_pl ?? raw?.unrealizedPl),
     dividendIncome: raw?.dividend_income !== undefined ? num(raw?.dividend_income) : undefined,
     totalPl: num(raw?.total_pl ?? raw?.totalPl),
     totalReturn: raw?.total_return !== undefined ? num(raw?.total_return) : undefined,
+    returnPct: raw?.return_pct !== undefined ? num(raw?.return_pct) : undefined,
   };
 }
 

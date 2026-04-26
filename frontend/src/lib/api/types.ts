@@ -271,12 +271,16 @@ export interface AdminModelHealth {
 export interface PortfolioPerformancePoint {
   date: string;
   marketValue: number;
+  cashBalance?: number;
+  totalEquity?: number;
+  netContributions?: number;
   costBasis: number;
   realizedPl: number;
   unrealizedPl: number;
   dividendIncome?: number;
   totalPl: number;
   totalReturn?: number;
+  returnPct?: number;
 }
 
 export interface PortfolioAnalyticsSector {

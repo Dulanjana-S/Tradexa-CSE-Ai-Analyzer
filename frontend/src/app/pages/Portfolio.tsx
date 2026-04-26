@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { marketApi, portfolioApi, watchlistApi } from "../../lib/api/services";
-import type { PortfolioAccount, PortfolioAnalytics, PortfolioData, PortfolioIntelligence, TradeFitPreview, PortfolioPerformancePoint, PortfolioPeriodPerformance, PortfolioTransaction, Stock, Watchlist } from "../../lib/api/types";
+import type { EventCalendar, PortfolioAccount, PortfolioAnalytics, PortfolioData, PortfolioIntelligence, TradeFitPreview, PortfolioPerformancePoint, PortfolioPeriodPerformance, PortfolioTransaction, Stock, Watchlist } from "../../lib/api/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -79,6 +79,30 @@ const defaultForm = () => ({
   notes: "",
 });
 
+type PortfolioPanel = "cash" | "smart" | "analytics" | "performance" | "holdings" | "events" | "import" | "transactions";
+
+const portfolioPanels: Array<{ key: PortfolioPanel; label: string; description: string }> = [
+  { key: "cash", label: "Cash", description: "cash balance, deposits and withdrawals" },
+  { key: "smart", label: "Smart", description: "health score, attention and suggestions" },
+  { key: "analytics", label: "Analytics", description: "sectors, gainers, losers and income mix" },
+  { key: "performance", label: "Performance", description: "charts, periods and benchmarks" },
+  { key: "holdings", label: "Holdings", description: "open positions and smart status" },
+  { key: "events", label: "Events", description: "corporate actions and held-stock calendar" },
+  { key: "import", label: "Import", description: "broker statements and CSV import" },
+  { key: "transactions", label: "Transactions", description: "trade history and corrections" },
+];
+
+const timeframeOptions = [
+  { label: "1D", days: 1 },
+  { label: "1W", days: 7 },
+  { label: "1M", days: 30 },
+  { label: "3M", days: 90 },
+  { label: "6M", days: 180 },
+  { label: "1Y", days: 365 },
+  { label: "2Y", days: 730 },
+  { label: "5Y", days: 1825 },
+];
+
 function money(value: number) {
   return `Rs. ${value.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
@@ -115,6 +139,7 @@ export function Portfolio() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [chartDays, setChartDays] = useState(365);
+  const [activePanel, setActivePanel] = useState<PortfolioPanel>("performance");
   const [error, setError] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [importingCsv, setImportingCsv] = useState(false);
@@ -528,7 +553,26 @@ export function Portfolio() {
           <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className={`flex h-10 w-10 items-center justify-center rounded-md ${portfolio.summary.realizedPl >= 0 ? "bg-amber-500/10" : "bg-red-500/10"}`}>{portfolio.summary.realizedPl >= 0 ? <TrendingUp className="h-5 w-5 text-amber-500" /> : <TrendingDown className="h-5 w-5 text-red-500" />}</div><div><p className="text-[13px] text-[#768390]">Realized P/L</p><p className={`text-[24px] font-bold ${portfolio.summary.realizedPl >= 0 ? "text-amber-400" : "text-red-400"}`}>{money(portfolio.summary.realizedPl)}</p><p className="text-[12px] text-[#768390]">{portfolio.summary.positionsCount} open positions</p></div></div></CardContent></Card>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-3">
+        <Card className="sticky top-0 z-10 border-[#30363d] bg-[#0d1117]/95 backdrop-blur">
+          <CardContent className="p-3">
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {portfolioPanels.map((panel) => (
+                <button
+                  key={panel.key}
+                  type="button"
+                  onClick={() => setActivePanel(panel.key)}
+                  title={panel.description}
+                  className={activePanel === panel.key ? "whitespace-nowrap rounded-md bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white" : "whitespace-nowrap rounded-md border border-[#30363d] bg-[#161b22] px-4 py-2 text-[13px] text-[#9da7b3] hover:bg-[#1c2128] hover:text-[#e6edf3]"}
+                >
+                  {panel.label}
+                </button>
+              ))}
+            </div>
+            <div className="mt-2 px-1 text-[12px] text-[#768390]">{portfolioPanels.find((panel) => panel.key === activePanel)?.description}</div>
+          </CardContent>
+        </Card>
+
+        <div className={activePanel === "cash" ? "grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]" : "hidden"}>
           <Card className="border-[#30363d] bg-[#161b22] xl:col-span-2">
             <CardHeader><CardTitle className="text-[18px] text-[#e6edf3]">Cash management</CardTitle><CardDescription className="text-[13px] text-[#768390]">Deposits, withdrawals, and available cash for this portfolio.</CardDescription></CardHeader>
             <CardContent className="space-y-4">
@@ -550,23 +594,26 @@ export function Portfolio() {
               </div>
             </CardContent>
           </Card>
+        </div>
+
+        <div className={activePanel === "performance" ? "grid gap-6" : "hidden"}>
           <Card className="border-[#30363d] bg-[#161b22]"><CardHeader><CardTitle className="text-[18px] text-[#e6edf3]">Performance by period</CardTitle><CardDescription className="text-[13px] text-[#768390]">Portfolio returns vs ASPI and S&P SL20.</CardDescription></CardHeader><CardContent className="space-y-3">{periodPerformance.length ? periodPerformance.map((row) => <div key={row.label} className="rounded-lg border border-[#30363d] bg-[#0d1117] p-3"><div className="flex items-center justify-between"><span className="font-medium text-[#e6edf3]">{row.label}</span><span className={row.portfolioReturnPct >= 0 ? "text-emerald-400" : "text-red-400"}>{signedPercent(row.portfolioReturnPct)}</span></div><div className="mt-1 flex justify-between text-[12px] text-[#768390]"><span>ASPI {signedPercent(row.aspiReturnPct)}</span><span>Alpha {signedPercent(row.alphaVsAspiPct)}</span></div><div className="mt-1 flex justify-between text-[12px] text-[#768390]"><span>S&P SL20 {signedPercent(row.sp20ReturnPct)}</span><span>Alpha {signedPercent(row.alphaVsSp20Pct)}</span></div></div>) : <p className="text-[13px] text-[#768390]">Add positions to calculate period performance.</p>}</CardContent></Card>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className={activePanel === "smart" ? "grid grid-cols-1 gap-4 md:grid-cols-3" : "hidden"}>
           <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-emerald-500/10"><ShieldCheck className="h-5 w-5 text-emerald-400" /></div><div><p className="text-[13px] text-[#768390]">Portfolio health</p><p className="text-[24px] font-bold text-[#e6edf3]">{intelligence.health.score}/100</p><p className="text-[12px] text-[#768390]">{intelligence.health.label} · {intelligence.health.attentionCount} need attention</p></div></div></CardContent></Card>
           <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-amber-500/10"><Wallet className="h-5 w-5 text-amber-400" /></div><div><p className="text-[13px] text-[#768390]">Cash management</p><p className="text-[24px] font-bold text-[#e6edf3]">{intelligence.cashManagement.cashPct.toFixed(1)}%</p><p className="text-[12px] text-[#768390]">Target {intelligence.cashManagement.targetMinPct.toFixed(0)}–{intelligence.cashManagement.targetMaxPct.toFixed(0)}%</p></div></div></CardContent></Card>
           <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-violet-500/10"><Lightbulb className="h-5 w-5 text-violet-400" /></div><div><p className="text-[13px] text-[#768390]">Smart suggestion</p><p className="text-[14px] font-semibold text-[#e6edf3]">{intelligence.suggestions[0] || "Keep monitoring cash, concentration and market events"}</p></div></div></CardContent></Card>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className={activePanel === "analytics" ? "grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4" : "hidden"}>
           <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-cyan-500/10"><PieChart className="h-5 w-5 text-cyan-400" /></div><div><p className="text-[13px] text-[#768390]">Diversification</p><p className="text-[24px] font-bold text-[#e6edf3]">{analytics.diversification.score}/100</p><p className="text-[12px] text-[#768390]">{analytics.diversification.label} · {analytics.diversification.sectorCount} sectors</p></div></div></CardContent></Card>
           <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-rose-500/10"><ShieldAlert className="h-5 w-5 text-rose-400" /></div><div><p className="text-[13px] text-[#768390]">Portfolio risk</p><p className="text-[24px] font-bold text-[#e6edf3]">{analytics.risk.score}/100</p><p className="text-[12px] text-[#768390]">{analytics.risk.label} · Vol {analytics.risk.annualizedVolatilityPct.toFixed(1)}%</p></div></div></CardContent></Card>
           <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-amber-500/10"><Wallet className="h-5 w-5 text-amber-400" /></div><div><p className="text-[13px] text-[#768390]">Dividend income</p><p className="text-[24px] font-bold text-[#e6edf3]">{money(analytics.dividendSummary.totalIncome)}</p><p className="text-[12px] text-[#768390]">Yield on cost {signedPercent(analytics.dividendSummary.yieldOnCostPct)}</p></div></div></CardContent></Card>
           <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-indigo-500/10"><BarChart3 className="h-5 w-5 text-indigo-400" /></div><div><p className="text-[13px] text-[#768390]">Vs ASPI</p><p className={`text-[24px] font-bold ${analytics.benchmark.alphaVsAspiPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>{signedPercent(analytics.benchmark.alphaVsAspiPct)}</p><p className="text-[12px] text-[#768390]">{chartDays >= 365 ? `${chartDays / 365}Y` : `${chartDays}D`} alpha</p></div></div></CardContent></Card>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-3">
+        <div className={activePanel === "analytics" ? "grid gap-6 xl:grid-cols-3" : "hidden"}>
           <Card className="border-[#30363d] bg-[#161b22]">
             <CardHeader>
               <CardTitle className="text-[18px] text-[#e6edf3]">Sector allocation</CardTitle>
@@ -669,16 +716,16 @@ export function Portfolio() {
           </Card>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+        <div className={activePanel === "performance" ? "grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]" : "hidden"}>
           <Card className="border-[#30363d] bg-[#161b22]">
             <CardHeader className="flex flex-col gap-4 border-b border-[#30363d] sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <CardTitle className="text-[18px] text-[#e6edf3]">Portfolio performance</CardTitle>
-                <CardDescription className="text-[13px] text-[#768390]">Market value versus cost basis using your saved trades and stored price history.</CardDescription>
+                <CardDescription className="text-[13px] text-[#768390]">Total equity and cost basis using trades, cash movements, and stored price history.</CardDescription>
               </div>
               <div className="flex flex-wrap gap-2">
-                {[90, 180, 365, 730].map((days) => (
-                  <Button key={days} variant={chartDays === days ? "default" : "outline"} onClick={() => setChartDays(days)} className={chartDays === days ? "bg-blue-600 text-white hover:bg-blue-700" : "border-[#30363d] text-[#768390] hover:bg-[#1c2128] hover:text-[#e6edf3]"}>{days >= 365 ? `${days / 365}Y` : `${days}D`}</Button>
+                {timeframeOptions.map((option) => (
+                  <Button key={option.label} variant={chartDays === option.days ? "default" : "outline"} onClick={() => setChartDays(option.days)} className={chartDays === option.days ? "bg-blue-600 text-white hover:bg-blue-700" : "border-[#30363d] text-[#768390] hover:bg-[#1c2128] hover:text-[#e6edf3]"}>{option.label}</Button>
                 ))}
               </div>
             </CardHeader>
@@ -702,10 +749,10 @@ export function Portfolio() {
                       <YAxis tick={{ fill: "#768390", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(value) => `Rs. ${Number(value).toLocaleString("en-LK")}`} width={92} />
                       <Tooltip
                         contentStyle={{ backgroundColor: "#0d1117", border: "1px solid #30363d", borderRadius: 12, color: "#e6edf3" }}
-                        formatter={(value: number, name: string) => [money(Number(value)), name === "marketValue" ? "Market value" : "Cost basis"]}
+                        formatter={(value: number, name: string) => [money(Number(value)), name === "totalEquity" ? "Total equity" : name === "marketValue" ? "Market value" : "Cost basis"]}
                         labelFormatter={(_, payload) => payload?.[0]?.payload?.label || ""}
                       />
-                      <Area type="monotone" dataKey="marketValue" stroke="#2563eb" fill="url(#portfolioMarketValue)" strokeWidth={2.5} />
+                      <Area type="monotone" dataKey="totalEquity" stroke="#2563eb" fill="url(#portfolioMarketValue)" strokeWidth={2.5} />
                       <Area type="monotone" dataKey="costBasis" stroke="#f59e0b" fillOpacity={0} strokeWidth={2} />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -784,7 +831,7 @@ export function Portfolio() {
           </Card>
         </div>
 
-        <Card className="border-[#30363d] bg-[#161b22]">
+        <Card className={activePanel === "holdings" ? "border-[#30363d] bg-[#161b22]" : "hidden"}>
           <CardHeader className="flex flex-row items-center justify-between gap-3">
             <div>
               <CardTitle className="text-[18px] text-[#e6edf3]">Holdings</CardTitle>
@@ -828,7 +875,7 @@ export function Portfolio() {
           </CardContent>
         </Card>
 
-        <Card className="border-[#30363d] bg-[#161b22]">
+        <Card className={activePanel === "events" ? "border-[#30363d] bg-[#161b22]" : "hidden"}>
           <CardHeader>
             <CardTitle className="text-[18px] text-[#e6edf3]">Recent corporate actions</CardTitle>
             <CardDescription className="text-[13px] text-[#768390]">Dividends, splits, and bonus issues stored in the system and used in portfolio calculations.</CardDescription>
@@ -858,7 +905,7 @@ export function Portfolio() {
           </CardContent>
         </Card>
 
-        <Card className="border-[#30363d] bg-[#161b22]">
+        <Card className={activePanel === "import" ? "border-[#30363d] bg-[#161b22]" : "hidden"}>
           <CardHeader>
             <CardTitle className="text-[18px] text-[#e6edf3]">Broker statement import</CardTitle>
             <CardDescription className="text-[13px] text-[#768390]">Import broker contract notes / statement CSVs or your TradexaLK transaction CSV. We auto-detect common broker statement formats.</CardDescription>
@@ -882,7 +929,7 @@ export function Portfolio() {
           </CardContent>
         </Card>
 
-        <Card className="border-[#30363d] bg-[#161b22]">
+        <Card className={activePanel === "events" ? "border-[#30363d] bg-[#161b22]" : "hidden"}>
           <CardHeader>
             <CardTitle className="text-[18px] text-[#e6edf3]">Earnings / dividend / event calendar</CardTitle>
             <CardDescription className="text-[13px] text-[#768390]">Upcoming and recent event markers for symbols currently held in this portfolio.</CardDescription>
@@ -901,7 +948,7 @@ export function Portfolio() {
           </CardContent>
         </Card>
 
-        <Card className="border-[#30363d] bg-[#161b22]">
+        <Card className={activePanel === "transactions" ? "border-[#30363d] bg-[#161b22]" : "hidden"}>
           <CardHeader>
             <CardTitle className="text-[18px] text-[#e6edf3]">Transaction history</CardTitle>
             <CardDescription className="text-[13px] text-[#768390]">Every trade used to calculate positions, cost basis, and performance. You can edit mistakes without re-entering everything.</CardDescription>

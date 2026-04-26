@@ -793,7 +793,7 @@ def api_portfolio(request: Request, portfolio_id: Optional[str] = Query(None)):
 
 
 @app.get("/api/portfolio/performance")
-def api_portfolio_performance(request: Request, portfolio_id: Optional[str] = Query(None), days: int = Query(365, ge=30, le=1825)):
+def api_portfolio_performance(request: Request, portfolio_id: Optional[str] = Query(None), days: int = Query(365, ge=1, le=1825)):
     user = require_user(request)
     return data_service.get_portfolio_performance(user['username'], days=days, portfolio_id=portfolio_id)
 
@@ -805,7 +805,7 @@ def api_portfolio_period_performance(request: Request, portfolio_id: Optional[st
 
 
 @app.get("/api/portfolio/analytics")
-def api_portfolio_analytics(request: Request, portfolio_id: Optional[str] = Query(None), days: int = Query(365, ge=30, le=1825)):
+def api_portfolio_analytics(request: Request, portfolio_id: Optional[str] = Query(None), days: int = Query(365, ge=1, le=1825)):
     user = require_user(request)
     return data_service.get_portfolio_analytics(user['username'], days=days, portfolio_id=portfolio_id)
 

@@ -1185,8 +1185,10 @@ def get_portfolio(username: str, portfolio_id: Optional[str] = None) -> Dict[str
 
 def get_portfolio_performance(username: str, days: int = 365, portfolio_id: Optional[str] = None) -> Dict[str, Any]:
     portfolio_id = _resolve_portfolio_id(username, portfolio_id)
+    days = max(1, int(days or 365))
     transactions = _storage.list_portfolio_transactions(username, portfolio_id)
-    if not transactions:
+    cash_movements = _storage.list_cash_movements(username, portfolio_id)
+    if not transactions and not cash_movements:
         return {"days": days, "series": []}
 
     ordered_txs = sorted(transactions, key=_portfolio_sort_key)
@@ -1195,79 +1197,152 @@ def get_portfolio_performance(username: str, days: int = 365, portfolio_id: Opti
     histories: Dict[str, Dict[str, float]] = {}
     history_dates: List[date] = []
     for symbol in symbols:
-        price_rows = _storage.get_price_history(symbol, limit=max(days + 40, 2000))
+        price_rows = _storage.get_price_history(symbol, limit=max(days + 120, 2400))
         price_map: Dict[str, float] = {}
         for row in price_rows:
             date_key = str(row.get("date") or "")[:10]
             close_value = _to_float(row.get("close"))
             if date_key and close_value is not None:
                 price_map[date_key] = float(close_value)
-                history_dates.append(date.fromisoformat(date_key))
+                try:
+                    history_dates.append(date.fromisoformat(date_key))
+                except Exception:
+                    pass
         if price_map:
             histories[symbol] = price_map
-    if not histories:
+    if symbols and not histories:
         return {"days": days, "series": []}
 
-    tx_dates = [date.fromisoformat(str(item.get("traded_at") or item.get("created_at") or "")[:10]) for item in ordered_txs if str(item.get("traded_at") or item.get("created_at") or "")[:10]]
-    if not tx_dates:
-        return {"days": days, "series": []}
-    action_dates = [date.fromisoformat(str(item.get("ex_date") or "")[:10]) for rows in action_map.values() for item in rows if str(item.get("ex_date") or "")[:10]]
+    def _item_date(item: Dict[str, Any], *keys: str) -> Optional[date]:
+        for key in keys:
+            raw = str(item.get(key) or "")[:10]
+            if raw:
+                try:
+                    return date.fromisoformat(raw)
+                except Exception:
+                    continue
+        return None
 
-    latest_history_date = max(history_dates)
-    earliest_event_date = min(tx_dates + action_dates) if action_dates else min(tx_dates)
+    tx_dates = [d for d in (_item_date(item, "traded_at", "created_at") for item in ordered_txs) if d]
+    action_dates = [d for d in (_item_date(item, "ex_date") for rows in action_map.values() for item in rows) if d]
+    cash_dates = [d for d in (_item_date(item, "movement_date", "created_at") for item in cash_movements) if d]
+    if history_dates:
+        latest_history_date = max(history_dates)
+    else:
+        latest_history_date = max(tx_dates + cash_dates) if (tx_dates or cash_dates) else date.today()
+    event_dates = tx_dates + action_dates + cash_dates
+    earliest_event_date = min(event_dates) if event_dates else latest_history_date
     start_date = max(earliest_event_date, latest_history_date - timedelta(days=max(days - 1, 0)))
-    market_dates = sorted({d for d in history_dates if d >= start_date})
+
+    if histories:
+        market_dates = sorted({d for d in history_dates if d >= start_date})
+    else:
+        # cash-only portfolio: build a simple daily series over the requested window
+        market_dates = [start_date + timedelta(days=i) for i in range((latest_history_date - start_date).days + 1)] or [latest_history_date]
     if not market_dates:
         return {"days": days, "series": []}
 
     tx_by_date: Dict[date, List[Dict[str, Any]]] = {}
     for tx in ordered_txs:
-        raw_day = str(tx.get("traded_at") or tx.get("created_at") or "")[:10]
-        if raw_day:
-            tx_by_date.setdefault(date.fromisoformat(raw_day), []).append(tx)
+        d = _item_date(tx, "traded_at", "created_at")
+        if d:
+            tx_by_date.setdefault(d, []).append(tx)
     actions_by_date: Dict[date, List[Dict[str, Any]]] = {}
     for rows in action_map.values():
         for action in rows:
-            raw_day = str(action.get("ex_date") or "")[:10]
-            if raw_day:
-                actions_by_date.setdefault(date.fromisoformat(raw_day), []).append(action)
+            d = _item_date(action, "ex_date")
+            if d:
+                actions_by_date.setdefault(d, []).append(action)
+    cash_by_date: Dict[date, List[Dict[str, Any]]] = {}
+    for movement in cash_movements:
+        d = _item_date(movement, "movement_date", "created_at")
+        if d:
+            cash_by_date.setdefault(d, []).append(movement)
 
     positions: Dict[str, Dict[str, float]] = {}
+    cash_balance = 0.0
+
+    def _apply_cash(movement: Dict[str, Any]) -> None:
+        nonlocal cash_balance
+        amount = float(movement.get("amount") or 0.0)
+        movement_type = str(movement.get("movement_type") or "deposit").lower().strip()
+        if movement_type == "withdrawal":
+            cash_balance -= amount
+        else:
+            cash_balance += amount
+
+    def _apply_action(action: Dict[str, Any]) -> None:
+        symbol = str(action.get("symbol") or "").upper().strip()
+        if not symbol:
+            return
+        pos = positions.setdefault(symbol, {"quantity": 0.0, "cost_total": 0.0, "realized_pl": 0.0, "dividend_income": 0.0})
+        held_qty = float(pos.get("quantity") or 0.0)
+        if held_qty <= 0:
+            return
+        action_type = str(action.get("action_type") or "").lower().strip()
+        if action_type == "dividend":
+            amount = float(_to_float(action.get("amount")) or 0.0)
+            if amount:
+                dividend = held_qty * amount
+                pos["dividend_income"] += dividend
+                cash_balance_add[0] += dividend
+        elif action_type in {"split", "bonus"}:
+            ratio = _action_ratio(action)
+            if ratio > 0 and abs(ratio - 1.0) > 1e-9:
+                pos["quantity"] = held_qty * ratio
+
+    def _apply_tx(tx: Dict[str, Any]) -> None:
+        nonlocal cash_balance
+        symbol = str(tx.get("symbol") or "").upper().strip()
+        if not symbol:
+            return
+        tx_type = str(tx.get("tx_type") or tx.get("type") or "buy").lower().strip()
+        quantity = float(tx.get("quantity") or 0.0)
+        price = float(tx.get("price") or 0.0)
+        fees = float(tx.get("fees") or 0.0)
+        pos = positions.setdefault(symbol, {"quantity": 0.0, "cost_total": 0.0, "realized_pl": 0.0, "dividend_income": 0.0})
+        if tx_type == "buy":
+            pos["quantity"] += quantity
+            pos["cost_total"] += quantity * price + fees
+            cash_balance -= quantity * price + fees
+        elif tx_type == "sell":
+            held_qty = float(pos.get("quantity") or 0.0)
+            avg_cost = (float(pos.get("cost_total") or 0.0) / held_qty) if held_qty > 0 else 0.0
+            pos["realized_pl"] += quantity * (price - avg_cost) - fees
+            pos["quantity"] = max(0.0, held_qty - quantity)
+            pos["cost_total"] = max(0.0, float(pos.get("cost_total") or 0.0) - avg_cost * quantity)
+            cash_balance += quantity * price - fees
+
+    # Seed state before the visible period so short ranges like 1D and 1W still show existing holdings.
+    cash_balance_add = [0.0]
+    for d in sorted(set([*tx_by_date.keys(), *actions_by_date.keys(), *cash_by_date.keys()])):
+        if d >= start_date:
+            continue
+        for movement in sorted(cash_by_date.get(d, []), key=lambda item: str(item.get("created_at") or "")):
+            _apply_cash(movement)
+        for action in sorted(actions_by_date.get(d, []), key=lambda item: (str(item.get("symbol") or ""), str(item.get("action_id") or ""))):
+            cash_balance_add[0] = 0.0
+            _apply_action(action)
+            cash_balance += cash_balance_add[0]
+        for tx in sorted(tx_by_date.get(d, []), key=_portfolio_sort_key):
+            _apply_tx(tx)
+
     last_close: Dict[str, float] = {}
+    for symbol, price_map in histories.items():
+        previous = [(date.fromisoformat(day), close) for day, close in price_map.items() if date.fromisoformat(day) < start_date]
+        if previous:
+            last_close[symbol] = float(sorted(previous, key=lambda item: item[0])[-1][1])
+
     series: List[Dict[str, Any]] = []
     for market_day in market_dates:
+        for movement in sorted(cash_by_date.get(market_day, []), key=lambda item: str(item.get("created_at") or "")):
+            _apply_cash(movement)
         for action in sorted(actions_by_date.get(market_day, []), key=lambda item: (str(item.get("symbol") or ""), str(item.get("action_id") or ""))):
-            symbol = str(action.get("symbol") or "").upper().strip()
-            pos = positions.setdefault(symbol, {"quantity": 0.0, "cost_total": 0.0, "realized_pl": 0.0, "dividend_income": 0.0})
-            held_qty = float(pos.get("quantity") or 0.0)
-            if held_qty <= 0:
-                continue
-            action_type = str(action.get("action_type") or "").lower().strip()
-            if action_type == "dividend":
-                amount = float(_to_float(action.get("amount")) or 0.0)
-                pos["dividend_income"] += held_qty * amount
-            elif action_type in {"split", "bonus"}:
-                ratio = _action_ratio(action)
-                if ratio > 0 and abs(ratio - 1.0) > 1e-9:
-                    pos["quantity"] = held_qty * ratio
+            cash_balance_add[0] = 0.0
+            _apply_action(action)
+            cash_balance += cash_balance_add[0]
         for tx in sorted(tx_by_date.get(market_day, []), key=_portfolio_sort_key):
-            symbol = str(tx.get("symbol") or "").upper().strip()
-            if not symbol:
-                continue
-            tx_type = str(tx.get("tx_type") or tx.get("type") or "buy").lower().strip()
-            quantity = float(tx.get("quantity") or 0.0)
-            price = float(tx.get("price") or 0.0)
-            fees = float(tx.get("fees") or 0.0)
-            pos = positions.setdefault(symbol, {"quantity": 0.0, "cost_total": 0.0, "realized_pl": 0.0, "dividend_income": 0.0})
-            if tx_type == "buy":
-                pos["quantity"] += quantity
-                pos["cost_total"] += quantity * price + fees
-            elif tx_type == "sell":
-                held_qty = float(pos.get("quantity") or 0.0)
-                avg_cost = (float(pos.get("cost_total") or 0.0) / held_qty) if held_qty > 0 else 0.0
-                pos["realized_pl"] += quantity * (price - avg_cost) - fees
-                pos["quantity"] = max(0.0, held_qty - quantity)
-                pos["cost_total"] = max(0.0, float(pos.get("cost_total") or 0.0) - avg_cost * quantity)
+            _apply_tx(tx)
 
         total_market_value = 0.0
         total_cost_basis = 0.0
@@ -1289,18 +1364,25 @@ def get_portfolio_performance(username: str, days: int = 365, portfolio_id: Opti
             total_market_value += quantity * close_value
             total_cost_basis += float(pos.get("cost_total") or 0.0)
         unrealized = total_market_value - total_cost_basis
+        total_return = unrealized + total_realized + total_dividends
+        total_equity = total_market_value + cash_balance
+        net_contributions = sum(float(m.get("amount") or 0.0) * (-1.0 if str(m.get("movement_type") or "").lower() == "withdrawal" else 1.0) for d, rows in cash_by_date.items() for m in rows if d <= market_day)
+        invested_capital = max(abs(net_contributions), total_cost_basis, 1e-9)
         series.append({
             "date": market_day.isoformat(),
             "market_value": round(total_market_value, 4),
+            "cash_balance": round(cash_balance, 4),
+            "total_equity": round(total_equity, 4),
+            "net_contributions": round(net_contributions, 4),
             "cost_basis": round(total_cost_basis, 4),
             "realized_pl": round(total_realized, 4),
             "unrealized_pl": round(unrealized, 4),
             "dividend_income": round(total_dividends, 4),
             "total_pl": round(unrealized + total_realized, 4),
-            "total_return": round(unrealized + total_realized + total_dividends, 4),
+            "total_return": round(total_return, 4),
+            "return_pct": round((total_return / invested_capital) * 100.0, 4) if invested_capital else 0.0,
         })
     return {"days": days, "series": series}
-
 
 
 def _safe_pct(numerator: float, denominator: float) -> float:
@@ -1618,9 +1700,14 @@ def get_portfolio_period_performance(username: str, portfolio_id: Optional[str] 
                 cutoff = latest_date - timedelta(days=delta_days)
                 eligible = [p for p in series if date.fromisoformat(str(p.get("date"))[:10]) <= cutoff]
                 start = eligible[-1] if eligible else series[0]
-            start_val = float(start.get("market_value") or 0.0) + float(start.get("total_pl") or 0.0)
-            end_val = float(latest.get("market_value") or 0.0) + float(latest.get("total_pl") or 0.0)
-            ret = _safe_pct(end_val - start_val, start_val)
+            start_val = float(start.get("total_equity") or start.get("market_value") or 0.0)
+            end_val = float(latest.get("total_equity") or latest.get("market_value") or 0.0)
+            if abs(start_val) < 1e-9:
+                start_ret = float(start.get("return_pct") or 0.0)
+                end_ret = float(latest.get("return_pct") or 0.0)
+                ret = end_ret - start_ret
+            else:
+                ret = _safe_pct(end_val - start_val, start_val)
             benchmark_days = delta_days or max(30, (latest_date - date.fromisoformat(str(start.get("date"))[:10])).days)
             aspi = _benchmark_series("ASPI", latest_date - timedelta(days=benchmark_days), benchmark_days + 1)
             sp20 = _benchmark_series("S&P SL20", latest_date - timedelta(days=benchmark_days), benchmark_days + 1)
