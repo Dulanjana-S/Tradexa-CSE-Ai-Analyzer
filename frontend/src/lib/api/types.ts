@@ -316,6 +316,67 @@ export interface PortfolioAnalytics {
   benchmark: PortfolioBenchmarkComparison;
 }
 
+export interface HoldingAttention {
+  symbol: string;
+  company: string;
+  sector?: string;
+  status: "suitable" | "watch" | "need_attention" | "high_risk";
+  statusLabel: string;
+  severity: string;
+  fitScore: number;
+  riskScore: number;
+  weightPct: number;
+  sectorWeightPct: number;
+  volatilityPct?: number;
+  drawdownPct?: number;
+  sentimentScore30d?: number;
+  negativeSentimentCount?: number;
+  reasons: string[];
+  suggestions: string[];
+}
+
+export interface CashManagementInsight {
+  label: string;
+  score: number;
+  cashBalance: number;
+  cashPct: number;
+  targetMinPct: number;
+  targetMaxPct: number;
+  recommendedMinCash: number;
+  recommendedMaxCash: number;
+  reasons: string[];
+  suggestions: string[];
+}
+
+export interface PortfolioIntelligence {
+  portfolioId: string;
+  health: { score: number; label: string; attentionCount: number; watchCount: number };
+  cashManagement: CashManagementInsight;
+  holdings: HoldingAttention[];
+  attentionItems: HoldingAttention[];
+  suggestions: string[];
+  thresholds?: Record<string, number>;
+}
+
+export interface TradeFitPreview {
+  portfolioId: string;
+  symbol: string;
+  txType: "buy" | "sell";
+  tradeValue: number;
+  cashBefore: number;
+  cashAfter: number;
+  currentStockWeightPct: number;
+  newStockWeightPct: number;
+  newSectorWeightPct: number;
+  status: "suitable" | "watch" | "need_attention" | "high_risk";
+  statusLabel: string;
+  fitScore: number;
+  riskScore: number;
+  reasons: string[];
+  suggestions: string[];
+  cashManagement: CashManagementInsight;
+}
+
 export interface Alert {
   id: string;
   username?: string;

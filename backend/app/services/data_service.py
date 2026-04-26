@@ -1637,6 +1637,356 @@ def get_portfolio_period_performance(username: str, portfolio_id: Optional[str] 
     return {"portfolio_id": portfolio_id, "periods": periods}
 
 
+
+
+def _status_from_fit_score(score: float) -> str:
+    if score >= 75:
+        return "suitable"
+    if score >= 60:
+        return "watch"
+    if score >= 40:
+        return "need_attention"
+    return "high_risk"
+
+
+def _attention_label(label: str) -> str:
+    return {
+        "suitable": "Suitable",
+        "watch": "Watch",
+        "need_attention": "Need Attention",
+        "high_risk": "High Risk",
+    }.get(label, "Watch")
+
+
+def _status_severity(label: str) -> str:
+    return {
+        "suitable": "low",
+        "watch": "medium",
+        "need_attention": "high",
+        "high_risk": "critical",
+    }.get(label, "medium")
+
+
+def _position_price_risk(symbol: str) -> Dict[str, Any]:
+    rows = _storage.get_price_history(symbol.upper(), limit=140)
+    closes = [float(_to_float(row.get("close")) or 0.0) for row in rows if _to_float(row.get("close")) is not None and float(_to_float(row.get("close")) or 0) > 0]
+    vols = [float(_to_float(row.get("volume")) or 0.0) for row in rows if _to_float(row.get("volume")) is not None]
+    returns = []
+    for prev, curr in zip(closes, closes[1:]):
+        if prev > 0:
+            returns.append((curr / prev) - 1.0)
+    volatility = 0.0
+    if len(returns) > 2:
+        try:
+            volatility = statistics.stdev(returns) * math.sqrt(252) * 100.0
+        except statistics.StatisticsError:
+            volatility = 0.0
+    drawdown = 0.0
+    if closes:
+        peak = max(closes)
+        if peak > 0:
+            drawdown = (closes[-1] / peak - 1.0) * 100.0
+    avg_volume = sum(vols[-30:]) / max(1, len(vols[-30:])) if vols else 0.0
+    risk_points = 0.0
+    reasons: List[str] = []
+    if volatility >= 45:
+        risk_points += 22
+        reasons.append(f"High annualized volatility around {volatility:.1f}%")
+    elif volatility >= 28:
+        risk_points += 12
+        reasons.append(f"Moderate volatility around {volatility:.1f}%")
+    if drawdown <= -25:
+        risk_points += 18
+        reasons.append(f"Large drawdown from recent high ({drawdown:.1f}%)")
+    elif drawdown <= -12:
+        risk_points += 9
+        reasons.append(f"Recent price drawdown is {drawdown:.1f}%")
+    if avg_volume > 0 and avg_volume < 2500:
+        risk_points += 12
+        reasons.append("Low recent trading volume may make exits harder")
+    return {"volatility_pct": round(volatility, 2), "drawdown_pct": round(drawdown, 2), "avg_volume_30d": round(avg_volume, 0), "risk_points": risk_points, "reasons": reasons}
+
+
+def _symbol_sentiment_risk(symbol: str) -> Dict[str, Any]:
+    try:
+        rows = _storage.get_news_sentiment(symbol=symbol.upper(), limit=30)
+    except Exception:
+        rows = []
+    if not rows:
+        return {"score_30d": 0.0, "impact_30d": 0.0, "negative_count": 0, "risk_points": 0.0, "reasons": []}
+    scores = [float(row.get("sentiment_score") or 0.0) for row in rows]
+    impact = sum(float(row.get("impact_score") or 0.0) for row in rows[:30])
+    negative_count = sum(1 for row in rows[:30] if str(row.get("sentiment_label") or "").lower() == "negative")
+    risk_points = 0.0
+    reasons: List[str] = []
+    avg_score = sum(scores[:30]) / max(1, len(scores[:30]))
+    if avg_score <= -0.25:
+        risk_points += 18
+        reasons.append("Recent official/news sentiment is negative")
+    elif avg_score <= -0.08:
+        risk_points += 8
+        reasons.append("Recent sentiment has weakened")
+    if negative_count >= 2:
+        risk_points += 10
+        reasons.append(f"{negative_count} negative sentiment items were detected recently")
+    if impact >= 3.0 and avg_score < 0:
+        risk_points += 8
+        reasons.append("High-impact negative events require attention")
+    return {"score_30d": round(avg_score, 4), "impact_30d": round(impact, 4), "negative_count": negative_count, "risk_points": risk_points, "reasons": reasons}
+
+
+def _cash_management(summary: Dict[str, Any], risk_score: float = 50.0) -> Dict[str, Any]:
+    total_equity = float(summary.get("total_equity") or 0.0)
+    cash_balance = float(summary.get("cash_balance") or 0.0)
+    cash_pct = _safe_pct(cash_balance, total_equity) if total_equity > 0 else 0.0
+    target_min = 5.0
+    target_max = 20.0
+    if risk_score >= 70:
+        target_min = 10.0
+        target_max = 25.0
+    elif risk_score <= 35:
+        target_min = 3.0
+        target_max = 18.0
+    reasons: List[str] = []
+    suggestions: List[str] = []
+    if cash_balance < 0:
+        label = "cash_deficit"
+        score = 15
+        reasons.append("Cash balance is negative after recorded trades and withdrawals")
+        suggestions.append("Add a deposit or review transaction/cash entries before adding more buys")
+    elif cash_pct < target_min:
+        label = "low_cash"
+        score = max(25, 55 - (target_min - cash_pct) * 5)
+        reasons.append(f"Cash is only {cash_pct:.1f}% of total equity")
+        suggestions.append(f"Keep at least {target_min:.0f}% cash buffer for flexibility and risk control")
+    elif cash_pct > 35:
+        label = "high_idle_cash"
+        score = 66
+        reasons.append(f"Cash is high at {cash_pct:.1f}% of total equity")
+        suggestions.append("Review whether idle cash should be deployed gradually or kept for your strategy")
+    elif cash_pct > target_max:
+        label = "above_target_cash"
+        score = 78
+        reasons.append(f"Cash is above the suggested range at {cash_pct:.1f}%")
+        suggestions.append("Consider staged entry plans instead of deploying all cash at once")
+    else:
+        label = "healthy_cash"
+        score = 92
+        reasons.append(f"Cash buffer is within the suggested range ({cash_pct:.1f}%)")
+        suggestions.append("Cash level looks suitable for normal portfolio flexibility")
+    recommended_min_cash = total_equity * target_min / 100.0
+    recommended_max_cash = total_equity * target_max / 100.0
+    return {
+        "label": label,
+        "score": round(float(score), 0),
+        "cash_balance": round(cash_balance, 2),
+        "cash_pct": round(cash_pct, 2),
+        "target_min_pct": target_min,
+        "target_max_pct": target_max,
+        "recommended_min_cash": round(recommended_min_cash, 2),
+        "recommended_max_cash": round(recommended_max_cash, 2),
+        "reasons": reasons,
+        "suggestions": suggestions,
+    }
+
+
+def _score_holding(symbol: str, company: str, sector: str, weight_pct: float, sector_weight_pct: float, unrealized_pct: float, *, cash_after_trade: Optional[float] = None, trade_context: bool = False) -> Dict[str, Any]:
+    score = 88.0
+    risk_score = 15.0
+    reasons: List[str] = []
+    suggestions: List[str] = []
+    if weight_pct >= 30:
+        score -= 32
+        risk_score += 34
+        reasons.append(f"Single-stock exposure would be very high at {weight_pct:.1f}%")
+        suggestions.append("Reduce quantity or split capital across more holdings")
+    elif weight_pct >= 22:
+        score -= 22
+        risk_score += 24
+        reasons.append(f"Single-stock exposure is high at {weight_pct:.1f}%")
+        suggestions.append("Keep this holding below roughly 15–20% unless it is a deliberate high-conviction allocation")
+    elif weight_pct >= 15:
+        score -= 10
+        risk_score += 12
+        reasons.append(f"Stock weight is becoming meaningful at {weight_pct:.1f}%")
+        suggestions.append("Monitor concentration if adding more later")
+    else:
+        reasons.append(f"Single-stock exposure is manageable at {weight_pct:.1f}%")
+    if sector_weight_pct >= 50:
+        score -= 25
+        risk_score += 28
+        reasons.append(f"Sector exposure would be very concentrated at {sector_weight_pct:.1f}%")
+        suggestions.append("Balance this with holdings from other sectors")
+    elif sector_weight_pct >= 38:
+        score -= 16
+        risk_score += 18
+        reasons.append(f"Sector exposure is high at {sector_weight_pct:.1f}%")
+        suggestions.append("Avoid adding too much more to the same sector")
+    elif sector_weight_pct >= 28:
+        score -= 7
+        risk_score += 8
+        reasons.append(f"Sector exposure is moderate at {sector_weight_pct:.1f}%")
+    if unrealized_pct <= -20:
+        score -= 12
+        risk_score += 12
+        reasons.append(f"Holding has a large unrealized loss ({unrealized_pct:.1f}%)")
+        suggestions.append("Review thesis, stop-loss, and latest disclosures before increasing exposure")
+    elif unrealized_pct <= -10:
+        score -= 6
+        risk_score += 6
+        reasons.append(f"Holding is down {unrealized_pct:.1f}% from cost")
+    price_risk = _position_price_risk(symbol)
+    sentiment_risk = _symbol_sentiment_risk(symbol)
+    score -= float(price_risk.get("risk_points") or 0.0)
+    risk_score += float(price_risk.get("risk_points") or 0.0)
+    reasons.extend(price_risk.get("reasons") or [])
+    score -= float(sentiment_risk.get("risk_points") or 0.0)
+    risk_score += float(sentiment_risk.get("risk_points") or 0.0)
+    reasons.extend(sentiment_risk.get("reasons") or [])
+    if cash_after_trade is not None and cash_after_trade < 0:
+        score -= 28
+        risk_score += 30
+        reasons.append("This trade would make portfolio cash negative")
+        suggestions.append("Record a deposit first or reduce trade size")
+    if not suggestions and score >= 75:
+        suggestions.append("Position looks suitable, but keep monitoring reports, sentiment and allocation")
+    elif score < 60 and not any("Reduce" in s or "review" in s.lower() for s in suggestions):
+        suggestions.append("Review this position before adding more capital")
+    label = _status_from_fit_score(max(0.0, min(100.0, score)))
+    return {
+        "symbol": symbol.upper(),
+        "company": company or symbol.upper(),
+        "sector": sector or "Unclassified",
+        "status": label,
+        "status_label": _attention_label(label),
+        "severity": _status_severity(label),
+        "fit_score": round(max(0.0, min(100.0, score)), 0),
+        "risk_score": round(max(0.0, min(100.0, risk_score)), 0),
+        "weight_pct": round(weight_pct, 2),
+        "sector_weight_pct": round(sector_weight_pct, 2),
+        "volatility_pct": price_risk.get("volatility_pct", 0.0),
+        "drawdown_pct": price_risk.get("drawdown_pct", 0.0),
+        "sentiment_score_30d": sentiment_risk.get("score_30d", 0.0),
+        "negative_sentiment_count": sentiment_risk.get("negative_count", 0),
+        "reasons": reasons[:8],
+        "suggestions": suggestions[:6],
+        "trade_context": trade_context,
+    }
+
+
+def get_portfolio_intelligence(username: str, portfolio_id: Optional[str] = None) -> Dict[str, Any]:
+    portfolio_id = _resolve_portfolio_id(username, portfolio_id)
+    portfolio = get_portfolio(username, portfolio_id)
+    analytics = get_portfolio_analytics(username, portfolio_id=portfolio_id)
+    positions = portfolio.get("positions") or []
+    summary = portfolio.get("summary") or {}
+    sector_weights = {str(item.get("sector") or "Unclassified"): float(item.get("weight_pct") or 0.0) for item in analytics.get("sector_allocation") or []}
+    holdings = []
+    for pos in positions:
+        sector = str(pos.get("sector") or "Unclassified")
+        holdings.append(_score_holding(
+            str(pos.get("symbol") or ""),
+            str(pos.get("company") or pos.get("symbol") or ""),
+            sector,
+            float(pos.get("weight_pct") or 0.0),
+            float(sector_weights.get(sector, 0.0)),
+            float(pos.get("unrealized_pl_pct") or 0.0),
+        ))
+    risk_score = float((analytics.get("risk") or {}).get("score") or 0.0)
+    cash = _cash_management(summary, risk_score=risk_score)
+    attention = [item for item in holdings if item.get("status") in {"need_attention", "high_risk"}]
+    watch = [item for item in holdings if item.get("status") == "watch"]
+    diversification_score = float((analytics.get("diversification") or {}).get("score") or 0.0)
+    cash_score = float(cash.get("score") or 0.0)
+    attention_penalty = min(25.0, len(attention) * 8.0 + len(watch) * 3.0)
+    benchmark = analytics.get("benchmark") or {}
+    alpha = float(benchmark.get("alpha_vs_aspi_pct") or 0.0)
+    alpha_score = max(0.0, min(100.0, 55.0 + alpha * 2.0))
+    health_score = round(max(0.0, min(100.0, 0.34 * diversification_score + 0.24 * (100.0 - risk_score) + 0.22 * cash_score + 0.10 * alpha_score + 0.10 * max(0.0, 100.0 - attention_penalty))))
+    health_label = _score_label(health_score, bands=(45, 70), labels=("Needs attention", "Healthy", "Strong"))
+    suggestions: List[str] = []
+    if attention:
+        suggestions.append(f"Review {len(attention)} holding(s) marked Need Attention or High Risk")
+    if cash.get("label") in {"cash_deficit", "low_cash"}:
+        suggestions.extend(cash.get("suggestions") or [])
+    largest = (analytics.get("diversification") or {}).get("largest_position_pct") or 0
+    if float(largest or 0) >= 22:
+        suggestions.append("Reduce single-stock concentration before adding more to the largest holding")
+    largest_sector = (analytics.get("risk") or {}).get("largest_sector_pct") or 0
+    if float(largest_sector or 0) >= 38:
+        suggestions.append("Avoid adding more to the largest sector until allocation is more balanced")
+    if not suggestions:
+        suggestions.append("Portfolio looks manageable. Keep monitoring cash, concentration, news and disclosures")
+    return {
+        "portfolio_id": portfolio_id,
+        "health": {"score": health_score, "label": health_label, "attention_count": len(attention), "watch_count": len(watch)},
+        "cash_management": cash,
+        "holdings": holdings,
+        "attention_items": attention[:10],
+        "suggestions": suggestions[:8],
+        "thresholds": {"single_stock_watch_pct": 15, "single_stock_attention_pct": 22, "single_stock_high_risk_pct": 30, "sector_attention_pct": 38, "sector_high_risk_pct": 50},
+    }
+
+
+def preview_trade_fit(username: str, payload: Dict[str, Any], portfolio_id: Optional[str] = None) -> Dict[str, Any]:
+    portfolio_id = _resolve_portfolio_id(username, portfolio_id or payload.get("portfolio_id"))
+    clean = _validate_portfolio_transaction_payload(payload)
+    portfolio = get_portfolio(username, portfolio_id)
+    summary = portfolio.get("summary") or {}
+    positions = portfolio.get("positions") or []
+    symbol = clean["symbol"].upper()
+    trade_value = float(clean["quantity"]) * float(clean["price"]) + float(clean.get("fees") or 0.0)
+    if clean["tx_type"] == "sell":
+        trade_value = -1.0 * (float(clean["quantity"]) * float(clean["price"]) - float(clean.get("fees") or 0.0))
+    current_market_value = float(summary.get("market_value") or 0.0)
+    total_equity = float(summary.get("total_equity") or 0.0)
+    cash_balance = float(summary.get("cash_balance") or 0.0)
+    snapshots = {item.get("symbol"): item for item in stock_snapshots([symbol])}
+    snap = snapshots.get(symbol) or {}
+    company = snap.get("name") or symbol
+    sector = snap.get("sector") or (_storage.get_company(symbol) or {}).get("sector") or "Unclassified"
+    existing = next((item for item in positions if str(item.get("symbol") or "").upper() == symbol), None)
+    existing_market = float((existing or {}).get("market_value") or 0.0)
+    existing_unreal = float((existing or {}).get("unrealized_pl_pct") or 0.0)
+    if clean["tx_type"] == "buy":
+        new_symbol_market = existing_market + trade_value
+        new_market_value = current_market_value + trade_value
+        cash_after = cash_balance - trade_value
+    else:
+        sell_value = abs(trade_value)
+        new_symbol_market = max(0.0, existing_market - sell_value)
+        new_market_value = max(0.0, current_market_value - sell_value)
+        cash_after = cash_balance + sell_value
+    new_total_equity = max(0.0, total_equity - float(clean.get("fees") or 0.0)) if total_equity > 0 else max(new_market_value + cash_after, 0.0)
+    denominator = new_total_equity if new_total_equity > 0 else max(new_market_value, 1.0)
+    new_stock_weight = _safe_pct(new_symbol_market, denominator)
+    old_sector_value = sum(float(item.get("market_value") or 0.0) for item in positions if str(item.get("sector") or "Unclassified") == sector)
+    if clean["tx_type"] == "buy":
+        new_sector_value = old_sector_value + trade_value
+    else:
+        new_sector_value = max(0.0, old_sector_value - abs(trade_value))
+    new_sector_weight = _safe_pct(new_sector_value, denominator)
+    scoring = _score_holding(symbol, str(company), str(sector), new_stock_weight, new_sector_weight, existing_unreal, cash_after_trade=cash_after, trade_context=True)
+    cash_eval = _cash_management({"cash_balance": cash_after, "total_equity": denominator}, risk_score=float(scoring.get("risk_score") or 50.0))
+    return {
+        "portfolio_id": portfolio_id,
+        "symbol": symbol,
+        "tx_type": clean["tx_type"],
+        "trade_value": round(abs(trade_value), 2),
+        "cash_before": round(cash_balance, 2),
+        "cash_after": round(cash_after, 2),
+        "current_stock_weight_pct": round(_safe_pct(existing_market, max(total_equity, 1.0)), 2),
+        "new_stock_weight_pct": round(new_stock_weight, 2),
+        "new_sector_weight_pct": round(new_sector_weight, 2),
+        "status": scoring.get("status"),
+        "status_label": scoring.get("status_label"),
+        "fit_score": scoring.get("fit_score"),
+        "risk_score": scoring.get("risk_score"),
+        "reasons": scoring.get("reasons") or [],
+        "suggestions": list(dict.fromkeys((scoring.get("suggestions") or []) + (cash_eval.get("suggestions") or [])))[:8],
+        "cash_management": cash_eval,
+    }
+
 def create_portfolio_transaction(username: str, payload: Dict[str, Any], portfolio_id: Optional[str] = None) -> Dict[str, Any]:
     portfolio_id = _resolve_portfolio_id(username, portfolio_id or payload.get("portfolio_id"))
     clean = _validate_portfolio_transaction_payload(payload)

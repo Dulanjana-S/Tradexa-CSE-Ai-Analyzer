@@ -28,6 +28,8 @@ import type {
   PortfolioSummary,
   PortfolioTransaction,
   PortfolioAnalytics,
+  PortfolioIntelligence,
+  TradeFitPreview,
   SentimentSummary,
 } from "./types";
 
@@ -237,6 +239,80 @@ function mapPortfolioPerformancePoint(raw: any): PortfolioPerformancePoint {
     dividendIncome: raw?.dividend_income !== undefined ? num(raw?.dividend_income) : undefined,
     totalPl: num(raw?.total_pl ?? raw?.totalPl),
     totalReturn: raw?.total_return !== undefined ? num(raw?.total_return) : undefined,
+  };
+}
+
+function mapHoldingAttention(item: any) {
+  return {
+    symbol: String(item?.symbol || ""),
+    company: String(item?.company || item?.symbol || ""),
+    sector: item?.sector || undefined,
+    status: String(item?.status || "watch") as any,
+    statusLabel: String(item?.status_label || item?.statusLabel || "Watch"),
+    severity: String(item?.severity || "medium"),
+    fitScore: num(item?.fit_score ?? item?.fitScore),
+    riskScore: num(item?.risk_score ?? item?.riskScore),
+    weightPct: num(item?.weight_pct ?? item?.weightPct),
+    sectorWeightPct: num(item?.sector_weight_pct ?? item?.sectorWeightPct),
+    volatilityPct: num(item?.volatility_pct ?? item?.volatilityPct),
+    drawdownPct: num(item?.drawdown_pct ?? item?.drawdownPct),
+    sentimentScore30d: num(item?.sentiment_score_30d ?? item?.sentimentScore30d),
+    negativeSentimentCount: num(item?.negative_sentiment_count ?? item?.negativeSentimentCount),
+    reasons: Array.isArray(item?.reasons) ? item.reasons.map(String) : [],
+    suggestions: Array.isArray(item?.suggestions) ? item.suggestions.map(String) : [],
+  };
+}
+
+function mapCashManagement(raw: any) {
+  return {
+    label: String(raw?.label || "healthy_cash"),
+    score: num(raw?.score),
+    cashBalance: num(raw?.cash_balance ?? raw?.cashBalance),
+    cashPct: num(raw?.cash_pct ?? raw?.cashPct),
+    targetMinPct: num(raw?.target_min_pct ?? raw?.targetMinPct),
+    targetMaxPct: num(raw?.target_max_pct ?? raw?.targetMaxPct),
+    recommendedMinCash: num(raw?.recommended_min_cash ?? raw?.recommendedMinCash),
+    recommendedMaxCash: num(raw?.recommended_max_cash ?? raw?.recommendedMaxCash),
+    reasons: Array.isArray(raw?.reasons) ? raw.reasons.map(String) : [],
+    suggestions: Array.isArray(raw?.suggestions) ? raw.suggestions.map(String) : [],
+  };
+}
+
+function mapPortfolioIntelligence(raw: any): PortfolioIntelligence {
+  return {
+    portfolioId: String(raw?.portfolio_id || raw?.portfolioId || ""),
+    health: {
+      score: num(raw?.health?.score),
+      label: String(raw?.health?.label || "Healthy"),
+      attentionCount: num(raw?.health?.attention_count ?? raw?.health?.attentionCount),
+      watchCount: num(raw?.health?.watch_count ?? raw?.health?.watchCount),
+    },
+    cashManagement: mapCashManagement(raw?.cash_management || raw?.cashManagement || {}),
+    holdings: Array.isArray(raw?.holdings) ? raw.holdings.map(mapHoldingAttention) : [],
+    attentionItems: Array.isArray(raw?.attention_items) ? raw.attention_items.map(mapHoldingAttention) : [],
+    suggestions: Array.isArray(raw?.suggestions) ? raw.suggestions.map(String) : [],
+    thresholds: raw?.thresholds || {},
+  };
+}
+
+function mapTradeFitPreview(raw: any): TradeFitPreview {
+  return {
+    portfolioId: String(raw?.portfolio_id || raw?.portfolioId || ""),
+    symbol: String(raw?.symbol || ""),
+    txType: String(raw?.tx_type || raw?.txType || "buy") as any,
+    tradeValue: num(raw?.trade_value ?? raw?.tradeValue),
+    cashBefore: num(raw?.cash_before ?? raw?.cashBefore),
+    cashAfter: num(raw?.cash_after ?? raw?.cashAfter),
+    currentStockWeightPct: num(raw?.current_stock_weight_pct ?? raw?.currentStockWeightPct),
+    newStockWeightPct: num(raw?.new_stock_weight_pct ?? raw?.newStockWeightPct),
+    newSectorWeightPct: num(raw?.new_sector_weight_pct ?? raw?.newSectorWeightPct),
+    status: String(raw?.status || "watch") as any,
+    statusLabel: String(raw?.status_label || raw?.statusLabel || "Watch"),
+    fitScore: num(raw?.fit_score ?? raw?.fitScore),
+    riskScore: num(raw?.risk_score ?? raw?.riskScore),
+    reasons: Array.isArray(raw?.reasons) ? raw.reasons.map(String) : [],
+    suggestions: Array.isArray(raw?.suggestions) ? raw.suggestions.map(String) : [],
+    cashManagement: mapCashManagement(raw?.cash_management || raw?.cashManagement || {}),
   };
 }
 
@@ -818,6 +894,20 @@ export const portfolioApi = {
 
   getAnalytics: async (days = 365, portfolioId?: string): Promise<PortfolioAnalytics> =>
     mapPortfolioAnalytics(await api.get<any>(`/api/portfolio/analytics?days=${encodeURIComponent(String(days))}${portfolioId ? `&portfolio_id=${encodeURIComponent(portfolioId)}` : ""}`)),
+
+  getIntelligence: async (portfolioId?: string): Promise<PortfolioIntelligence> =>
+    mapPortfolioIntelligence(await api.get<any>(`/api/portfolio/intelligence${portfolioId ? `?portfolio_id=${encodeURIComponent(portfolioId)}` : ""}`)),
+
+  previewTradeFit: async (payload: { symbol: string; txType: "buy" | "sell"; quantity: number; price: number; fees?: number; tradedAt?: string; notes?: string }, portfolioId?: string): Promise<TradeFitPreview> =>
+    mapTradeFitPreview(await api.post<any>(`/api/portfolio/trade-preview${portfolioId ? `?portfolio_id=${encodeURIComponent(portfolioId)}` : ""}`, {
+      symbol: payload.symbol,
+      tx_type: payload.txType,
+      quantity: payload.quantity,
+      price: payload.price,
+      fees: payload.fees,
+      traded_at: payload.tradedAt,
+      notes: payload.notes,
+    })),
 
   addCashMovement: async (payload: { movementType: "deposit" | "withdrawal"; amount: number; movementDate?: string; notes?: string }, portfolioId?: string): Promise<PortfolioData> =>
     mapPortfolioData(await api.post<any>(`/api/portfolio/cash${portfolioId ? `?portfolio_id=${encodeURIComponent(portfolioId)}` : ""}`, {

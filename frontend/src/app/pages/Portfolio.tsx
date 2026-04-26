@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { marketApi, portfolioApi, watchlistApi } from "../../lib/api/services";
-import type { PortfolioAccount, PortfolioAnalytics, PortfolioData, PortfolioPerformancePoint, PortfolioPeriodPerformance, PortfolioTransaction, Stock, Watchlist } from "../../lib/api/types";
+import type { PortfolioAccount, PortfolioAnalytics, PortfolioData, PortfolioIntelligence, TradeFitPreview, PortfolioPerformancePoint, PortfolioPeriodPerformance, PortfolioTransaction, Stock, Watchlist } from "../../lib/api/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -11,7 +11,7 @@ import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Textarea } from "../components/ui/textarea";
-import { BarChart3, BriefcaseBusiness, FileUp, Landmark, Loader2, Pencil, PieChart, Plus, ShieldAlert, ShoppingBag, Trash2, TrendingDown, TrendingUp, Wallet } from "lucide-react";
+import { BarChart3, BriefcaseBusiness, FileUp, Landmark, Loader2, Pencil, PieChart, Plus, ShieldAlert, ShoppingBag, Trash2, TrendingDown, TrendingUp, Wallet, ShieldCheck, Lightbulb } from "lucide-react";
 
 const emptyPortfolio: PortfolioData = {
   summary: {
@@ -48,6 +48,25 @@ const emptyAnalytics: PortfolioAnalytics = {
   benchmark: { periodDays: 365, portfolioReturnPct: 0, aspiReturnPct: 0, sp20ReturnPct: 0, alphaVsAspiPct: 0, alphaVsSp20Pct: 0, series: [] },
 };
 
+const emptyIntelligence: PortfolioIntelligence = {
+  portfolioId: "",
+  health: { score: 0, label: "Needs attention", attentionCount: 0, watchCount: 0 },
+  cashManagement: { label: "healthy_cash", score: 0, cashBalance: 0, cashPct: 0, targetMinPct: 5, targetMaxPct: 20, recommendedMinCash: 0, recommendedMaxCash: 0, reasons: [], suggestions: [] },
+  holdings: [],
+  attentionItems: [],
+  suggestions: [],
+};
+
+function statusBadgeClass(status?: string) {
+  switch (status) {
+    case "suitable": return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300";
+    case "watch": return "border-blue-500/30 bg-blue-500/10 text-blue-300";
+    case "need_attention": return "border-amber-500/30 bg-amber-500/10 text-amber-300";
+    case "high_risk": return "border-red-500/30 bg-red-500/10 text-red-300";
+    default: return "border-[#30363d] bg-[#0d1117] text-[#768390]";
+  }
+}
+
 const defaultForm = () => ({
   symbol: "",
   txType: "buy" as "buy" | "sell",
@@ -79,6 +98,9 @@ export function Portfolio() {
   const [performance, setPerformance] = useState<PortfolioPerformancePoint[]>([]);
   const [periodPerformance, setPeriodPerformance] = useState<PortfolioPeriodPerformance[]>([]);
   const [analytics, setAnalytics] = useState<PortfolioAnalytics>(emptyAnalytics);
+  const [intelligence, setIntelligence] = useState<PortfolioIntelligence>(emptyIntelligence);
+  const [tradePreview, setTradePreview] = useState<TradeFitPreview | null>(null);
+  const [tradePreviewLoading, setTradePreviewLoading] = useState(false);
   const [portfolios, setPortfolios] = useState<PortfolioAccount[]>([]);
   const [selectedPortfolioId, setSelectedPortfolioId] = useState<string>("");
   const [newPortfolioName, setNewPortfolioName] = useState("");
@@ -132,16 +154,21 @@ export function Portfolio() {
     }
   };
 
+  const loadIntelligence = async (portfolioId = selectedPortfolioId) => {
+    const payload = await portfolioApi.getIntelligence(portfolioId || undefined);
+    setIntelligence(payload);
+  };
+
   useEffect(() => {
     (async () => {
       const activeId = await loadPortfolio();
-      await Promise.all([loadPerformance(chartDays, activeId), loadAnalytics(chartDays, activeId)]);
+      await Promise.all([loadPerformance(chartDays, activeId), loadAnalytics(chartDays, activeId), loadIntelligence(activeId)]);
     })().finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
     if (!selectedPortfolioId) return;
-    Promise.all([loadPortfolio(selectedPortfolioId), loadPerformance(chartDays, selectedPortfolioId).catch(() => setPerformance([])), loadAnalytics(chartDays, selectedPortfolioId).catch(() => setAnalytics(emptyAnalytics))]);
+    Promise.all([loadPortfolio(selectedPortfolioId), loadPerformance(chartDays, selectedPortfolioId).catch(() => setPerformance([])), loadAnalytics(chartDays, selectedPortfolioId).catch(() => setAnalytics(emptyAnalytics)), loadIntelligence(selectedPortfolioId).catch(() => setIntelligence(emptyIntelligence))]);
   }, [selectedPortfolioId, chartDays]);
 
   useEffect(() => {
@@ -178,6 +205,34 @@ export function Portfolio() {
     };
   }, [dialogOpen, form.symbol]);
 
+  useEffect(() => {
+    const symbol = form.symbol.trim().toUpperCase();
+    const quantity = Number(form.quantity || 0);
+    const price = Number(form.price || 0);
+    if (!dialogOpen || editingId || !symbol || quantity <= 0 || price <= 0) {
+      setTradePreview(null);
+      setTradePreviewLoading(false);
+      return;
+    }
+    let alive = true;
+    setTradePreviewLoading(true);
+    const timer = window.setTimeout(() => {
+      portfolioApi.previewTradeFit({
+        symbol,
+        txType: form.txType,
+        quantity,
+        price,
+        fees: Number(form.fees || 0),
+        tradedAt: form.tradedAt,
+        notes: form.notes || undefined,
+      }, selectedPortfolioId || undefined)
+        .then((payload) => { if (alive) setTradePreview(payload); })
+        .catch(() => { if (alive) setTradePreview(null); })
+        .finally(() => { if (alive) setTradePreviewLoading(false); });
+    }, 350);
+    return () => { alive = false; window.clearTimeout(timer); };
+  }, [dialogOpen, editingId, form.symbol, form.txType, form.quantity, form.price, form.fees, form.tradedAt, form.notes, selectedPortfolioId]);
+
   const watchlistCandidates = useMemo(
     () => watchlist.items.filter((item) => !portfolio.positions.some((position) => position.symbol === item.symbol)).slice(0, 8),
     [watchlist.items, portfolio.positions]
@@ -200,6 +255,7 @@ export function Portfolio() {
     setForm(defaultForm());
     setSymbolSuggestions([]);
     setSymbolSearchOpen(false);
+    setTradePreview(null);
   };
 
   const openAddDialog = (symbol?: string) => {
@@ -243,7 +299,7 @@ export function Portfolio() {
       };
       const updated = editingId ? await portfolioApi.updateTransaction(editingId, payload, selectedPortfolioId || undefined) : await portfolioApi.addTransaction(payload, selectedPortfolioId || undefined);
       setPortfolio(updated);
-      await Promise.all([loadPerformance(chartDays, selectedPortfolioId), loadAnalytics(chartDays, selectedPortfolioId), watchlistApi.get().then(setWatchlist), loadPortfolio(selectedPortfolioId)]);
+      await Promise.all([loadPerformance(chartDays, selectedPortfolioId), loadAnalytics(chartDays, selectedPortfolioId), watchlistApi.get().then(setWatchlist), loadPortfolio(selectedPortfolioId), loadIntelligence(selectedPortfolioId)]);
       resetDialog();
     } catch (err: any) {
       setError(err?.message || "Could not save portfolio transaction");
@@ -255,7 +311,7 @@ export function Portfolio() {
   const deleteTransaction = async (transactionId: string) => {
     const updated = await portfolioApi.deleteTransaction(transactionId, selectedPortfolioId || undefined);
     setPortfolio(updated);
-    await Promise.all([loadPerformance(chartDays, selectedPortfolioId), loadAnalytics(chartDays, selectedPortfolioId), loadPortfolio(selectedPortfolioId)]);
+    await Promise.all([loadPerformance(chartDays, selectedPortfolioId), loadAnalytics(chartDays, selectedPortfolioId), loadPortfolio(selectedPortfolioId), loadIntelligence(selectedPortfolioId)]);
   };
 
   const previewCsvImport = async (file: File) => {
@@ -299,7 +355,7 @@ export function Portfolio() {
     const updated = await portfolioApi.addCashMovement({ movementType: cashForm.movementType, amount, movementDate: cashForm.movementDate, notes: cashForm.notes || undefined }, selectedPortfolioId || undefined);
     setPortfolio(updated);
     setCashForm({ movementType: "deposit", amount: "", movementDate: new Date().toISOString().slice(0, 10), notes: "" });
-    await Promise.all([loadPerformance(chartDays, selectedPortfolioId), loadAnalytics(chartDays, selectedPortfolioId), loadPortfolio(selectedPortfolioId)]);
+    await Promise.all([loadPerformance(chartDays, selectedPortfolioId), loadAnalytics(chartDays, selectedPortfolioId), loadPortfolio(selectedPortfolioId), loadIntelligence(selectedPortfolioId)]);
   };
 
   const importCsvTransactions = async () => {
@@ -309,7 +365,7 @@ export function Portfolio() {
     try {
       const updated = await portfolioApi.importTransactions(csvFile, selectedPortfolioId || undefined);
       setPortfolio(updated);
-      await Promise.all([loadPerformance(chartDays, selectedPortfolioId), loadAnalytics(chartDays, selectedPortfolioId), loadPortfolio(selectedPortfolioId)]);
+      await Promise.all([loadPerformance(chartDays, selectedPortfolioId), loadAnalytics(chartDays, selectedPortfolioId), loadPortfolio(selectedPortfolioId), loadIntelligence(selectedPortfolioId)]);
       setCsvFile(null);
       setCsvPreview(null);
     } catch (err: any) {
@@ -423,6 +479,27 @@ export function Portfolio() {
                   <Label htmlFor="notes">Notes</Label>
                   <Textarea id="notes" value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} placeholder="Optional note" className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
                 </div>
+                {tradePreviewLoading && <div className="sm:col-span-2 rounded-lg border border-[#30363d] bg-[#0d1117] p-4 text-[13px] text-[#768390]"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Checking portfolio fit...</div>}
+                {tradePreview && (
+                  <div className="sm:col-span-2 rounded-lg border border-[#30363d] bg-[#0d1117] p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-[13px] font-semibold text-[#e6edf3]">Smart trade check</div>
+                        <div className="text-[12px] text-[#768390]">Projected after this {tradePreview.txType}</div>
+                      </div>
+                      <Badge variant="outline" className={statusBadgeClass(tradePreview.status)}>{tradePreview.statusLabel}</Badge>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-md border border-[#30363d] p-3"><div className="text-[11px] text-[#768390]">Fit score</div><div className="text-[18px] font-bold text-[#e6edf3]">{tradePreview.fitScore}/100</div></div>
+                      <div className="rounded-md border border-[#30363d] p-3"><div className="text-[11px] text-[#768390]">New stock weight</div><div className="text-[18px] font-bold text-[#e6edf3]">{tradePreview.newStockWeightPct.toFixed(1)}%</div></div>
+                      <div className="rounded-md border border-[#30363d] p-3"><div className="text-[11px] text-[#768390]">Cash after</div><div className={tradePreview.cashAfter < 0 ? "text-[18px] font-bold text-red-400" : "text-[18px] font-bold text-[#e6edf3]"}>{money(tradePreview.cashAfter)}</div></div>
+                    </div>
+                    <div className="mt-3 space-y-1">
+                      {tradePreview.reasons.slice(0, 3).map((item) => <div key={item} className="text-[12px] text-[#9da7b3]">• {item}</div>)}
+                    </div>
+                    {tradePreview.suggestions.length ? <div className="mt-3 rounded-md bg-amber-500/10 p-3 text-[12px] text-amber-200">{tradePreview.suggestions[0]}</div> : null}
+                  </div>
+                )}
                 {error && <p className="sm:col-span-2 text-sm text-red-400">{error}</p>}
               </div>
               <DialogFooter>
@@ -466,6 +543,12 @@ export function Portfolio() {
             </CardContent>
           </Card>
           <Card className="border-[#30363d] bg-[#161b22]"><CardHeader><CardTitle className="text-[18px] text-[#e6edf3]">Performance by period</CardTitle><CardDescription className="text-[13px] text-[#768390]">Portfolio returns vs ASPI and S&P SL20.</CardDescription></CardHeader><CardContent className="space-y-3">{periodPerformance.length ? periodPerformance.map((row) => <div key={row.label} className="rounded-lg border border-[#30363d] bg-[#0d1117] p-3"><div className="flex items-center justify-between"><span className="font-medium text-[#e6edf3]">{row.label}</span><span className={row.portfolioReturnPct >= 0 ? "text-emerald-400" : "text-red-400"}>{signedPercent(row.portfolioReturnPct)}</span></div><div className="mt-1 flex justify-between text-[12px] text-[#768390]"><span>ASPI {signedPercent(row.aspiReturnPct)}</span><span>Alpha {signedPercent(row.alphaVsAspiPct)}</span></div><div className="mt-1 flex justify-between text-[12px] text-[#768390]"><span>S&P SL20 {signedPercent(row.sp20ReturnPct)}</span><span>Alpha {signedPercent(row.alphaVsSp20Pct)}</span></div></div>) : <p className="text-[13px] text-[#768390]">Add positions to calculate period performance.</p>}</CardContent></Card>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-emerald-500/10"><ShieldCheck className="h-5 w-5 text-emerald-400" /></div><div><p className="text-[13px] text-[#768390]">Portfolio health</p><p className="text-[24px] font-bold text-[#e6edf3]">{intelligence.health.score}/100</p><p className="text-[12px] text-[#768390]">{intelligence.health.label} · {intelligence.health.attentionCount} need attention</p></div></div></CardContent></Card>
+          <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-amber-500/10"><Wallet className="h-5 w-5 text-amber-400" /></div><div><p className="text-[13px] text-[#768390]">Cash management</p><p className="text-[24px] font-bold text-[#e6edf3]">{intelligence.cashManagement.cashPct.toFixed(1)}%</p><p className="text-[12px] text-[#768390]">Target {intelligence.cashManagement.targetMinPct.toFixed(0)}–{intelligence.cashManagement.targetMaxPct.toFixed(0)}%</p></div></div></CardContent></Card>
+          <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-violet-500/10"><Lightbulb className="h-5 w-5 text-violet-400" /></div><div><p className="text-[13px] text-[#768390]">Smart suggestion</p><p className="text-[14px] font-semibold text-[#e6edf3]">{intelligence.suggestions[0] || "Keep monitoring cash, concentration and market events"}</p></div></div></CardContent></Card>
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -712,6 +795,7 @@ export function Portfolio() {
                   <TableHead className="text-[#768390]">Market Value</TableHead>
                   <TableHead className="text-[#768390]">Unrealized P/L</TableHead>
                   <TableHead className="text-[#768390]">Weight</TableHead>
+                  <TableHead className="text-[#768390]">Smart Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -727,9 +811,10 @@ export function Portfolio() {
                     <TableCell className="text-[#e6edf3]">{money(position.marketValue)}</TableCell>
                     <TableCell className={position.unrealizedPl >= 0 ? "text-emerald-400" : "text-red-400"}>{money(position.unrealizedPl)} <span className="ml-1 text-[12px]">({signedPercent(position.unrealizedPlPct)})</span></TableCell>
                     <TableCell className="text-[#e6edf3]">{position.weightPct.toFixed(2)}%</TableCell>
+                    <TableCell>{(() => { const item = intelligence.holdings.find((h) => h.symbol === position.symbol); return item ? <div className="space-y-1"><Badge variant="outline" className={statusBadgeClass(item.status)}>{item.statusLabel}</Badge><div className="text-[11px] text-[#768390]">Fit {item.fitScore}/100 · Risk {item.riskScore}/100</div></div> : <span className="text-[#768390]">—</span>; })()}</TableCell>
                   </TableRow>
                 ))}
-                {!loading && portfolio.positions.length === 0 && <TableRow><TableCell colSpan={7} className="py-8 text-center text-[#768390]">No holdings yet. Add your first buy transaction to start tracking your portfolio.</TableCell></TableRow>}
+                {!loading && portfolio.positions.length === 0 && <TableRow><TableCell colSpan={8} className="py-8 text-center text-[#768390]">No holdings yet. Add your first buy transaction to start tracking your portfolio.</TableCell></TableRow>}
               </TableBody>
             </Table>
           </CardContent>

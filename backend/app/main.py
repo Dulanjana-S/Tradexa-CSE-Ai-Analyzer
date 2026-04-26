@@ -759,6 +759,18 @@ def api_portfolio_analytics(request: Request, portfolio_id: Optional[str] = Quer
     return data_service.get_portfolio_analytics(user['username'], days=days, portfolio_id=portfolio_id)
 
 
+@app.get("/api/portfolio/intelligence")
+def api_portfolio_intelligence(request: Request, portfolio_id: Optional[str] = Query(None)):
+    user = require_user(request)
+    return data_service.get_portfolio_intelligence(user['username'], portfolio_id=portfolio_id)
+
+
+@app.post("/api/portfolio/trade-preview")
+def api_portfolio_trade_preview(request: Request, payload: Dict[str, Any] = Body(...), portfolio_id: Optional[str] = Query(None)):
+    user = require_user(request)
+    return data_service.preview_trade_fit(user['username'], payload, portfolio_id=portfolio_id)
+
+
 @app.post("/api/portfolio/cash")
 def api_portfolio_create_cash(request: Request, payload: Dict[str, Any] = Body(...), portfolio_id: Optional[str] = Query(None)):
     user = require_user(request)
