@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { API_BASE_URL, api, APIError } from "./client";
 import { normalizeRole } from "../auth/roles";
 import type {
   AdminStatus,
@@ -1112,6 +1112,17 @@ export const settingsApi = {
   getUserSettings: async (): Promise<UserSettings> => api.get<UserSettings>("/api/settings"),
   saveUserSettings: async (settings: Record<string, any>): Promise<UserSettings> =>
     api.post<UserSettings>("/api/settings", { settings }),
+  exportAccountData: async (): Promise<Blob> => {
+    const response = await fetch(`${API_BASE_URL}/api/account/export`, {
+      method: "GET",
+      credentials: "include",
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => "Request failed");
+      throw new APIError(text || "Request failed", response.status);
+    }
+    return await response.blob();
+  },
 };
 
 

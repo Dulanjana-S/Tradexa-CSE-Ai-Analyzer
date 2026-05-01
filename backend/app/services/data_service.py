@@ -2750,6 +2750,47 @@ def mark_all_notifications_read(username: str) -> Dict[str, Any]:
     return {"ok": True, "notifications": list_notifications(username)}
 
 
+def export_user_account_data(username: str) -> Dict[str, Any]:
+    user = _storage.get_user(username) or {"username": username}
+    watchlist_symbols = _storage.list_watchlist(profile=username)
+    portfolios = list_portfolios(username)
+    portfolio_ids = [str(pf.get("portfolio_id") or "") for pf in portfolios if pf.get("portfolio_id")]
+    portfolio_payload = []
+    for pf in portfolios:
+        pid = str(pf.get("portfolio_id") or "")
+        portfolio_payload.append({
+            "portfolio": pf,
+            "details": get_portfolio(username, pid),
+            "transactions": _storage.list_portfolio_transactions(username, pid),
+            "cash_movements": _storage.list_cash_movements(username, pid),
+        })
+    alerts = list_alerts(username)
+    notifications = _storage.list_notifications(username, unread_only=False)
+    notification_preview = notifications[:200]
+    return {
+        "exported_at": datetime.utcnow().isoformat() + "Z",
+        "user": {
+            "username": user.get("username"),
+            "role": user.get("role"),
+            "display_name": user.get("display_name"),
+            "email": user.get("email"),
+            "created_at": user.get("created_at"),
+            "last_login_at": user.get("last_login_at"),
+        },
+        "settings": get_user_settings(username).get("settings") or {},
+        "watchlist": {
+            "symbols": watchlist_symbols,
+            "items": watchlist(username).get("items") if username else [],
+        },
+        "portfolios": portfolio_payload,
+        "alerts": alerts,
+        "notifications": {
+            "count": len(notifications),
+            "preview": notification_preview,
+        },
+    }
+
+
 def get_user_settings(username: str) -> Dict[str, Any]:
     prefs = _storage.get_preferences(profile=username)
     defaults = dict(NOTIFICATION_DEFAULTS)

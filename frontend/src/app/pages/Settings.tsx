@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { User, Bell, Shield, Palette, Database, CreditCard, Loader2, Mail, Radio, CheckCircle2, AlertTriangle } from "lucide-react";
+import { User, Bell, Shield, Palette, Database, CreditCard, Loader2, Mail, CheckCircle2, AlertTriangle } from "lucide-react";
 import { authApi, settingsApi, systemApi } from "../../lib/api/services";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
@@ -168,7 +168,6 @@ export function Settings() {
     return {
       inAppCount: ["alert_notifications", "announcement_notifications", "market_status_notifications", "watchlist_notifications"].filter((key) => Boolean(settings[key])).length,
       emailCount: ["email_alert_notifications", "email_announcement_notifications", "email_market_status_notifications", "email_watchlist_notifications"].filter((key) => Boolean(settings[key])).length,
-      pushCount: ["push_alert_notifications", "push_announcement_notifications", "push_market_status_notifications", "push_watchlist_notifications"].filter((key) => Boolean(settings[key])).length,
     };
   }, [settings]);
 
@@ -237,76 +236,69 @@ export function Settings() {
           </TabsContent>
 
           <TabsContent value="notifications" className="space-y-6">
-            <div className="grid gap-4 lg:grid-cols-3">
-              <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-5"><div className="text-[12px] text-[#768390]">In-app categories enabled</div><div className="mt-2 text-[26px] font-bold text-[#e6edf3]">{deliverySummary.inAppCount}/4</div></CardContent></Card>
-              <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-5"><div className="text-[12px] text-[#768390]">Email categories enabled</div><div className="mt-2 text-[26px] font-bold text-[#e6edf3]">{settings.email_notifications ? `${deliverySummary.emailCount}/4` : "Off"}</div></CardContent></Card>
-              <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-5"><div className="text-[12px] text-[#768390]">Push categories enabled</div><div className="mt-2 text-[26px] font-bold text-[#e6edf3]">{settings.push_notifications ? `${deliverySummary.pushCount}/4` : "Off"}</div></CardContent></Card>
-            </div>
-
-            {!userAlertsEnabled && (
-              <Card className="border-amber-500/30 bg-amber-500/10">
-                <CardContent className="flex items-start gap-3 p-4 text-amber-100">
-                  <AlertTriangle className="mt-0.5 h-5 w-5" />
-                  <div>
-                    <div className="font-semibold">User-created alerts are currently disabled by the administrator</div>
-                    <p className="mt-1 text-[13px] text-amber-200/80">You can still manage your notification preferences, but new personal price alerts will stay unavailable until the system setting is re-enabled.</p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
             <Card className="border-[#30363d] bg-[#161b22]">
               <CardHeader>
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-md bg-blue-500/10"><Bell className="h-5 w-5 text-blue-500" /></div>
                   <div>
                     <CardTitle className="text-[18px] text-[#e6edf3]">Notification Preferences</CardTitle>
-                    <CardDescription className="text-[13px] text-[#768390]">Choose what you receive in-app, by email, and through webhook-based push delivery.</CardDescription>
+                    <CardDescription className="text-[13px] text-[#768390]">Control your in-app notifications and optional email delivery. Advanced webhook delivery has been removed from the user settings page to keep this experience simple and clear.</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <ToggleRow title="Price Alerts" description="Personal alert triggers for symbols you track." checked={Boolean(settings.alert_notifications)} disabled={!userAlertsEnabled} onChange={(checked) => setSettings((prev) => ({ ...prev, alert_notifications: checked }))} />
-                  <ToggleRow title="Market Announcements" description="Important CSE announcements and report-related updates." checked={Boolean(settings.announcement_notifications)} onChange={(checked) => setSettings((prev) => ({ ...prev, announcement_notifications: checked }))} />
-                  <ToggleRow title="Market Status" description="Sync, job, and market system status messages." checked={Boolean(settings.market_status_notifications)} onChange={(checked) => setSettings((prev) => ({ ...prev, market_status_notifications: checked }))} />
-                  <ToggleRow title="Watchlist Updates" description="Changes that matter for stocks you are following." checked={Boolean(settings.watchlist_notifications)} onChange={(checked) => setSettings((prev) => ({ ...prev, watchlist_notifications: checked }))} />
+                {!userAlertsEnabled ? (
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-[12px] text-amber-100">
+                    <div className="mb-1 flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4" /> Personal alerts are currently disabled by the system administrator.</div>
+                    <div>You can still review existing alerts and notifications, but new personal alert triggers are temporarily unavailable.</div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-[#30363d] bg-[#0d1117] p-4 text-[12px] text-[#9da7b3]">Personal alerts are enabled. Use the Alerts page to create price, move, volume, or announcement alerts for your own portfolio and watchlist.</div>
+                )}
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <Card className="border-[#30363d] bg-[#0d1117]"><CardContent className="p-4"><div className="text-[12px] text-[#768390]">In-app categories on</div><div className="mt-2 text-[24px] font-bold text-[#e6edf3]">{deliverySummary.inAppCount}/4</div></CardContent></Card>
+                  <Card className="border-[#30363d] bg-[#0d1117]"><CardContent className="p-4"><div className="text-[12px] text-[#768390]">Email delivery</div><div className="mt-2 text-[24px] font-bold text-[#e6edf3]">{settings.email_notifications ? "On" : "Off"}</div></CardContent></Card>
+                  <Card className="border-[#30363d] bg-[#0d1117]"><CardContent className="p-4"><div className="text-[12px] text-[#768390]">Email categories on</div><div className="mt-2 text-[24px] font-bold text-[#e6edf3]">{deliverySummary.emailCount}/4</div></CardContent></Card>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="text-[13px] font-semibold text-[#e6edf3]">In-app notifications</div>
+                  <ToggleRow title="Price alerts" description="Get notified when a personal stock alert condition triggers." checked={Boolean(settings.alert_notifications)} disabled={!userAlertsEnabled} onChange={(checked) => setSettings((prev) => ({ ...prev, alert_notifications: checked }))} />
+                  <ToggleRow title="Market announcements" description="Receive important CSE announcement and report-related updates." checked={Boolean(settings.announcement_notifications)} onChange={(checked) => setSettings((prev) => ({ ...prev, announcement_notifications: checked }))} />
+                  <ToggleRow title="Market status" description="Receive job, sync, and market status messages from the backend." checked={Boolean(settings.market_status_notifications)} onChange={(checked) => setSettings((prev) => ({ ...prev, market_status_notifications: checked }))} />
+                  <ToggleRow title="Watchlist updates" description="Receive important changes for symbols you are tracking." checked={Boolean(settings.watchlist_notifications)} onChange={(checked) => setSettings((prev) => ({ ...prev, watchlist_notifications: checked }))} />
                 </div>
 
                 <Separator className="bg-[#30363d]" />
 
-                <div className="grid gap-6 lg:grid-cols-2">
+                <div className="grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
                   <div className="space-y-4 rounded-xl border border-[#30363d] bg-[#0d1117] p-5">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-emerald-400" /><div><div className="text-[13px] font-semibold text-[#e6edf3]">Email delivery</div><div className="text-[12px] text-[#768390]">Route selected categories to an email inbox.</div></div></div>
+                      <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-emerald-400" /><div className="text-[13px] font-semibold text-[#e6edf3]">Email delivery</div></div>
                       <Switch checked={Boolean(settings.email_notifications)} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, email_notifications: checked }))} />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-[#e6edf3]">Notification email</Label>
                       <Input type="email" value={settings.notification_email || ""} onChange={(e) => setSettings((prev) => ({ ...prev, notification_email: e.target.value }))} placeholder="Leave blank to use your account email" className="border-[#30363d] bg-[#08090c] text-[#e6edf3]" disabled={!settings.email_notifications} />
                     </div>
-                    <div className="space-y-3">
-                      <ToggleRow title="Alert emails" description="Send personal price-alert triggers by email." checked={Boolean(settings.email_alert_notifications)} disabled={!settings.email_notifications || !userAlertsEnabled} onChange={(checked) => setSettings((prev) => ({ ...prev, email_alert_notifications: checked }))} />
-                      <ToggleRow title="Announcement emails" description="Send important announcement/report events by email." checked={Boolean(settings.email_announcement_notifications)} disabled={!settings.email_notifications} onChange={(checked) => setSettings((prev) => ({ ...prev, email_announcement_notifications: checked }))} />
-                      <ToggleRow title="Market status emails" description="Send job, sync, and system status updates by email." checked={Boolean(settings.email_market_status_notifications)} disabled={!settings.email_notifications} onChange={(checked) => setSettings((prev) => ({ ...prev, email_market_status_notifications: checked }))} />
-                      <ToggleRow title="Watchlist emails" description="Send watchlist-specific updates by email." checked={Boolean(settings.email_watchlist_notifications)} disabled={!settings.email_notifications} onChange={(checked) => setSettings((prev) => ({ ...prev, email_watchlist_notifications: checked }))} />
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <ToggleRow title="Email price alerts" description="Send your personal alert triggers to email." checked={Boolean(settings.email_alert_notifications)} disabled={!settings.email_notifications || !userAlertsEnabled} onChange={(checked) => setSettings((prev) => ({ ...prev, email_alert_notifications: checked }))} />
+                      <ToggleRow title="Email announcements" description="Send important announcement/report events to email." checked={Boolean(settings.email_announcement_notifications)} disabled={!settings.email_notifications} onChange={(checked) => setSettings((prev) => ({ ...prev, email_announcement_notifications: checked }))} />
+                      <ToggleRow title="Email market status" description="Send job and market status updates to email." checked={Boolean(settings.email_market_status_notifications)} disabled={!settings.email_notifications} onChange={(checked) => setSettings((prev) => ({ ...prev, email_market_status_notifications: checked }))} />
+                      <ToggleRow title="Email watchlist updates" description="Send watchlist-related updates to email." checked={Boolean(settings.email_watchlist_notifications)} disabled={!settings.email_notifications} onChange={(checked) => setSettings((prev) => ({ ...prev, email_watchlist_notifications: checked }))} />
                     </div>
                   </div>
-
                   <div className="space-y-4 rounded-xl border border-[#30363d] bg-[#0d1117] p-5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2"><Radio className="h-4 w-4 text-violet-400" /><div><div className="text-[13px] font-semibold text-[#e6edf3]">Push / webhook delivery</div><div className="text-[12px] text-[#768390]">Send events to your configured webhook endpoint.</div></div></div>
-                      <Switch checked={Boolean(settings.push_notifications)} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, push_notifications: checked }))} />
+                    <div className="text-[13px] font-semibold text-[#e6edf3]">How this works</div>
+                    <div className="space-y-3 text-[12px] text-[#9da7b3]">
+                      <p>In-app notifications always appear inside the TradexaLK notification center when the matching category is enabled.</p>
+                      <p>Email is optional and only works if the backend email delivery is enabled by the administrator.</p>
+                      <p>Advanced webhook-style delivery was removed from the normal user settings page to keep this screen focused on investor-friendly controls.</p>
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-[#e6edf3]">Push webhook URL</Label>
-                      <Input value={settings.push_webhook_url || ""} onChange={(e) => setSettings((prev) => ({ ...prev, push_webhook_url: e.target.value }))} placeholder="https://your-endpoint.example/notify" className="border-[#30363d] bg-[#08090c] text-[#e6edf3]" disabled={!settings.push_notifications} />
-                    </div>
-                    <div className="space-y-3">
-                      <ToggleRow title="Alert push notifications" description="Send personal alert triggers to your webhook endpoint." checked={Boolean(settings.push_alert_notifications)} disabled={!settings.push_notifications || !userAlertsEnabled} onChange={(checked) => setSettings((prev) => ({ ...prev, push_alert_notifications: checked }))} />
-                      <ToggleRow title="Announcement push notifications" description="Send important announcement/report events to your webhook endpoint." checked={Boolean(settings.push_announcement_notifications)} disabled={!settings.push_notifications} onChange={(checked) => setSettings((prev) => ({ ...prev, push_announcement_notifications: checked }))} />
-                      <ToggleRow title="Market status push notifications" description="Send job and market status updates to your webhook endpoint." checked={Boolean(settings.push_market_status_notifications)} disabled={!settings.push_notifications} onChange={(checked) => setSettings((prev) => ({ ...prev, push_market_status_notifications: checked }))} />
-                      <ToggleRow title="Watchlist push notifications" description="Send watchlist-related updates to your webhook endpoint." checked={Boolean(settings.push_watchlist_notifications)} disabled={!settings.push_notifications} onChange={(checked) => setSettings((prev) => ({ ...prev, push_watchlist_notifications: checked }))} />
+                    <div className="rounded-lg border border-[#30363d] bg-[#08090c] p-4 text-[12px] text-[#9da7b3]">
+                      <div className="mb-2 font-semibold text-[#e6edf3]">Recommendation</div>
+                      Keep <span className="text-emerald-300">in-app notifications</span> enabled for all categories you care about, and turn on email only for alerts you truly want outside the app.
                     </div>
                   </div>
                 </div>
@@ -317,7 +309,6 @@ export function Settings() {
               </CardContent>
             </Card>
           </TabsContent>
-
           <TabsContent value="preferences" className="space-y-6">
             <Card className="border-[#30363d] bg-[#161b22]">
               <CardHeader>
@@ -403,18 +394,60 @@ export function Settings() {
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-md bg-cyan-500/10"><Database className="h-5 w-5 text-cyan-500" /></div>
                   <div>
-                    <CardTitle className="text-[18px] text-[#e6edf3]">Data & Sync</CardTitle>
-                    <CardDescription className="text-[13px] text-[#768390]">Overview of the data services connected to your account.</CardDescription>
+                    <CardTitle className="text-[18px] text-[#e6edf3]">Account Data</CardTitle>
+                    <CardDescription className="text-[13px] text-[#768390]">Review what is stored for your account and export a copy of your own data.</CardDescription>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4 text-[13px] text-[#9da7b3]">
-                <div className="rounded-xl border border-[#30363d] bg-[#0d1117] p-4">Market data, portfolio analytics, and notification preferences are saved to your account profile automatically when you press save.</div>
-                <div className="rounded-xl border border-[#30363d] bg-[#0d1117] p-4">Your personal settings do not change global admin/system settings. Delivery channels like email or webhook push only work if the backend is configured for them.</div>
+              <CardContent className="space-y-6">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <Card className="border-[#30363d] bg-[#0d1117]"><CardContent className="p-4"><div className="text-[12px] text-[#768390]">Saved settings</div><div className="mt-2 text-[24px] font-bold text-[#e6edf3]">{Object.keys(settings || {}).length}</div></CardContent></Card>
+                  <Card className="border-[#30363d] bg-[#0d1117]"><CardContent className="p-4"><div className="text-[12px] text-[#768390]">Primary email</div><div className="mt-2 text-[15px] font-semibold text-[#e6edf3] truncate">{profile.email || "Not set"}</div></CardContent></Card>
+                  <Card className="border-[#30363d] bg-[#0d1117]"><CardContent className="p-4"><div className="text-[12px] text-[#768390]">Theme</div><div className="mt-2 text-[24px] font-bold capitalize text-[#e6edf3]">{theme}</div></CardContent></Card>
+                </div>
+
+                <div className="rounded-xl border border-[#30363d] bg-[#0d1117] p-5">
+                  <div className="mb-3 text-[14px] font-semibold text-[#e6edf3]">Export my account data</div>
+                  <div className="space-y-3 text-[12px] text-[#9da7b3]">
+                    <p>This export gives you a JSON snapshot of your account data stored in the application.</p>
+                    <p>It includes your profile basics, saved settings, watchlist, portfolios, transactions, cash movements, alerts, and a preview of notifications.</p>
+                  </div>
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <Button className="bg-emerald-600 text-white hover:bg-emerald-700" disabled={saving} onClick={async () => {
+                      try {
+                        setSaving(true);
+                        setMessage(null);
+                        const blob = await settingsApi.exportAccountData();
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `tradexalk-account-export-${(user?.username || 'user')}.json`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        URL.revokeObjectURL(url);
+                        setMessage('Account data export downloaded successfully.');
+                      } catch (error: any) {
+                        setMessage(error?.message || 'Failed to export account data.');
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}>{saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />} Download Account Data</Button>
+                    <Badge className="border-[#3a4450] bg-[#111927] text-[#9da7b3]">JSON export</Badge>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-[#30363d] bg-[#0d1117] p-5 text-[12px] text-[#9da7b3]">
+                  <div className="mb-2 font-semibold text-[#e6edf3]">Data handling notes</div>
+                  <ul className="list-disc space-y-2 pl-5">
+                    <li>Your personal settings do not change global admin/system settings.</li>
+                    <li>Email delivery only works if the backend email system is enabled by the administrator.</li>
+                    <li>Billing is not active in this build, so no payment data is stored in this settings area.</li>
+                  </ul>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
-
           <TabsContent value="billing" className="space-y-6">
             <Card className="border-[#30363d] bg-[#161b22]">
               <CardHeader>

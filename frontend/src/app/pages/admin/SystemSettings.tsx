@@ -102,7 +102,7 @@ export function SystemSettings() {
         <div className="mb-6 grid gap-4 md:grid-cols-4">
           <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-5"><div className="text-[12px] text-[#768390]">User alerts</div><div className="mt-2 text-[26px] font-bold text-[#e6edf3]">{settings.userAlertsEnabled ? "On" : "Off"}</div></CardContent></Card>
           <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-5"><div className="text-[12px] text-[#768390]">Email delivery</div><div className="mt-2 text-[26px] font-bold text-[#e6edf3]">{settings.emailNotifications ? "On" : "Off"}</div></CardContent></Card>
-          <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-5"><div className="text-[12px] text-[#768390]">Push delivery</div><div className="mt-2 text-[26px] font-bold text-[#e6edf3]">{settings.pushNotifications ? "On" : "Off"}</div></CardContent></Card>
+          <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-5"><div className="text-[12px] text-[#768390]">External push delivery</div><div className="mt-2 text-[26px] font-bold text-[#e6edf3]">{settings.pushNotifications ? "On" : "Off"}</div></CardContent></Card>
           <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-5"><div className="text-[12px] text-[#768390]">Provider</div><div className="mt-2 text-[26px] font-bold text-[#e6edf3]">{String(settings.provider || "hybrid")}</div></CardContent></Card>
         </div>
 
@@ -132,7 +132,7 @@ export function SystemSettings() {
                 <div className="grid gap-6 lg:grid-cols-2">
                   <AdminToggle title="User-created alerts" description="Allow normal investors to create personal price, move, volume, and announcement alerts." checked={Boolean(settings.userAlertsEnabled)} onChange={(checked) => setSettings({ ...settings, userAlertsEnabled: checked })} />
                   <AdminToggle title="Email notifications" description="Master backend switch for email delivery. Turn this off to suppress all email fan-out." checked={Boolean(settings.emailNotifications)} onChange={(checked) => setSettings({ ...settings, emailNotifications: checked })} />
-                  <AdminToggle title="Push notifications" description="Master backend switch for webhook/push delivery." checked={Boolean(settings.pushNotifications)} onChange={(checked) => setSettings({ ...settings, pushNotifications: checked })} />
+                  <AdminToggle title="External push delivery" description="Master backend switch for advanced external push/webhook delivery." checked={Boolean(settings.pushNotifications)} onChange={(checked) => setSettings({ ...settings, pushNotifications: checked })} />
                   <AdminToggle title="SMS notifications" description="Reserved for future SMS delivery integration." checked={Boolean(settings.smsNotifications)} onChange={(checked) => setSettings({ ...settings, smsNotifications: checked })} />
                 </div>
 

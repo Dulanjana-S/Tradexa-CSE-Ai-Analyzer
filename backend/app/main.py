@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 
 import shutil
 import tempfile
@@ -11,7 +12,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import Body, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -782,6 +783,18 @@ def api_settings_update(request: Request, payload: Dict[str, Any] = Body(...)):
     user = require_user(request)
     values = payload.get('settings') if isinstance(payload.get('settings'), dict) else payload
     return data_service.update_user_settings(user['username'], values)
+
+
+@app.get("/api/account/export")
+def api_account_export(request: Request):
+    user = require_user(request)
+    payload = data_service.export_user_account_data(user['username'])
+    filename = f"tradexalk-account-export-{user['username']}.json"
+    return Response(
+        content=json.dumps(payload, indent=2, default=str),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.get("/api/portfolios")
