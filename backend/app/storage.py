@@ -2288,6 +2288,14 @@ class Storage:
         with self.engine().begin() as conn:
             conn.execute(alerts_t.update().where(alerts_t.c.alert_id == alert_id).values(**values))
 
+    def reset_alert_triggered(self, alert_id: str, username: str) -> None:
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.execute("UPDATE alerts SET is_triggered=0, last_triggered_at=NULL, updated_at=? WHERE alert_id=? AND username=?", (_utc_now(), alert_id, username.lower()))
+            return
+        with self.engine().begin() as conn:
+            conn.execute(alerts_t.update().where((alerts_t.c.alert_id == alert_id) & (alerts_t.c.username == username.lower())).values(is_triggered=0, last_triggered_at=None, updated_at=_utc_now()))
+
     def delete_alert(self, alert_id: str, username: str) -> bool:
         if self._is_sqlite():
             with self._sqlite() as conn:

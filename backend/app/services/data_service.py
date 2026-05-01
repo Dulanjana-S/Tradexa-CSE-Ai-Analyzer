@@ -2247,7 +2247,38 @@ def import_portfolio_transactions(username: str, file: UploadFile, portfolio_id:
 
 
 # ---- Alerts / Notifications / Announcement logic ----
-def _ensure_notification(username: str, category: str, title: str, message: str, *, symbol: Optional[str] = None, severity: str = 'info', link: Optional[str] = None, dedupe_key: Optional[str] = None, meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+ALERT_TYPES = {'above_price', 'below_price', 'pct_move', 'volume_spike', 'important_announcement'}
+
+
+def _notification_preferences(username: str) -> Dict[str, Any]:
+    prefs = get_user_settings(username).get('settings') or {}
+    return {
+        'alert_notifications': bool(prefs.get('alert_notifications', True)),
+        'announcement_notifications': bool(prefs.get('announcement_notifications', True)),
+        'market_status_notifications': bool(prefs.get('market_status_notifications', True)),
+        'watchlist_notifications': bool(prefs.get('watchlist_notifications', False)),
+        'email_notifications': bool(prefs.get('email_notifications', False)),
+        'push_notifications': bool(prefs.get('push_notifications', False)),
+    }
+
+
+def _notification_allowed(username: str, category: str) -> bool:
+    prefs = _notification_preferences(username)
+    cat = str(category or 'system').lower()
+    if cat in {'alert', 'price_alert'}:
+        return prefs.get('alert_notifications', True)
+    if cat in {'announcement', 'document', 'report'}:
+        return prefs.get('announcement_notifications', True)
+    if cat in {'market', 'market_status'}:
+        return prefs.get('market_status_notifications', True)
+    if cat in {'watchlist'}:
+        return prefs.get('watchlist_notifications', False)
+    return True
+
+
+def _ensure_notification(username: str, category: str, title: str, message: str, *, symbol: Optional[str] = None, severity: str = 'info', link: Optional[str] = None, dedupe_key: Optional[str] = None, meta: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    if not _notification_allowed(username, category):
+        return None
     existing = _storage.list_notifications(username)
     if dedupe_key:
         for n in existing:
@@ -2257,38 +2288,101 @@ def _ensure_notification(username: str, category: str, title: str, message: str,
     payload = dict(meta or {})
     if dedupe_key:
         payload['dedupe_key'] = dedupe_key
+    payload.setdefault('channels', {
+        'in_app': True,
+        'email': _notification_preferences(username).get('email_notifications', False),
+        'push': _notification_preferences(username).get('push_notifications', False),
+    })
     return _storage.create_notification(username, category, title, message, symbol=symbol, severity=severity, link=link, meta=payload)
 
 
-def _latest_close_and_prev(symbol: str) -> Tuple[Optional[float], Optional[float], Optional[float]]:
+def _latest_close_and_prev(symbol: str) -> Tuple[Optional[float], Optional[float], Optional[float], Optional[str]]:
     hist = _storage.get_price_history(symbol.upper(), limit=21)
     if not hist:
-        return None, None, None
-    latest = _to_float(hist[-1].get('close'))
+        return None, None, None, None
+    latest_row = hist[-1]
+    latest = _to_float(latest_row.get('close'))
     prev = _to_float(hist[-2].get('close')) if len(hist) >= 2 else None
+    latest_date = str(latest_row.get('date') or '')[:10] or None
     avg_vol = None
     vols = [_to_float(r.get('volume')) for r in hist[-20:] if _to_float(r.get('volume')) is not None]
     if vols:
         avg_vol = sum(vols) / len(vols)
-    return latest, prev, avg_vol
+    return latest, prev, avg_vol, latest_date
+
+
+def _parse_alert_payload(payload: Dict[str, Any]) -> Tuple[Optional[str], str, Optional[float], Dict[str, Any]]:
+    raw_type = str(payload.get('alert_type') or payload.get('condition') or 'above_price').strip().lower()
+    aliases = {
+        'above': 'above_price',
+        'below': 'below_price',
+        'price_above': 'above_price',
+        'price_below': 'below_price',
+        'percentage_move': 'pct_move',
+        'announcement': 'important_announcement',
+    }
+    alert_type = aliases.get(raw_type, raw_type)
+    if alert_type not in ALERT_TYPES:
+        raise HTTPException(status_code=400, detail='Unsupported alert type')
+    symbol = str(payload.get('symbol') or '').strip().upper() or None
+    if alert_type != 'important_announcement' and not symbol:
+        raise HTTPException(status_code=400, detail='Symbol is required for this alert type')
+    raw_target = payload.get('target_value', payload.get('targetPrice'))
+    target = _to_float(raw_target)
+    if alert_type in {'above_price', 'below_price', 'pct_move', 'volume_spike'} and target is None:
+        raise HTTPException(status_code=400, detail='Target value is required')
+    if alert_type == 'pct_move' and (target is None or target <= 0):
+        raise HTTPException(status_code=400, detail='Percentage move must be greater than 0')
+    if alert_type == 'volume_spike' and (target is None or target < 1):
+        raise HTTPException(status_code=400, detail='Volume spike multiple must be at least 1')
+    meta = payload.get('meta') if isinstance(payload.get('meta'), dict) else {}
+    meta = dict(meta or {})
+    if 'recurring' in payload:
+        meta['recurring'] = bool(payload.get('recurring'))
+    meta['recurring'] = bool(meta.get('recurring', False))
+    meta['cooldown_minutes'] = int(_to_float(payload.get('cooldown_minutes') or meta.get('cooldown_minutes') or 1440) or 1440)
+    meta['created_from'] = str(payload.get('created_from') or meta.get('created_from') or 'user')
+    return symbol, alert_type, target, meta
 
 
 def _sync_important_announcement_notifications(username: str) -> None:
+    if not _notification_allowed(username, 'announcement'):
+        return
     watched = set(_storage.list_watchlist(profile=username))
+    symbol_specific = set()
+    has_watchlist_alert = False
     for a in _storage.list_alerts(username):
-        if a.get('alert_type') == 'important_announcement' and a.get('symbol'):
-            watched.add(str(a['symbol']).upper())
-    if not watched:
+        if not a.get('is_enabled'):
+            continue
+        if a.get('alert_type') == 'important_announcement':
+            if a.get('symbol'):
+                symbol_specific.add(str(a['symbol']).upper())
+            else:
+                has_watchlist_alert = True
+    watched.update(symbol_specific)
+    if not watched and not has_watchlist_alert:
         return
     recent = announcements(None, limit=100)
     for ann in recent:
         sym = (ann.get('symbol') or '').upper()
-        if sym not in watched:
+        if not sym or (watched and sym not in watched and not has_watchlist_alert):
             continue
         if not ann.get('is_important'):
             continue
         dedupe_key = f"important-ann:{ann.get('ann_id')}:{sym}"
         _ensure_notification(username, 'announcement', f"Important announcement for {sym}", ann.get('title') or 'Important announcement', symbol=sym, severity='warning', link=ann.get('url'), dedupe_key=dedupe_key, meta={'ann_id': ann.get('ann_id'), 'importance': ann.get('importance')})
+
+
+def _alert_can_fire(alert: Dict[str, Any], latest_date: Optional[str]) -> bool:
+    meta = alert.get('meta') or {}
+    recurring = bool(meta.get('recurring'))
+    if not recurring and alert.get('is_triggered'):
+        return False
+    if recurring:
+        last_key = meta.get('last_fire_key')
+        if latest_date and last_key == latest_date:
+            return False
+    return True
 
 
 def evaluate_alerts(username: str) -> List[Dict[str, Any]]:
@@ -2298,32 +2392,46 @@ def evaluate_alerts(username: str) -> List[Dict[str, Any]]:
         if not alert.get('is_enabled'):
             continue
         symbol = (alert.get('symbol') or '').upper()
-        latest, prev, avg_vol = _latest_close_and_prev(symbol) if symbol else (None, None, None)
+        latest, prev, avg_vol, latest_date = _latest_close_and_prev(symbol) if symbol else (None, None, None, None)
+        if not _alert_can_fire(alert, latest_date):
+            continue
         fire = False
         message = None
-        if alert.get('alert_type') == 'above_price' and latest is not None and alert.get('target_value') is not None:
+        severity = 'info'
+        alert_type = str(alert.get('alert_type') or '')
+        if alert_type == 'above_price' and latest is not None and alert.get('target_value') is not None:
             if latest >= float(alert['target_value']):
                 fire = True
                 message = f"{symbol} moved above {float(alert['target_value']):.2f}. Latest price is {latest:.2f}."
-        elif alert.get('alert_type') == 'below_price' and latest is not None and alert.get('target_value') is not None:
+                severity = 'success'
+        elif alert_type == 'below_price' and latest is not None and alert.get('target_value') is not None:
             if latest <= float(alert['target_value']):
                 fire = True
                 message = f"{symbol} moved below {float(alert['target_value']):.2f}. Latest price is {latest:.2f}."
-        elif alert.get('alert_type') == 'pct_move' and latest is not None and prev not in (None, 0) and alert.get('target_value') is not None:
+                severity = 'warning'
+        elif alert_type == 'pct_move' and latest is not None and prev not in (None, 0) and alert.get('target_value') is not None:
             pct = abs((latest / prev - 1.0) * 100.0)
             if pct >= float(alert['target_value']):
                 fire = True
-                message = f"{symbol} moved {pct:.2f}% today."
-        elif alert.get('alert_type') == 'volume_spike' and symbol:
+                direction = 'up' if latest >= prev else 'down'
+                message = f"{symbol} moved {direction} {pct:.2f}% today."
+                severity = 'warning'
+        elif alert_type == 'volume_spike' and symbol:
             bar = _storage.get_latest_bar(symbol)
             vol = _to_float((bar or {}).get('volume'))
             multiple = float(alert.get('target_value') or 2.0)
             if vol is not None and avg_vol not in (None, 0) and vol >= avg_vol * multiple:
                 fire = True
                 message = f"{symbol} volume spiked to {int(vol)} against a recent average of {int(avg_vol or 0)}."
+                severity = 'warning'
         if fire:
+            meta = dict(alert.get('meta') or {})
+            if latest_date:
+                meta['last_fire_key'] = latest_date
+            _storage.update_alert(str(alert['alert_id']), username, meta=meta)
             _storage.mark_alert_triggered(str(alert['alert_id']))
-            _ensure_notification(username, 'alert', f"Alert triggered for {symbol or 'market'}", message or 'Alert triggered', symbol=symbol or None, severity='info', dedupe_key=f"alert:{alert.get('alert_id')}", meta={'alert_id': alert.get('alert_id')})
+            dedupe = f"alert:{alert.get('alert_id')}:{latest_date or 'latest'}" if meta.get('recurring') else f"alert:{alert.get('alert_id')}"
+            _ensure_notification(username, 'alert', f"Alert triggered for {symbol or 'market'}", message or 'Alert triggered', symbol=symbol or None, severity=severity, link=f"/stock/{symbol}" if symbol else '/alerts', dedupe_key=dedupe, meta={'alert_id': alert.get('alert_id'), 'alert_type': alert_type})
             triggered.append(alert)
     _sync_important_announcement_notifications(username)
     return triggered
@@ -2335,14 +2443,38 @@ def list_alerts(username: str) -> List[Dict[str, Any]]:
 
 
 def create_alert(username: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-    alert = _storage.create_alert(username, payload.get('symbol'), str(payload.get('alert_type') or 'above_price'), _to_float(payload.get('target_value')), meta=payload.get('meta') if isinstance(payload.get('meta'), dict) else {})
+    symbol, alert_type, target, meta = _parse_alert_payload(payload)
+    alert = _storage.create_alert(username, symbol, alert_type, target, meta=meta)
     return {'alert': alert, 'alerts': list_alerts(username)}
 
 
 def update_alert(username: str, alert_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-    ok = _storage.update_alert(alert_id, username, symbol=payload.get('symbol'), target_value=_to_float(payload.get('target_value')) if payload.get('target_value') is not None else None, is_enabled=payload.get('is_enabled') if isinstance(payload.get('is_enabled'), bool) else None, meta=payload.get('meta') if isinstance(payload.get('meta'), dict) else None)
+    existing = next((a for a in _storage.list_alerts(username) if str(a.get('alert_id')) == str(alert_id)), None)
+    if not existing:
+        raise HTTPException(status_code=404, detail='Alert not found')
+    symbol = existing.get('symbol')
+    target = existing.get('target_value')
+    meta = dict(existing.get('meta') or {})
+    changed_trigger_basis = False
+    if 'symbol' in payload:
+        symbol = str(payload.get('symbol') or '').upper() or None
+        changed_trigger_basis = True
+    if 'target_value' in payload or 'targetPrice' in payload:
+        target = _to_float(payload.get('target_value', payload.get('targetPrice')))
+        changed_trigger_basis = True
+    if isinstance(payload.get('meta'), dict):
+        meta.update(payload.get('meta') or {})
+    if 'recurring' in payload:
+        meta['recurring'] = bool(payload.get('recurring'))
+    if 'cooldown_minutes' in payload:
+        meta['cooldown_minutes'] = int(_to_float(payload.get('cooldown_minutes')) or 1440)
+    # Validate changed payload against the existing alert type.
+    _parse_alert_payload({'symbol': symbol, 'alert_type': existing.get('alert_type'), 'target_value': target, 'meta': meta})
+    ok = _storage.update_alert(alert_id, username, symbol=symbol if 'symbol' in payload else None, target_value=target if ('target_value' in payload or 'targetPrice' in payload) else None, is_enabled=payload.get('is_enabled') if isinstance(payload.get('is_enabled'), bool) else None, meta=meta if any(k in payload for k in ('meta','recurring','cooldown_minutes')) else None)
     if not ok:
         raise HTTPException(status_code=404, detail='Alert not found')
+    if payload.get('is_enabled') is True or changed_trigger_basis:
+        _storage.reset_alert_triggered(alert_id, username)
     return {'ok': True, 'alerts': list_alerts(username)}
 
 

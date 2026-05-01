@@ -70,6 +70,7 @@ export function AlertMonitor() {
                     <SelectItem value="below">Below</SelectItem>
                     <SelectItem value="pct_move">Pct Move</SelectItem>
                     <SelectItem value="volume_spike">Volume Spike</SelectItem>
+                    <SelectItem value="important_announcement">Announcement</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -88,13 +89,13 @@ export function AlertMonitor() {
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-[14px] font-semibold text-[#e6edf3]">{alert.symbol}</h3>
-                        <Badge variant="outline" className="border-[#30363d] text-[#768390]">{alert.condition}</Badge>
+                        <Badge variant="outline" className="border-[#30363d] text-[#768390]">{alert.condition.replace("_", " ")}</Badge>
                         <Badge className={status === "Triggered" ? "bg-amber-600/20 text-amber-400 border-amber-500/30" : status === "Active" ? "bg-emerald-600/20 text-emerald-400 border-emerald-500/30" : "bg-[#1c2128] text-[#768390] border-[#30363d]"}>{status}</Badge>
                       </div>
                       <p className="text-[13px] text-[#768390]">{alert.companyName} • User: {alert.username || "—"}</p>
                     </div>
                     <div className="grid grid-cols-2 gap-4 text-[13px] text-[#768390]">
-                      <div>Target: <span className="text-[#e6edf3]">{alert.targetPrice.toFixed(2)}</span></div>
+                      <div>Target: <span className="text-[#e6edf3]">{alert.alertType === "important_announcement" ? "—" : alert.alertType === "pct_move" ? `${alert.targetPrice.toFixed(2)}%` : alert.alertType === "volume_spike" ? `${alert.targetPrice.toFixed(2)}x` : alert.targetPrice.toFixed(2)}</span></div>
                       <div>Current: <span className="text-[#e6edf3]">{alert.currentPrice.toFixed(2)}</span></div>
                     </div>
                   </div>

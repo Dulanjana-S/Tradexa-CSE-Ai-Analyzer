@@ -412,17 +412,20 @@ function mapPortfolioAnalytics(raw: any): PortfolioAnalytics {
 }
 
 function mapAlert(raw: any, currentPrice = 0): Alert {
-  const type = String(raw?.alert_type || raw?.condition || "above_price").toLowerCase();
+  const type = String(raw?.alert_type || raw?.condition || "above_price").toLowerCase() as Alert["alertType"];
   let condition: Alert["condition"] = "above";
-  if (type.includes("below")) condition = "below";
-  else if (type.includes("pct")) condition = "pct_move";
-  else if (type.includes("volume")) condition = "volume_spike";
+  if (type === "below_price") condition = "below";
+  else if (type === "pct_move") condition = "pct_move";
+  else if (type === "volume_spike") condition = "volume_spike";
+  else if (type === "important_announcement") condition = "important_announcement";
+  const meta = raw?.meta || {};
 
   return {
     id: String(raw?.alert_id || raw?.id || ""),
     username: raw?.username,
     symbol: String(raw?.symbol || ""),
-    companyName: String(raw?.companyName || raw?.symbol || "Unknown Company"),
+    companyName: String(raw?.companyName || raw?.symbol || (type === "important_announcement" ? "Watchlist / announcements" : "Unknown Company")),
+    alertType: type,
     condition,
     targetPrice: num(raw?.target_value ?? raw?.targetPrice),
     currentPrice,
@@ -430,6 +433,8 @@ function mapAlert(raw: any, currentPrice = 0): Alert {
     createdAt: String(raw?.created_at || raw?.createdAt || ""),
     triggered: Boolean(raw?.is_triggered ?? raw?.triggered),
     triggeredAt: raw?.last_triggered_at || raw?.triggeredAt,
+    recurring: Boolean(meta?.recurring),
+    cooldownMinutes: num(meta?.cooldown_minutes, 1440),
   };
 }
 
@@ -1048,22 +1053,27 @@ export const alertsApi = {
     return rows.map((row: any) => mapAlert(row, priceMap[row.symbol]?.lastPrice || 0));
   },
 
-  create: async (payload: { symbol: string; condition: "above" | "below"; targetPrice: number }) => {
+  create: async (payload: { symbol?: string; alertType?: Alert["alertType"]; condition?: Alert["condition"]; targetPrice?: number; recurring?: boolean; cooldownMinutes?: number }) => {
+    const alertType = payload.alertType || (payload.condition === "below" ? "below_price" : payload.condition === "pct_move" ? "pct_move" : payload.condition === "volume_spike" ? "volume_spike" : payload.condition === "important_announcement" ? "important_announcement" : "above_price");
     const response = await api.post<any>("/api/alerts", {
       symbol: payload.symbol,
-      alert_type: payload.condition === "above" ? "above_price" : "below_price",
+      alert_type: alertType,
       target_value: payload.targetPrice,
+      recurring: Boolean(payload.recurring),
+      cooldown_minutes: payload.cooldownMinutes || 1440,
     });
     const rows = Array.isArray(response?.alerts) ? response.alerts : [];
     const priceMap = await getPriceMap(rows.map((row: any) => row.symbol).filter(Boolean));
     return rows.map((row: any) => mapAlert(row, priceMap[row.symbol]?.lastPrice || 0));
   },
 
-  update: async (id: string, payload: { enabled?: boolean; targetPrice?: number; symbol?: string }) => {
+  update: async (id: string, payload: { enabled?: boolean; targetPrice?: number; symbol?: string; recurring?: boolean; cooldownMinutes?: number }) => {
     const response = await api.patch<any>(`/api/alerts/${id}`, {
       is_enabled: payload.enabled,
       target_value: payload.targetPrice,
       symbol: payload.symbol,
+      recurring: payload.recurring,
+      cooldown_minutes: payload.cooldownMinutes,
     });
     const rows = Array.isArray(response?.alerts) ? response.alerts : [];
     const priceMap = await getPriceMap(rows.map((row: any) => row.symbol).filter(Boolean));
