@@ -24,7 +24,7 @@ const notificationColors = {
 };
 
 function normalizeType(type: string): keyof typeof notificationIcons {
-  if (type === "price_alert") return "price_alert";
+  if (type === "price_alert" || type === "alert") return "price_alert";
   if (type === "announcement") return "announcement";
   if (type === "success") return "success";
   return "system";
@@ -67,6 +67,8 @@ export function NotificationPanel({ countOnly = false }: NotificationPanelProps)
 
   useEffect(() => {
     loadNotifications();
+    const timer = window.setInterval(loadNotifications, 60000);
+    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {

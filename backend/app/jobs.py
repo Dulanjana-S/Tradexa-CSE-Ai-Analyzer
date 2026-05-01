@@ -53,6 +53,20 @@ def _get_job(run_id: str) -> Optional[Dict[str, Any]]:
     return _storage().get_job_run(run_id)
 
 
+def _notify_admins(category: str, title: str, message: str, *, severity: str = "info", link: str = "/admin/jobs", meta: Optional[Dict[str, Any]] = None) -> None:
+    try:
+        cfg = _system_settings()
+        if category in {"sync", "job", "train"} and str(cfg.get("syncNotifications", True)).lower() not in {"1", "true", "yes", "on"}:
+            return
+        from .services import data_service
+        st = _storage()
+        for user in st.list_users():
+            if str(user.get("role") or "").lower() in {"admin", "co_admin", "owner"}:
+                data_service._ensure_notification(str(user.get("username")), category, title, message, severity=severity, link=link, meta=meta or {})
+    except Exception:
+        return
+
+
 def enqueue_job(job_name: str, params: Dict[str, Any], *, details: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     st = _storage()
     started = utc_now()
@@ -224,8 +238,11 @@ def _worker_loop() -> None:
             existing = _get_job(run_id)
             if existing and str(existing.get("status") or "") not in {"completed", "failed"}:
                 _record(run_id, job_name, "completed", existing.get("details") or {"params": params}, started_at=started, finished_at=utc_now())
+            if job_name in {"daily_pipeline", "sync", "train"}:
+                _notify_admins("job", f"{job_name.replace('_', ' ').title()} completed", f"Job {run_id} completed successfully.", severity="success", meta={"run_id": run_id, "job_name": job_name})
         except Exception as exc:
             _record(run_id, job_name, "failed", {"params": params, "error": str(exc), "traceback": traceback.format_exc(limit=10)}, started_at=started, finished_at=utc_now())
+            _notify_admins("job", f"{job_name.replace('_', ' ').title()} failed", str(exc), severity="error", meta={"run_id": run_id, "job_name": job_name})
         finally:
             _worker_queue.task_done()
 
@@ -246,6 +263,21 @@ def _scheduler_loop() -> None:
             if enabled and now >= trigger_at and last_date != today:
                 enqueue_daily_pipeline(cfg)
                 st.set_meta("last_daily_pipeline_date", today)
+
+            from .services import data_service
+            eval_interval = max(30, int(float(cfg.get("alertEvaluationIntervalSeconds") or 60)))
+            last_eval = st.get_meta("last_alert_evaluation_utc") or ""
+            should_eval = True
+            if last_eval:
+                try:
+                    should_eval = (datetime.now(tz) - datetime.fromisoformat(last_eval)).total_seconds() >= eval_interval
+                except Exception:
+                    should_eval = True
+            if should_eval:
+                data_service.evaluate_all_users_alerts()
+                st.set_meta("last_alert_evaluation_utc", datetime.now(tz).replace(microsecond=0).isoformat())
+
+            data_service.process_notification_dispatch_queue(limit=max(10, int(float(cfg.get("notificationDeliveryBatchSize") or 50))))
         except Exception:
             pass
         finally:

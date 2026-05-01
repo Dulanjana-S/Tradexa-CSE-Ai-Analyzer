@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 
 import shutil
 import tempfile
@@ -11,7 +12,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import Body, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -130,6 +131,9 @@ def _system_settings_defaults() -> Dict[str, Any]:
         'pushNotifications': False,
         'smsNotifications': False,
         'notificationDelay': '5',
+        'userAlertsEnabled': True,
+        'alertEvaluationIntervalSeconds': '60',
+        'notificationDeliveryBatchSize': '50',
         'cacheEnabled': True,
         'cacheDuration': '3600',
         'rateLimitPerMinute': '60',
@@ -138,12 +142,25 @@ def _system_settings_defaults() -> Dict[str, Any]:
     }
 
 
+def _normalize_system_setting_value(key: str, value: Any, default: Any) -> Any:
+    bool_keys = {
+        'maintenanceMode', 'requireTwoFactor', 'autoSync', 'dailyPipelineEnabled', 'dailyPipelineTrain',
+        'syncNotifications', 'emailNotifications', 'pushNotifications', 'smsNotifications',
+        'cacheEnabled', 'userAlertsEnabled',
+    }
+    if key in bool_keys:
+        return _to_bool(value, bool(default))
+    return value
+
+
 def _system_settings() -> Dict[str, Any]:
     values = data_service.get_preferences('__system__').get('preferences') or {}
     defaults = _system_settings_defaults()
-    defaults.update(values)
-    defaults['provider'] = values.get('provider') or defaults.get('provider')
-    return defaults
+    merged = dict(defaults)
+    for key, default in defaults.items():
+        merged[key] = _normalize_system_setting_value(key, values.get(key, default), default)
+    merged['provider'] = values.get('provider') or merged.get('provider')
+    return merged
 
 
 
@@ -768,6 +785,18 @@ def api_settings_update(request: Request, payload: Dict[str, Any] = Body(...)):
     return data_service.update_user_settings(user['username'], values)
 
 
+@app.get("/api/account/export")
+def api_account_export(request: Request):
+    user = require_user(request)
+    payload = data_service.export_user_account_data(user['username'])
+    filename = f"tradexalk-account-export-{user['username']}.json"
+    return Response(
+        content=json.dumps(payload, indent=2, default=str),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @app.get("/api/portfolios")
 def api_portfolios(request: Request):
     user = require_user(request)
@@ -886,18 +915,25 @@ def api_corporate_actions(symbol: Optional[str] = Query(None), limit: int = Quer
 @app.get("/api/alerts")
 def api_alerts(request: Request):
     user = require_user(request)
-    return {'alerts': data_service.list_alerts(user['username'])}
+    return {'alerts': data_service.list_alerts(user['username']), 'user_alerts_enabled': bool(_system_settings().get('userAlertsEnabled', True))}
 
 
 @app.post("/api/alerts")
 def api_alerts_create(request: Request, payload: Dict[str, Any] = Body(...)):
     user = require_user(request)
+    if not bool(_system_settings().get('userAlertsEnabled', True)):
+        raise HTTPException(status_code=403, detail="User-created alerts are disabled by system settings")
     return data_service.create_alert(user['username'], payload)
 
 
 @app.patch("/api/alerts/{alert_id}")
 def api_alerts_update(alert_id: str, request: Request, payload: Dict[str, Any] = Body(...)):
     user = require_user(request)
+    if not bool(_system_settings().get('userAlertsEnabled', True)):
+        disallowed = any(k in payload for k in ('symbol','alert_type','target_value','targetPrice','meta','recurring','cooldown_minutes'))
+        reenable = payload.get('is_enabled') is True
+        if disallowed or reenable:
+            raise HTTPException(status_code=403, detail="User-created alerts are disabled by system settings")
     return data_service.update_alert(user['username'], alert_id, payload)
 
 
@@ -958,6 +994,12 @@ def api_admin_notifications(request: Request, x_admin_key: Optional[str] = Heade
     return {'notifications': data_service.admin_notifications()}
 
 
+@app.get("/api/admin/notification-queue")
+def api_admin_notification_queue(request: Request, x_admin_key: Optional[str] = Header(default=None), limit: int = Query(200, ge=1, le=500)):
+    _check_admin_access(request, x_admin_key)
+    return {'queue': data_service.admin_notification_queue(limit=limit)}
+
+
 @app.get("/api/admin/announcements/review")
 def api_admin_ann_review(request: Request, x_admin_key: Optional[str] = Header(default=None), limit: int = Query(100, ge=1, le=500), important_only: bool = Query(False), include_hidden: bool = Query(False)):
     _check_admin_access(request, x_admin_key)
@@ -992,7 +1034,9 @@ def api_admin_system_settings_update(request: Request, payload: Dict[str, Any] =
     actor = _check_admin_access(request, x_admin_key)
     values = payload.get('settings') if isinstance(payload.get('settings'), dict) else payload
     current = _system_settings()
-    current.update(values or {})
+    incoming = values or {}
+    for key, value in incoming.items():
+        current[key] = _normalize_system_setting_value(key, value, current.get(key))
     provider = str(current.get('provider') or settings.data_provider)
     try:
         active = data_service.set_effective_provider_name(provider)

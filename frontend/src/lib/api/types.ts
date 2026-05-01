@@ -435,13 +435,16 @@ export interface Alert {
   username?: string;
   symbol: string;
   companyName: string;
-  condition: "above" | "below" | "pct_move" | "volume_spike";
+  alertType: "above_price" | "below_price" | "pct_move" | "volume_spike" | "important_announcement";
+  condition: "above" | "below" | "pct_move" | "volume_spike" | "important_announcement";
   targetPrice: number;
   currentPrice: number;
   enabled: boolean;
   createdAt: string;
   triggered: boolean;
   triggeredAt?: string;
+  recurring?: boolean;
+  cooldownMinutes?: number;
 }
 
 export interface Notification {
