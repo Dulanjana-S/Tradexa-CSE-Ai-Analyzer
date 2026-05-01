@@ -58,10 +58,11 @@ def _notify_admins(category: str, title: str, message: str, *, severity: str = "
         cfg = _system_settings()
         if category in {"sync", "job", "train"} and str(cfg.get("syncNotifications", True)).lower() not in {"1", "true", "yes", "on"}:
             return
+        from .services import data_service
         st = _storage()
         for user in st.list_users():
             if str(user.get("role") or "").lower() in {"admin", "co_admin", "owner"}:
-                st.create_notification(str(user.get("username")), category, title, message, severity=severity, link=link, meta=meta or {})
+                data_service._ensure_notification(str(user.get("username")), category, title, message, severity=severity, link=link, meta=meta or {})
     except Exception:
         return
 
@@ -262,6 +263,21 @@ def _scheduler_loop() -> None:
             if enabled and now >= trigger_at and last_date != today:
                 enqueue_daily_pipeline(cfg)
                 st.set_meta("last_daily_pipeline_date", today)
+
+            from .services import data_service
+            eval_interval = max(30, int(float(cfg.get("alertEvaluationIntervalSeconds") or 60)))
+            last_eval = st.get_meta("last_alert_evaluation_utc") or ""
+            should_eval = True
+            if last_eval:
+                try:
+                    should_eval = (datetime.now(tz) - datetime.fromisoformat(last_eval)).total_seconds() >= eval_interval
+                except Exception:
+                    should_eval = True
+            if should_eval:
+                data_service.evaluate_all_users_alerts()
+                st.set_meta("last_alert_evaluation_utc", datetime.now(tz).replace(microsecond=0).isoformat())
+
+            data_service.process_notification_dispatch_queue(limit=max(10, int(float(cfg.get("notificationDeliveryBatchSize") or 50))))
         except Exception:
             pass
         finally:

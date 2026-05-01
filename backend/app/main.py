@@ -130,6 +130,8 @@ def _system_settings_defaults() -> Dict[str, Any]:
         'pushNotifications': False,
         'smsNotifications': False,
         'notificationDelay': '5',
+        'alertEvaluationIntervalSeconds': '60',
+        'notificationDeliveryBatchSize': '50',
         'cacheEnabled': True,
         'cacheDuration': '3600',
         'rateLimitPerMinute': '60',
@@ -956,6 +958,12 @@ def api_admin_alerts(request: Request, x_admin_key: Optional[str] = Header(defau
 def api_admin_notifications(request: Request, x_admin_key: Optional[str] = Header(default=None)):
     _check_admin_access(request, x_admin_key)
     return {'notifications': data_service.admin_notifications()}
+
+
+@app.get("/api/admin/notification-queue")
+def api_admin_notification_queue(request: Request, x_admin_key: Optional[str] = Header(default=None), limit: int = Query(200, ge=1, le=500)):
+    _check_admin_access(request, x_admin_key)
+    return {'queue': data_service.admin_notification_queue(limit=limit)}
 
 
 @app.get("/api/admin/announcements/review")

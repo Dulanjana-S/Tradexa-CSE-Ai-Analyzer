@@ -23,12 +23,13 @@ try:  # Optional dependency; SQLite mode works without it.
         Table,
         Text,
         create_engine,
+        or_,
         select,
     )
     from sqlalchemy.engine import Engine
 except Exception:  # pragma: no cover
     Column = Date = DateTime = Float = Integer = MetaData = String = Table = Text = None  # type: ignore
-    create_engine = select = None  # type: ignore
+    create_engine = or_ = select = None  # type: ignore
     Engine = Any  # type: ignore
 
 
@@ -203,6 +204,24 @@ if metadata is not None:
         Column("meta", Text, nullable=True),
     )
 
+
+    notification_dispatch_queue_t = Table(
+        "notification_dispatch_queue",
+        metadata,
+        Column("queue_id", String(128), primary_key=True),
+        Column("username", String(64), nullable=False, index=True),
+        Column("notification_id", String(128), nullable=False, index=True),
+        Column("channel", String(32), nullable=False),
+        Column("status", String(32), nullable=False),
+        Column("attempts", Integer, nullable=False),
+        Column("next_attempt_at", DateTime, nullable=True),
+        Column("sent_at", DateTime, nullable=True),
+        Column("error", Text, nullable=True),
+        Column("payload", Text, nullable=True),
+        Column("created_at", DateTime, nullable=True),
+        Column("updated_at", DateTime, nullable=True),
+    )
+
     portfolio_accounts_t = Table(
         "portfolio_accounts",
         metadata,
@@ -366,7 +385,7 @@ if metadata is not None:
         Column("created_at", DateTime, nullable=True),
     )
 else:  # pragma: no cover
-    companies_t = prices_t = indices_t = announcements_t = meta_t = watchlists_t = preferences_t = job_runs_t = users_t = sessions_t = password_reset_tokens_t = model_registry_t = alerts_t = notifications_t = portfolio_accounts_t = portfolio_cash_movements_t = portfolio_transactions_t = announcement_meta_t = corporate_actions_t = news_sentiment_t = macro_indicators_t = document_intelligence_t = source_whitelist_t = external_news_items_t = audit_logs_t = None  # type: ignore
+    companies_t = prices_t = indices_t = announcements_t = meta_t = watchlists_t = preferences_t = job_runs_t = users_t = sessions_t = password_reset_tokens_t = model_registry_t = alerts_t = notifications_t = notification_dispatch_queue_t = portfolio_accounts_t = portfolio_cash_movements_t = portfolio_transactions_t = announcement_meta_t = corporate_actions_t = news_sentiment_t = macro_indicators_t = document_intelligence_t = source_whitelist_t = external_news_items_t = audit_logs_t = None  # type: ignore
 
 
 def _utc_now() -> str:
@@ -565,6 +584,22 @@ class Storage:
                     );
                     CREATE INDEX IF NOT EXISTS idx_notifications_username ON notifications(username);
                     CREATE INDEX IF NOT EXISTS idx_notifications_symbol ON notifications(symbol);
+                    CREATE TABLE IF NOT EXISTS notification_dispatch_queue (
+                        queue_id TEXT PRIMARY KEY,
+                        username TEXT NOT NULL,
+                        notification_id TEXT NOT NULL,
+                        channel TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        attempts INTEGER NOT NULL DEFAULT 0,
+                        next_attempt_at TEXT,
+                        sent_at TEXT,
+                        error TEXT,
+                        payload TEXT,
+                        created_at TEXT,
+                        updated_at TEXT
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_notification_dispatch_status ON notification_dispatch_queue(status, next_attempt_at);
+                    CREATE INDEX IF NOT EXISTS idx_notification_dispatch_username ON notification_dispatch_queue(username, created_at DESC);
                     CREATE TABLE IF NOT EXISTS portfolio_accounts (
                         portfolio_id TEXT PRIMARY KEY,
                         username TEXT NOT NULL,
@@ -2604,6 +2639,92 @@ class Storage:
             with self.engine().begin() as conn:
                 conn.execute(notifications_t.insert().values(**row))
         return row
+
+    def enqueue_notification_delivery(self, username: str, notification_id: str, channel: str, *, payload: Optional[Dict[str, Any]] = None, next_attempt_at: Optional[str] = None) -> Dict[str, Any]:
+        row = {
+            'queue_id': f"ndq_{secrets.token_urlsafe(10)}",
+            'username': username.lower(),
+            'notification_id': notification_id,
+            'channel': channel,
+            'status': 'queued',
+            'attempts': 0,
+            'next_attempt_at': next_attempt_at or _utc_now(),
+            'sent_at': None,
+            'error': None,
+            'payload': _json_dumps(payload or {}),
+            'created_at': _utc_now(),
+            'updated_at': _utc_now(),
+        }
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                conn.execute("INSERT INTO notification_dispatch_queue (queue_id, username, notification_id, channel, status, attempts, next_attempt_at, sent_at, error, payload, created_at, updated_at) VALUES (:queue_id,:username,:notification_id,:channel,:status,:attempts,:next_attempt_at,:sent_at,:error,:payload,:created_at,:updated_at)", row)
+        else:
+            with self.engine().begin() as conn:
+                conn.execute(notification_dispatch_queue_t.insert().values(**row))
+        return row
+
+    def list_notification_dispatch_queue(self, status: Optional[str] = None, limit: int = 200) -> List[Dict[str, Any]]:
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                if status:
+                    rows = conn.execute("SELECT queue_id, username, notification_id, channel, status, attempts, next_attempt_at, sent_at, error, payload, created_at, updated_at FROM notification_dispatch_queue WHERE status=? ORDER BY created_at DESC LIMIT ?", (status, limit)).fetchall()
+                else:
+                    rows = conn.execute("SELECT queue_id, username, notification_id, channel, status, attempts, next_attempt_at, sent_at, error, payload, created_at, updated_at FROM notification_dispatch_queue ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+            out=[dict(r) for r in rows]
+        else:
+            stmt = select(notification_dispatch_queue_t)
+            if status:
+                stmt = stmt.where(notification_dispatch_queue_t.c.status == status)
+            stmt = stmt.order_by(notification_dispatch_queue_t.c.created_at.desc()).limit(limit)
+            with self.engine().connect() as conn:
+                out=[dict(r) for r in conn.execute(stmt).mappings().all()]
+        for r in out:
+            try:
+                r['payload'] = json.loads(r.get('payload') or '{}')
+            except Exception:
+                r['payload'] = {}
+        return out
+
+    def get_due_notification_dispatches(self, now_iso: Optional[str] = None, limit: int = 100) -> List[Dict[str, Any]]:
+        now_iso = now_iso or _utc_now()
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                rows = conn.execute(
+                    "SELECT queue_id, username, notification_id, channel, status, attempts, next_attempt_at, sent_at, error, payload, created_at, updated_at FROM notification_dispatch_queue WHERE status IN ('queued','retry') AND (next_attempt_at IS NULL OR next_attempt_at <= ?) ORDER BY created_at ASC LIMIT ?",
+                    (now_iso, limit),
+                ).fetchall()
+            out = [dict(r) for r in rows]
+        else:
+            stmt = select(notification_dispatch_queue_t).where(notification_dispatch_queue_t.c.status.in_(['queued','retry']))
+            stmt = stmt.where(or_(notification_dispatch_queue_t.c.next_attempt_at.is_(None), notification_dispatch_queue_t.c.next_attempt_at <= now_iso)).order_by(notification_dispatch_queue_t.c.created_at.asc()).limit(limit)
+            with self.engine().connect() as conn:
+                out=[dict(r) for r in conn.execute(stmt).mappings().all()]
+        for r in out:
+            try:
+                r['payload'] = json.loads(r.get('payload') or '{}')
+            except Exception:
+                r['payload'] = {}
+        return out
+
+    def update_notification_dispatch(self, queue_id: str, *, status: str, attempts: Optional[int] = None, next_attempt_at: Optional[str] = None, sent_at: Optional[str] = None, error: Optional[str] = None, payload: Optional[Dict[str, Any]] = None) -> bool:
+        values: Dict[str, Any] = {'status': status, 'updated_at': _utc_now()}
+        if attempts is not None:
+            values['attempts'] = attempts
+        if next_attempt_at is not None:
+            values['next_attempt_at'] = next_attempt_at
+        if sent_at is not None:
+            values['sent_at'] = sent_at
+        if error is not None:
+            values['error'] = error
+        if payload is not None:
+            values['payload'] = _json_dumps(payload)
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                cur = conn.execute(f"UPDATE notification_dispatch_queue SET {', '.join([k+'=?' for k in values])} WHERE queue_id=?", tuple(values.values()) + (queue_id,))
+                return (cur.rowcount or 0) > 0
+        with self.engine().begin() as conn:
+            res = conn.execute(notification_dispatch_queue_t.update().where(notification_dispatch_queue_t.c.queue_id == queue_id).values(**values))
+            return (res.rowcount or 0) > 0
 
     def mark_notification_read(self, notification_id: str, username: str) -> bool:
         if self._is_sqlite():
