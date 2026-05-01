@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Switch } from "../components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Bell, Plus, TrendingUp, TrendingDown, Trash2, Activity, Megaphone, Volume2, Percent, Loader2 } from "lucide-react";
-import { alertsApi } from "../../lib/api/services";
+import { alertsApi, systemApi } from "../../lib/api/services";
 import type { Alert } from "../../lib/api/types";
 
 type AlertType = Alert["alertType"];
@@ -42,11 +42,14 @@ export function Alerts() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [newAlert, setNewAlert] = useState({ symbol: "", alertType: "above_price" as AlertType, targetPrice: "", recurring: false, cooldownMinutes: "1440" });
+  const [userAlertsEnabled, setUserAlertsEnabled] = useState(true);
 
   const load = async () => {
     setLoading(true);
     try {
-      setAlerts(await alertsApi.getAll());
+      const [rows, status] = await Promise.all([alertsApi.getAll(), systemApi.getStatus().catch(() => null)]);
+      setAlerts(rows);
+      setUserAlertsEnabled(Boolean(status?.features?.user_alerts_enabled ?? true));
     } finally {
       setLoading(false);
     }
@@ -54,7 +57,7 @@ export function Alerts() {
 
   useEffect(() => {
     load();
-    const timer = window.setInterval(() => alertsApi.getAll().then(setAlerts).catch(() => null), 60000);
+    const timer = window.setInterval(() => load().catch(() => null), 60000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -63,6 +66,7 @@ export function Alerts() {
   const recurringAlerts = useMemo(() => alerts.filter((a) => a.recurring).length, [alerts]);
 
   const toggleAlert = async (id: string, enabled: boolean) => {
+    if (!userAlertsEnabled && enabled) return;
     setAlerts(await alertsApi.update(id, { enabled }));
   };
 
@@ -91,7 +95,7 @@ export function Alerts() {
   };
 
   const selectedMeta = alertTypeMeta[newAlert.alertType];
-  const canCreate = (newAlert.alertType === "important_announcement" || Boolean(newAlert.symbol)) && (!selectedMeta.needsTarget || Number(newAlert.targetPrice) > 0);
+  const canCreate = userAlertsEnabled && (newAlert.alertType === "important_announcement" || Boolean(newAlert.symbol)) && (!selectedMeta.needsTarget || Number(newAlert.targetPrice) > 0);
 
   return (
     <div className="min-h-screen bg-[#08090c]">
@@ -99,11 +103,12 @@ export function Alerts() {
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1.5">
             <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[#e6edf3]">Alerts & Monitoring</h1>
-            <p className="text-[13px] text-[#768390]">Track prices, daily moves, volume spikes, and important CSE announcements.</p>
+            <p className="text-[13px] text-[#768390]">Track prices, daily moves, volume spikes, and important CSE announcements. User-created alerts are a normal investor feature and can be globally disabled by admin if needed.</p>
           </div>
+          {!userAlertsEnabled && <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">User-created alerts are currently disabled by system settings. Existing alerts remain visible, and you can still delete or switch off old alerts.</div>}
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="flex items-center gap-2 bg-emerald-600 text-white hover:bg-emerald-700"><Plus className="h-4 w-4" />Create Alert</Button>
+              <Button className="flex items-center gap-2 bg-emerald-600 text-white hover:bg-emerald-700" disabled={!userAlertsEnabled}><Plus className="h-4 w-4" />Create Alert</Button>
             </DialogTrigger>
             <DialogContent className="border-[#30363d] bg-[#161b22] text-[#e6edf3] sm:max-w-lg">
               <DialogHeader><DialogTitle>Create Smart Alert</DialogTitle><DialogDescription className="text-[#768390]">Choose what condition should create an in-app notification.</DialogDescription></DialogHeader>

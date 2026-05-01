@@ -171,6 +171,13 @@ class SmokeTest(unittest.TestCase):
         resp = self.client.patch(f"/api/alerts/{alert_id}", json={"is_enabled": False})
         self.assertEqual(resp.status_code, 200)
 
+        admin_headers = {"X-Admin-Key": os.environ.get("ADMIN_API_KEY", "")}
+        resp = self.client.post("/api/admin/system-settings", json={"settings": {"userAlertsEnabled": False}}, headers=admin_headers)
+        self.assertEqual(resp.status_code, 200, msg=resp.text)
+        resp = self.client.post("/api/alerts", json={"symbol": self.symbol, "alert_type": "above_price", "target_value": 0.01})
+        self.assertEqual(resp.status_code, 403)
+        self.client.post("/api/admin/system-settings", json={"settings": {"userAlertsEnabled": True}}, headers=admin_headers)
+
 
     def test_portfolio_csv_import_preview(self):
         csv_payload = (

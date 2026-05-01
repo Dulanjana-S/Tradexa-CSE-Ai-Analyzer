@@ -1114,6 +1114,11 @@ export const settingsApi = {
     api.post<UserSettings>("/api/settings", { settings }),
 };
 
+
+export const systemApi = {
+  getStatus: async () => api.get<any>("/api/system/status"),
+};
+
 export const dashboardApi = {
   getData: async () => {
     const [overview, user] = await Promise.all([marketApi.getOverview(), getOptionalCurrentUser()]);

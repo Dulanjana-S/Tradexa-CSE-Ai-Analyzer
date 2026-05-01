@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Label } from "../components/ui/label";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Switch } from "../components/ui/switch";
 import { Separator } from "../components/ui/separator";
+import { Badge } from "../components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -13,8 +14,8 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { User, Bell, Shield, Palette, Database, CreditCard, Loader2 } from "lucide-react";
-import { authApi, settingsApi } from "../../lib/api/services";
+import { User, Bell, Shield, Palette, Database, CreditCard, Loader2, Mail, Radio, CheckCircle2, AlertTriangle } from "lucide-react";
+import { authApi, settingsApi, systemApi } from "../../lib/api/services";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
 
@@ -31,7 +32,48 @@ const defaultSettings = {
   announcement_notifications: true,
   market_status_notifications: true,
   watchlist_notifications: false,
+  email_alert_notifications: true,
+  email_announcement_notifications: true,
+  email_market_status_notifications: false,
+  email_watchlist_notifications: false,
+  push_alert_notifications: true,
+  push_announcement_notifications: true,
+  push_market_status_notifications: false,
+  push_watchlist_notifications: false,
+  notification_email: "",
+  push_webhook_url: "",
 };
+
+type NotificationKey = keyof typeof defaultSettings;
+
+function ToggleRow({
+  title,
+  description,
+  checked,
+  disabled,
+  onChange,
+}: {
+  title: string;
+  description: string;
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <div className={`flex items-start justify-between gap-4 rounded-xl border p-4 ${disabled ? "border-[#2a313b] bg-[#0f1319]/70 opacity-70" : "border-[#30363d] bg-[#0d1117]"}`}>
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <Label className="text-[13px] font-semibold text-[#e6edf3]">{title}</Label>
+          <Badge className={checked ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : "border-[#3a4450] bg-[#111927] text-[#9da7b3]"}>
+            {checked ? "On" : "Off"}
+          </Badge>
+        </div>
+        <p className="text-[12px] text-[#768390]">{description}</p>
+      </div>
+      <Switch checked={checked} onCheckedChange={onChange} disabled={disabled} />
+    </div>
+  );
+}
 
 export function Settings() {
   const { user, refreshUser } = useAuth();
@@ -39,15 +81,23 @@ export function Settings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [systemStatus, setSystemStatus] = useState<any>(null);
   const [profile, setProfile] = useState({ name: "", email: "", phone: "" });
   const [settings, setSettings] = useState<Record<string, any>>(defaultSettings);
   const [passwords, setPasswords] = useState({ current: "", next: "", confirm: "" });
+
+  const userAlertsEnabled = Boolean(systemStatus?.features?.user_alerts_enabled ?? true);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       try {
-        const [me, userSettings] = await Promise.all([authApi.me(), settingsApi.getUserSettings()]);
+        const [me, userSettings, status] = await Promise.all([
+          authApi.me(),
+          settingsApi.getUserSettings(),
+          systemApi.getStatus().catch(() => null),
+        ]);
+        setSystemStatus(status);
         setProfile({ name: me.name || "", email: me.email || "", phone: String(userSettings.settings?.phone || "") });
         const merged = { ...defaultSettings, ...(userSettings.settings || {}) };
         setSettings(merged);
@@ -62,7 +112,7 @@ export function Settings() {
       }
     };
     load();
-  }, [user?.email, user?.name]);
+  }, [setTheme, user?.email, user?.name]);
 
   const saveProfile = async () => {
     setSaving(true);
@@ -114,9 +164,17 @@ export function Settings() {
     }
   };
 
+  const deliverySummary = useMemo(() => {
+    return {
+      inAppCount: ["alert_notifications", "announcement_notifications", "market_status_notifications", "watchlist_notifications"].filter((key) => Boolean(settings[key])).length,
+      emailCount: ["email_alert_notifications", "email_announcement_notifications", "email_market_status_notifications", "email_watchlist_notifications"].filter((key) => Boolean(settings[key])).length,
+      pushCount: ["push_alert_notifications", "push_announcement_notifications", "push_market_status_notifications", "push_watchlist_notifications"].filter((key) => Boolean(settings[key])).length,
+    };
+  }, [settings]);
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#08090c] flex items-center justify-center text-[#768390]">
+      <div className="flex min-h-screen items-center justify-center bg-[#08090c] text-[#768390]">
         <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading settings...
       </div>
     );
@@ -127,7 +185,7 @@ export function Settings() {
       <div className="mx-auto max-w-[1200px] px-6 py-8 lg:px-8">
         <div className="mb-8 space-y-1.5">
           <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[#e6edf3]">Settings</h1>
-          <p className="text-[13px] text-[#768390]">Manage your account settings and preferences</p>
+          <p className="text-[13px] text-[#768390]">Manage your account settings, delivery channels, and portfolio experience.</p>
           {message && <p className="text-[13px] text-emerald-400">{message}</p>}
         </div>
 
@@ -148,7 +206,7 @@ export function Settings() {
                   <div className="flex h-10 w-10 items-center justify-center rounded-md bg-emerald-500/10"><User className="h-5 w-5 text-emerald-500" /></div>
                   <div>
                     <CardTitle className="text-[18px] text-[#e6edf3]">Profile Information</CardTitle>
-                    <CardDescription className="text-[13px] text-[#768390]">Update your account profile information</CardDescription>
+                    <CardDescription className="text-[13px] text-[#768390]">Update your account profile information.</CardDescription>
                   </div>
                 </div>
               </CardHeader>
@@ -172,49 +230,89 @@ export function Settings() {
                   <Button variant="outline" className="border-[#30363d] text-[#768390] hover:bg-[#1c2128] hover:text-[#e6edf3]" onClick={() => window.location.reload()}>
                     Cancel
                   </Button>
-                  <Button className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={saveProfile} disabled={saving}>
-                    {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Save Changes
-                  </Button>
+                  <Button className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={saveProfile} disabled={saving}>Save Profile</Button>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="notifications" className="space-y-6">
+            <div className="grid gap-4 lg:grid-cols-3">
+              <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-5"><div className="text-[12px] text-[#768390]">In-app categories enabled</div><div className="mt-2 text-[26px] font-bold text-[#e6edf3]">{deliverySummary.inAppCount}/4</div></CardContent></Card>
+              <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-5"><div className="text-[12px] text-[#768390]">Email categories enabled</div><div className="mt-2 text-[26px] font-bold text-[#e6edf3]">{settings.email_notifications ? `${deliverySummary.emailCount}/4` : "Off"}</div></CardContent></Card>
+              <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-5"><div className="text-[12px] text-[#768390]">Push categories enabled</div><div className="mt-2 text-[26px] font-bold text-[#e6edf3]">{settings.push_notifications ? `${deliverySummary.pushCount}/4` : "Off"}</div></CardContent></Card>
+            </div>
+
+            {!userAlertsEnabled && (
+              <Card className="border-amber-500/30 bg-amber-500/10">
+                <CardContent className="flex items-start gap-3 p-4 text-amber-100">
+                  <AlertTriangle className="mt-0.5 h-5 w-5" />
+                  <div>
+                    <div className="font-semibold">User-created alerts are currently disabled by the administrator</div>
+                    <p className="mt-1 text-[13px] text-amber-200/80">You can still manage your notification preferences, but new personal price alerts will stay unavailable until the system setting is re-enabled.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <Card className="border-[#30363d] bg-[#161b22]">
               <CardHeader>
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-md bg-blue-500/10"><Bell className="h-5 w-5 text-blue-500" /></div>
                   <div>
                     <CardTitle className="text-[18px] text-[#e6edf3]">Notification Preferences</CardTitle>
-                    <CardDescription className="text-[13px] text-[#768390]">Choose what notifications you want to receive</CardDescription>
+                    <CardDescription className="text-[13px] text-[#768390]">Choose what you receive in-app, by email, and through webhook-based push delivery.</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
-                {[
-                  ["Price Alerts", "Get notified when stocks reach your target prices", "alert_notifications"],
-                  ["Market Announcements", "Corporate announcements and market news", "announcement_notifications"],
-                  ["Market Opening/Closing", "Daily market status updates", "market_status_notifications"],
-                  ["Watchlist Updates", "Significant changes to stocks in your watchlist", "watchlist_notifications"],
-                  ["Email Notifications", "Receive notifications via email", "email_notifications"],
-                  ["Push Notifications", "Receive browser/device push alerts", "push_notifications"],
-                ].map(([title, desc, key], idx) => (
-                  <div key={String(key)}>
-                    {idx > 0 && <Separator className="bg-[#30363d] mb-4" />}
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <ToggleRow title="Price Alerts" description="Personal alert triggers for symbols you track." checked={Boolean(settings.alert_notifications)} disabled={!userAlertsEnabled} onChange={(checked) => setSettings((prev) => ({ ...prev, alert_notifications: checked }))} />
+                  <ToggleRow title="Market Announcements" description="Important CSE announcements and report-related updates." checked={Boolean(settings.announcement_notifications)} onChange={(checked) => setSettings((prev) => ({ ...prev, announcement_notifications: checked }))} />
+                  <ToggleRow title="Market Status" description="Sync, job, and market system status messages." checked={Boolean(settings.market_status_notifications)} onChange={(checked) => setSettings((prev) => ({ ...prev, market_status_notifications: checked }))} />
+                  <ToggleRow title="Watchlist Updates" description="Changes that matter for stocks you are following." checked={Boolean(settings.watchlist_notifications)} onChange={(checked) => setSettings((prev) => ({ ...prev, watchlist_notifications: checked }))} />
+                </div>
+
+                <Separator className="bg-[#30363d]" />
+
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <div className="space-y-4 rounded-xl border border-[#30363d] bg-[#0d1117] p-5">
                     <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label className="text-[13px] font-semibold text-[#e6edf3]">{title}</Label>
-                        <p className="text-[12px] text-[#768390]">{desc}</p>
-                      </div>
-                      <Switch checked={Boolean(settings[key])} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, [key]: checked }))} />
+                      <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-emerald-400" /><div><div className="text-[13px] font-semibold text-[#e6edf3]">Email delivery</div><div className="text-[12px] text-[#768390]">Route selected categories to an email inbox.</div></div></div>
+                      <Switch checked={Boolean(settings.email_notifications)} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, email_notifications: checked }))} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[#e6edf3]">Notification email</Label>
+                      <Input type="email" value={settings.notification_email || ""} onChange={(e) => setSettings((prev) => ({ ...prev, notification_email: e.target.value }))} placeholder="Leave blank to use your account email" className="border-[#30363d] bg-[#08090c] text-[#e6edf3]" disabled={!settings.email_notifications} />
+                    </div>
+                    <div className="space-y-3">
+                      <ToggleRow title="Alert emails" description="Send personal price-alert triggers by email." checked={Boolean(settings.email_alert_notifications)} disabled={!settings.email_notifications || !userAlertsEnabled} onChange={(checked) => setSettings((prev) => ({ ...prev, email_alert_notifications: checked }))} />
+                      <ToggleRow title="Announcement emails" description="Send important announcement/report events by email." checked={Boolean(settings.email_announcement_notifications)} disabled={!settings.email_notifications} onChange={(checked) => setSettings((prev) => ({ ...prev, email_announcement_notifications: checked }))} />
+                      <ToggleRow title="Market status emails" description="Send job, sync, and system status updates by email." checked={Boolean(settings.email_market_status_notifications)} disabled={!settings.email_notifications} onChange={(checked) => setSettings((prev) => ({ ...prev, email_market_status_notifications: checked }))} />
+                      <ToggleRow title="Watchlist emails" description="Send watchlist-specific updates by email." checked={Boolean(settings.email_watchlist_notifications)} disabled={!settings.email_notifications} onChange={(checked) => setSettings((prev) => ({ ...prev, email_watchlist_notifications: checked }))} />
                     </div>
                   </div>
-                ))}
-                <Separator className="bg-[#30363d]" />
+
+                  <div className="space-y-4 rounded-xl border border-[#30363d] bg-[#0d1117] p-5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2"><Radio className="h-4 w-4 text-violet-400" /><div><div className="text-[13px] font-semibold text-[#e6edf3]">Push / webhook delivery</div><div className="text-[12px] text-[#768390]">Send events to your configured webhook endpoint.</div></div></div>
+                      <Switch checked={Boolean(settings.push_notifications)} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, push_notifications: checked }))} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[#e6edf3]">Push webhook URL</Label>
+                      <Input value={settings.push_webhook_url || ""} onChange={(e) => setSettings((prev) => ({ ...prev, push_webhook_url: e.target.value }))} placeholder="https://your-endpoint.example/notify" className="border-[#30363d] bg-[#08090c] text-[#e6edf3]" disabled={!settings.push_notifications} />
+                    </div>
+                    <div className="space-y-3">
+                      <ToggleRow title="Alert push notifications" description="Send personal alert triggers to your webhook endpoint." checked={Boolean(settings.push_alert_notifications)} disabled={!settings.push_notifications || !userAlertsEnabled} onChange={(checked) => setSettings((prev) => ({ ...prev, push_alert_notifications: checked }))} />
+                      <ToggleRow title="Announcement push notifications" description="Send important announcement/report events to your webhook endpoint." checked={Boolean(settings.push_announcement_notifications)} disabled={!settings.push_notifications} onChange={(checked) => setSettings((prev) => ({ ...prev, push_announcement_notifications: checked }))} />
+                      <ToggleRow title="Market status push notifications" description="Send job and market status updates to your webhook endpoint." checked={Boolean(settings.push_market_status_notifications)} disabled={!settings.push_notifications} onChange={(checked) => setSettings((prev) => ({ ...prev, push_market_status_notifications: checked }))} />
+                      <ToggleRow title="Watchlist push notifications" description="Send watchlist-related updates to your webhook endpoint." checked={Boolean(settings.push_watchlist_notifications)} disabled={!settings.push_notifications} onChange={(checked) => setSettings((prev) => ({ ...prev, push_watchlist_notifications: checked }))} />
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex justify-end">
-                  <Button className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={savePreferences} disabled={saving}>Save Preferences</Button>
+                  <Button className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={savePreferences} disabled={saving}>{saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />} Save Notification Settings</Button>
                 </div>
               </CardContent>
             </Card>
@@ -224,84 +322,55 @@ export function Settings() {
             <Card className="border-[#30363d] bg-[#161b22]">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-md bg-purple-500/10"><Palette className="h-5 w-5 text-purple-500" /></div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-md bg-violet-500/10"><Palette className="h-5 w-5 text-violet-500" /></div>
                   <div>
                     <CardTitle className="text-[18px] text-[#e6edf3]">Display Preferences</CardTitle>
-                    <CardDescription className="text-[13px] text-[#768390]">Customize the way market data appears</CardDescription>
+                    <CardDescription className="text-[13px] text-[#768390]">Personalize how charts and tables behave.</CardDescription>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label className="text-[#e6edf3]">Currency</Label>
-                    <Select value={settings.currency} onValueChange={(value) => setSettings((prev) => ({ ...prev, currency: value }))}>
-                      <SelectTrigger className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]"><SelectValue /></SelectTrigger>
-                      <SelectContent className="border-[#30363d] bg-[#161b22]">
-                        <SelectItem value="lkr">LKR - Sri Lankan Rupee</SelectItem>
-                        <SelectItem value="usd">USD - US Dollar</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[#e6edf3]">Date Format</Label>
-                    <Select value={settings.date_format} onValueChange={(value) => setSettings((prev) => ({ ...prev, date_format: value }))}>
-                      <SelectTrigger className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]"><SelectValue /></SelectTrigger>
-                      <SelectContent className="border-[#30363d] bg-[#161b22]">
-                        <SelectItem value="dd-mm-yyyy">DD/MM/YYYY</SelectItem>
-                        <SelectItem value="mm-dd-yyyy">MM/DD/YYYY</SelectItem>
-                        <SelectItem value="yyyy-mm-dd">YYYY-MM-DD</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[#e6edf3]">Theme</Label>
-                    <Select value={theme} onValueChange={(value) => { setTheme(value as "light" | "dark"); setSettings((prev) => ({ ...prev, theme: value })); }}>
-                      <SelectTrigger className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]"><SelectValue /></SelectTrigger>
-                      <SelectContent className="border-[#30363d] bg-[#161b22]">
-                        <SelectItem value="dark">Dark Mode</SelectItem>
-                        <SelectItem value="light">Light Mode</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[#e6edf3]">Default Chart Type</Label>
-                    <Select value={settings.chart_type} onValueChange={(value) => setSettings((prev) => ({ ...prev, chart_type: value }))}>
-                      <SelectTrigger className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]"><SelectValue /></SelectTrigger>
-                      <SelectContent className="border-[#30363d] bg-[#161b22]">
-                        <SelectItem value="candlestick">Candlestick</SelectItem>
-                        <SelectItem value="line">Line</SelectItem>
-                        <SelectItem value="area">Area</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[#e6edf3]">Default Time Range</Label>
-                    <Select value={settings.default_timeframe} onValueChange={(value) => setSettings((prev) => ({ ...prev, default_timeframe: value }))}>
-                      <SelectTrigger className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]"><SelectValue /></SelectTrigger>
-                      <SelectContent className="border-[#30363d] bg-[#161b22]">
-                        <SelectItem value="1M">1 Month</SelectItem>
-                        <SelectItem value="3M">3 Months</SelectItem>
-                        <SelectItem value="6M">6 Months</SelectItem>
-                        <SelectItem value="1Y">1 Year</SelectItem>
-                        <SelectItem value="ALL">All Time</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+              <CardContent className="grid gap-6 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label className="text-[#e6edf3]">Theme</Label>
+                  <Select value={theme} onValueChange={(value) => { setTheme(value as "light" | "dark"); setSettings((prev) => ({ ...prev, theme: value })); }}>
+                    <SelectTrigger className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]"><SelectValue /></SelectTrigger>
+                    <SelectContent className="border-[#30363d] bg-[#161b22]">
+                      <SelectItem value="dark">Dark Mode</SelectItem>
+                      <SelectItem value="light">Light Mode</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <Separator className="bg-[#30363d]" />
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="text-[13px] font-semibold text-[#e6edf3]">Show Advanced Metrics</Label>
-                    <p className="text-[12px] text-[#768390]">Display technical indicators and advanced analytics</p>
-                  </div>
-                  <Switch checked={Boolean(settings.advanced_metrics)} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, advanced_metrics: checked }))} />
+                <div className="space-y-2">
+                  <Label className="text-[#e6edf3]">Default Timeframe</Label>
+                  <Select value={String(settings.default_timeframe || "6M")} onValueChange={(value) => setSettings((prev) => ({ ...prev, default_timeframe: value }))}>
+                    <SelectTrigger className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]"><SelectValue /></SelectTrigger>
+                    <SelectContent className="border-[#30363d] bg-[#161b22]">
+                      <SelectItem value="1D">1D</SelectItem><SelectItem value="1W">1W</SelectItem><SelectItem value="1M">1M</SelectItem><SelectItem value="3M">3M</SelectItem><SelectItem value="6M">6M</SelectItem><SelectItem value="1Y">1Y</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <Separator className="bg-[#30363d]" />
-                <div className="flex justify-end gap-3">
-                  <Button variant="outline" className="border-[#30363d] text-[#768390] hover:bg-[#1c2128] hover:text-[#e6edf3]" onClick={() => setSettings(defaultSettings)}>
-                    Reset to Default
-                  </Button>
+                <div className="space-y-2">
+                  <Label className="text-[#e6edf3]">Date Format</Label>
+                  <Select value={String(settings.date_format || "dd-mm-yyyy")} onValueChange={(value) => setSettings((prev) => ({ ...prev, date_format: value }))}>
+                    <SelectTrigger className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]"><SelectValue /></SelectTrigger>
+                    <SelectContent className="border-[#30363d] bg-[#161b22]">
+                      <SelectItem value="dd-mm-yyyy">DD/MM/YYYY</SelectItem><SelectItem value="mm-dd-yyyy">MM/DD/YYYY</SelectItem><SelectItem value="yyyy-mm-dd">YYYY-MM-DD</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[#e6edf3]">Chart Type</Label>
+                  <Select value={String(settings.chart_type || "candlestick")} onValueChange={(value) => setSettings((prev) => ({ ...prev, chart_type: value }))}>
+                    <SelectTrigger className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]"><SelectValue /></SelectTrigger>
+                    <SelectContent className="border-[#30363d] bg-[#161b22]">
+                      <SelectItem value="candlestick">Candlestick</SelectItem><SelectItem value="line">Line</SelectItem><SelectItem value="area">Area</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="md:col-span-2">
+                  <ToggleRow title="Advanced metrics" description="Show additional performance and intelligence blocks on portfolio and stock pages." checked={Boolean(settings.advanced_metrics)} onChange={(checked) => setSettings((prev) => ({ ...prev, advanced_metrics: checked }))} />
+                </div>
+                <div className="md:col-span-2 flex justify-end">
                   <Button className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={savePreferences} disabled={saving}>Save Preferences</Button>
                 </div>
               </CardContent>
@@ -314,37 +383,16 @@ export function Settings() {
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-md bg-red-500/10"><Shield className="h-5 w-5 text-red-500" /></div>
                   <div>
-                    <CardTitle className="text-[18px] text-[#e6edf3]">Security Settings</CardTitle>
-                    <CardDescription className="text-[13px] text-[#768390]">Manage your account security</CardDescription>
+                    <CardTitle className="text-[18px] text-[#e6edf3]">Security</CardTitle>
+                    <CardDescription className="text-[13px] text-[#768390]">Change your password and secure your account.</CardDescription>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="currentPassword" className="text-[#e6edf3]">Current Password</Label>
-                  <Input id="currentPassword" type="password" value={passwords.current} onChange={(e) => setPasswords((prev) => ({ ...prev, current: e.target.value }))} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="newPassword" className="text-[#e6edf3]">New Password</Label>
-                  <Input id="newPassword" type="password" value={passwords.next} onChange={(e) => setPasswords((prev) => ({ ...prev, next: e.target.value }))} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword" className="text-[#e6edf3]">Confirm New Password</Label>
-                  <Input id="confirmPassword" type="password" value={passwords.confirm} onChange={(e) => setPasswords((prev) => ({ ...prev, confirm: e.target.value }))} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
-                </div>
-                <Separator className="bg-[#30363d]" />
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="text-[13px] font-semibold text-[#e6edf3]">Two-Factor Authentication</Label>
-                    <p className="text-[12px] text-[#768390]">Add an extra layer of security to your account</p>
-                  </div>
-                  <Button variant="outline" className="border-[#30363d] text-[#768390] hover:bg-[#1c2128] hover:text-[#e6edf3]">Enable</Button>
-                </div>
-                <Separator className="bg-[#30363d]" />
-                <div className="flex justify-end gap-3">
-                  <Button variant="outline" className="border-[#30363d] text-[#768390] hover:bg-[#1c2128] hover:text-[#e6edf3]" onClick={() => setPasswords({ current: "", next: "", confirm: "" })}>Cancel</Button>
-                  <Button className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={updatePassword} disabled={saving}>Update Password</Button>
-                </div>
+              <CardContent className="grid gap-6 md:grid-cols-2">
+                <div className="space-y-2 md:col-span-2"><Label className="text-[#e6edf3]">Current Password</Label><Input type="password" value={passwords.current} onChange={(e) => setPasswords((prev) => ({ ...prev, current: e.target.value }))} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" /></div>
+                <div className="space-y-2"><Label className="text-[#e6edf3]">New Password</Label><Input type="password" value={passwords.next} onChange={(e) => setPasswords((prev) => ({ ...prev, next: e.target.value }))} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" /></div>
+                <div className="space-y-2"><Label className="text-[#e6edf3]">Confirm New Password</Label><Input type="password" value={passwords.confirm} onChange={(e) => setPasswords((prev) => ({ ...prev, confirm: e.target.value }))} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" /></div>
+                <div className="md:col-span-2 flex justify-end"><Button className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={updatePassword} disabled={saving}>Update Password</Button></div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -353,30 +401,16 @@ export function Settings() {
             <Card className="border-[#30363d] bg-[#161b22]">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-md bg-yellow-500/10"><Database className="h-5 w-5 text-yellow-500" /></div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-md bg-cyan-500/10"><Database className="h-5 w-5 text-cyan-500" /></div>
                   <div>
-                    <CardTitle className="text-[18px] text-[#e6edf3]">Data Management</CardTitle>
-                    <CardDescription className="text-[13px] text-[#768390]">Export or delete your data</CardDescription>
+                    <CardTitle className="text-[18px] text-[#e6edf3]">Data & Sync</CardTitle>
+                    <CardDescription className="text-[13px] text-[#768390]">Overview of the data services connected to your account.</CardDescription>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between rounded-md border border-[#30363d] bg-[#0d1117] p-4">
-                    <div className="space-y-0.5">
-                      <Label className="text-[13px] font-semibold text-[#e6edf3]">Export Your Data</Label>
-                      <p className="text-[12px] text-[#768390]">Download your watchlists, alerts, and settings</p>
-                    </div>
-                    <Button variant="outline" className="border-[#30363d] text-[#768390] hover:bg-[#1c2128] hover:text-[#e6edf3]">Export</Button>
-                  </div>
-                  <div className="flex items-center justify-between rounded-md border border-red-500/30 bg-red-500/5 p-4">
-                    <div className="space-y-0.5">
-                      <Label className="text-[13px] font-semibold text-red-400">Delete Account</Label>
-                      <p className="text-[12px] text-red-400/70">Permanently delete your account and all data</p>
-                    </div>
-                    <Button variant="outline" className="border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300">Delete</Button>
-                  </div>
-                </div>
+              <CardContent className="space-y-4 text-[13px] text-[#9da7b3]">
+                <div className="rounded-xl border border-[#30363d] bg-[#0d1117] p-4">Market data, portfolio analytics, and notification preferences are saved to your account profile automatically when you press save.</div>
+                <div className="rounded-xl border border-[#30363d] bg-[#0d1117] p-4">Your personal settings do not change global admin/system settings. Delivery channels like email or webhook push only work if the backend is configured for them.</div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -385,35 +419,15 @@ export function Settings() {
             <Card className="border-[#30363d] bg-[#161b22]">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-md bg-green-500/10"><CreditCard className="h-5 w-5 text-green-500" /></div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-md bg-amber-500/10"><CreditCard className="h-5 w-5 text-amber-500" /></div>
                   <div>
-                    <CardTitle className="text-[18px] text-[#e6edf3]">Billing & Subscription</CardTitle>
-                    <CardDescription className="text-[13px] text-[#768390]">Manage your subscription and payment methods</CardDescription>
+                    <CardTitle className="text-[18px] text-[#e6edf3]">Billing</CardTitle>
+                    <CardDescription className="text-[13px] text-[#768390]">Billing features are not enabled in this build.</CardDescription>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="rounded-md border border-[#30363d] bg-[#0d1117] p-6">
-                  <div className="mb-4 flex items-start justify-between">
-                    <div>
-                      <h3 className="text-[15px] font-semibold text-[#e6edf3]">Pro Plan</h3>
-                      <p className="text-[13px] text-[#768390]">Full access to all features</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[24px] font-bold text-emerald-500">LKR 2,500</p>
-                      <p className="text-[11px] text-[#768390]">per month</p>
-                    </div>
-                  </div>
-                  <Separator className="mb-4 bg-[#30363d]" />
-                  <div className="space-y-2 text-[12px] text-[#768390]">
-                    <p>Next billing date: April 15, 2026</p>
-                    <p>Payment method: •••• •••• •••• 4242</p>
-                  </div>
-                </div>
-                <div className="flex justify-end gap-3">
-                  <Button variant="outline" className="border-[#30363d] text-[#768390] hover:bg-[#1c2128] hover:text-[#e6edf3]">Update Payment Method</Button>
-                  <Button className="bg-emerald-600 text-white hover:bg-emerald-700">Manage Subscription</Button>
-                </div>
+              <CardContent>
+                <div className="rounded-xl border border-[#30363d] bg-[#0d1117] p-4 text-[13px] text-[#9da7b3]">This area is reserved for future subscription and billing controls.</div>
               </CardContent>
             </Card>
           </TabsContent>

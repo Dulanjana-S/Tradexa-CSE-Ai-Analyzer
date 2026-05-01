@@ -130,6 +130,7 @@ def _system_settings_defaults() -> Dict[str, Any]:
         'pushNotifications': False,
         'smsNotifications': False,
         'notificationDelay': '5',
+        'userAlertsEnabled': True,
         'alertEvaluationIntervalSeconds': '60',
         'notificationDeliveryBatchSize': '50',
         'cacheEnabled': True,
@@ -140,12 +141,25 @@ def _system_settings_defaults() -> Dict[str, Any]:
     }
 
 
+def _normalize_system_setting_value(key: str, value: Any, default: Any) -> Any:
+    bool_keys = {
+        'maintenanceMode', 'requireTwoFactor', 'autoSync', 'dailyPipelineEnabled', 'dailyPipelineTrain',
+        'syncNotifications', 'emailNotifications', 'pushNotifications', 'smsNotifications',
+        'cacheEnabled', 'userAlertsEnabled',
+    }
+    if key in bool_keys:
+        return _to_bool(value, bool(default))
+    return value
+
+
 def _system_settings() -> Dict[str, Any]:
     values = data_service.get_preferences('__system__').get('preferences') or {}
     defaults = _system_settings_defaults()
-    defaults.update(values)
-    defaults['provider'] = values.get('provider') or defaults.get('provider')
-    return defaults
+    merged = dict(defaults)
+    for key, default in defaults.items():
+        merged[key] = _normalize_system_setting_value(key, values.get(key, default), default)
+    merged['provider'] = values.get('provider') or merged.get('provider')
+    return merged
 
 
 
@@ -888,18 +902,25 @@ def api_corporate_actions(symbol: Optional[str] = Query(None), limit: int = Quer
 @app.get("/api/alerts")
 def api_alerts(request: Request):
     user = require_user(request)
-    return {'alerts': data_service.list_alerts(user['username'])}
+    return {'alerts': data_service.list_alerts(user['username']), 'user_alerts_enabled': bool(_system_settings().get('userAlertsEnabled', True))}
 
 
 @app.post("/api/alerts")
 def api_alerts_create(request: Request, payload: Dict[str, Any] = Body(...)):
     user = require_user(request)
+    if not bool(_system_settings().get('userAlertsEnabled', True)):
+        raise HTTPException(status_code=403, detail="User-created alerts are disabled by system settings")
     return data_service.create_alert(user['username'], payload)
 
 
 @app.patch("/api/alerts/{alert_id}")
 def api_alerts_update(alert_id: str, request: Request, payload: Dict[str, Any] = Body(...)):
     user = require_user(request)
+    if not bool(_system_settings().get('userAlertsEnabled', True)):
+        disallowed = any(k in payload for k in ('symbol','alert_type','target_value','targetPrice','meta','recurring','cooldown_minutes'))
+        reenable = payload.get('is_enabled') is True
+        if disallowed or reenable:
+            raise HTTPException(status_code=403, detail="User-created alerts are disabled by system settings")
     return data_service.update_alert(user['username'], alert_id, payload)
 
 
@@ -1000,7 +1021,9 @@ def api_admin_system_settings_update(request: Request, payload: Dict[str, Any] =
     actor = _check_admin_access(request, x_admin_key)
     values = payload.get('settings') if isinstance(payload.get('settings'), dict) else payload
     current = _system_settings()
-    current.update(values or {})
+    incoming = values or {}
+    for key, value in incoming.items():
+        current[key] = _normalize_system_setting_value(key, value, current.get(key))
     provider = str(current.get('provider') or settings.data_provider)
     try:
         active = data_service.set_effective_provider_name(provider)
