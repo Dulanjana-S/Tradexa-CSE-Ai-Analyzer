@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ title }} · CSE AI Analyzer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <div class="min-h-screen flex flex-col">
+    <nav class="bg-white border-b border-slate-200">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex h-16 items-center justify-between gap-3">
+          <div class="flex items-center gap-3 min-w-0">
+            <a href="/" class="flex items-center gap-2 shrink-0">
+              <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-white font-semibold">AI</span>
+              <div class="leading-tight">
+                <div class="text-sm font-semibold">CSE AI Analyzer</div>
+                <div class="text-xs text-slate-500 -mt-0.5">Live market intelligence · User + Admin</div>
+              </div>
+            </a>
+            <span id="providerBadge" class="hidden sm:inline-flex items-center rounded-full bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 border border-indigo-100">Provider: —</span>
+            <span id="modelBadge" class="hidden sm:inline-flex items-center rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800 border border-emerald-100">Model: —</span>
+            <span id="syncBadge" class="hidden lg:inline-flex items-center rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 border border-amber-100">Last sync: —</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="relative hidden md:block">
+              <input id="companySearch" placeholder="Search company" class="w-72 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+              <div id="companySearchResults" class="absolute left-0 right-0 mt-2 hidden rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden z-20"></div>
+            </div>
+            <a href="/" class="navlink">Dashboard</a>
+            <a href="/screener" class="navlink">Screener</a>
+            <a href="/announcements" class="navlink">Announcements</a>
+            {% if current_user %}
+            <a href="/watchlist" class="navlink">Watchlist</a>
+            <a href="/profile" class="navlink">Profile</a>
+            {% endif %}
+            {% if is_admin %}
+            <a href="/admin/status" class="navlink">Admin</a>
+            {% endif %}
+            <div class="flex items-center gap-2 border-l border-slate-200 pl-3">
+              {% if current_user %}
+              <span class="text-sm text-slate-600">{{ current_user.display_name or current_user.username }}</span>
+              <button id="logoutBtn" class="btnSecondary">Logout</button>
+              {% else %}
+              <a href="/login" class="btnSecondary">Login</a>
+              <a href="/register" class="btn">Register</a>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </nav>
+    <main class="flex-1">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+    <footer class="border-t border-slate-200 bg-white">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 text-sm text-slate-600 flex flex-col md:flex-row gap-2 md:items-center md:justify-between">
+        <div><span class="font-medium">Disclaimer:</span> Predictions are probabilistic and experimental. Not investment advice.</div>
+        <div class="text-xs text-slate-500">Built with FastAPI · Tailwind · Plotly</div>
+      </div>
+    </footer>
+  </div>
+  <script src="/static/app.js"></script>
+  <script>
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', async () => {
+        try { await fetchJSON('/api/auth/logout', { method: 'POST' }); } catch {}
+        window.location.href = '/login';
+      });
+    }
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

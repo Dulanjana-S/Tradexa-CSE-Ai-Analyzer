@@ -1,0 +1,55 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: cse
+      POSTGRES_PASSWORD: cse
+      POSTGRES_DB: cse_ai
+    ports:
+      - "5432:5432"
+    volumes:
+      - cse_ai_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cse -d cse_ai"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      DATA_PROVIDER: ${DATA_PROVIDER:-hybrid}
+      DB_CACHE_ENABLED: ${DB_CACHE_ENABLED:-true}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://cse:cse@db:5432/cse_ai}
+      MODEL_DIR: ${MODEL_DIR:-models}
+      ALLOW_PREDICTION_FALLBACK: ${ALLOW_PREDICTION_FALLBACK:-false}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  scheduler:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATA_PROVIDER: ${DATA_PROVIDER:-hybrid}
+      DB_CACHE_ENABLED: ${DB_CACHE_ENABLED:-true}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://cse:cse@db:5432/cse_ai}
+      MODEL_DIR: ${MODEL_DIR:-models}
+      ALLOW_PREDICTION_FALLBACK: ${ALLOW_PREDICTION_FALLBACK:-false}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+    command: ["python", "-m", "app.cli", "run-scheduler", "--once", "--sync", "--train"]
+
+volumes:
+  cse_ai_pgdata:
