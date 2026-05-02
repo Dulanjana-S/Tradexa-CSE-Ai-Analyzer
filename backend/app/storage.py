@@ -2057,12 +2057,68 @@ class Storage:
                 conn.execute("UPDATE model_registry SET is_active=0")
                 cur = conn.execute("UPDATE model_registry SET is_active=1 WHERE model_id=?", (model_id,))
                 found = (cur.rowcount or 0) > 0
+                if found:
+                    row = conn.execute("SELECT meta FROM model_registry WHERE model_id=?", (model_id,)).fetchone()
+                    if row:
+                        try:
+                            meta = json.loads(row['meta'] or '{}')
+                        except Exception:
+                            meta = {}
+                        meta['lifecycle_status'] = 'active'
+                        conn.execute("UPDATE model_registry SET meta=? WHERE model_id=?", (_json_dumps(meta), model_id))
+                    rows = conn.execute("SELECT model_id, meta FROM model_registry WHERE model_id <> ?", (model_id,)).fetchall()
+                    for r in rows:
+                        try:
+                            meta = json.loads(r['meta'] or '{}')
+                        except Exception:
+                            meta = {}
+                        if str(meta.get('lifecycle_status') or '').lower() == 'active':
+                            meta['lifecycle_status'] = 'beta'
+                            conn.execute("UPDATE model_registry SET meta=? WHERE model_id=?", (_json_dumps(meta), r['model_id']))
             return found
         with self.engine().begin() as conn:
             conn.execute(model_registry_t.update().values(is_active=0))
             res = conn.execute(model_registry_t.update().where(model_registry_t.c.model_id == model_id).values(is_active=1))
             found = (res.rowcount or 0) > 0
+            if found:
+                row = conn.execute(select(model_registry_t.c.meta).where(model_registry_t.c.model_id == model_id)).mappings().first()
+                if row:
+                    try:
+                        meta = json.loads(row.get('meta') or '{}')
+                    except Exception:
+                        meta = {}
+                    meta['lifecycle_status'] = 'active'
+                    conn.execute(model_registry_t.update().where(model_registry_t.c.model_id == model_id).values(meta=_json_dumps(meta)))
         return found
+
+    def update_model_meta(self, model_id: str, meta: Dict[str, Any]) -> bool:
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                cur = conn.execute("UPDATE model_registry SET meta=? WHERE model_id=?", (_json_dumps(meta), model_id))
+                return (cur.rowcount or 0) > 0
+        with self.engine().begin() as conn:
+            res = conn.execute(model_registry_t.update().where(model_registry_t.c.model_id == model_id).values(meta=_json_dumps(meta)))
+            return (res.rowcount or 0) > 0
+
+    def archive_model(self, model_id: str) -> bool:
+        model = next((m for m in self.list_models() if str(m.get('model_id')) == model_id), None)
+        if not model or bool(model.get('is_active')):
+            return False
+        meta = dict(model.get('meta') or {})
+        meta['lifecycle_status'] = 'archived'
+        return self.update_model_meta(model_id, meta)
+
+    def delete_model(self, model_id: str) -> bool:
+        model = next((m for m in self.list_models() if str(m.get('model_id')) == model_id), None)
+        if not model or bool(model.get('is_active')):
+            return False
+        if self._is_sqlite():
+            with self._sqlite() as conn:
+                cur = conn.execute("DELETE FROM model_registry WHERE model_id=?", (model_id,))
+                return (cur.rowcount or 0) > 0
+        with self.engine().begin() as conn:
+            res = conn.execute(model_registry_t.delete().where(model_registry_t.c.model_id == model_id))
+            return (res.rowcount or 0) > 0
 
 
     # ---- Corporate actions ----

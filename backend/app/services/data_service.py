@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import csv
 import io
+import importlib.util
 import json
 import math
+import os
 import statistics
 from datetime import date, timedelta, datetime
 from pathlib import Path
@@ -14,7 +16,7 @@ from fastapi import HTTPException, UploadFile
 from ..config import settings
 from ..intelligence import DEFAULT_NEWS_WHITELIST, build_document_intelligence_row, build_sentiment_rows, document_row_to_sentiment, enrich_external_news_item, external_news_to_sentiment_row, extract_links_from_html, is_report_or_corporate_document, preview_macro_rows, summarize_sentiment, validate_whitelisted_url
 from ..mock_data import DEMO_SYMBOLS, demo_prediction
-from ..ml.model_store import activate_bundle, latest_bundle
+from ..ml.model_store import activate_bundle, delete_bundle, inspect_model_store, latest_bundle
 from ..ml.predict import predict_next
 from ..providers.base import MarketDataProvider
 from ..providers.cse_provider import CSEProvider
@@ -32,6 +34,18 @@ _storage.init()
 _cache = TTLCache(ttl_seconds=settings.cache_ttl_seconds)
 _provider: Optional[MarketDataProvider] = None
 _provider_key: Optional[str] = None
+
+
+def _json_safe(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, tuple):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    return value
 
 
 def clear_runtime_cache() -> None:
@@ -725,31 +739,31 @@ def stock_resources(symbol: str) -> Dict[str, Any]:
 def prediction(symbol: str) -> Dict[str, Any]:
     hist = stock_history(symbol, days=320)
     if len(hist) < 120 or hist[-1].get("close") is None:
-        return {
+        return _json_safe({
             "available": False,
             "symbol": symbol.upper(),
             "reason": "Insufficient end-of-day price history for this symbol. Import more data before showing a model signal.",
             "required_history_points": 120,
             "history_points": len(hist),
-        }
+        })
     bundle = latest_bundle(Path(settings.model_dir))
     if bundle is not None:
         try:
             pred = predict_next(symbol=symbol, database_url=settings.database_url, model_dir=settings.model_dir, horizon_days=int(bundle.meta.get("horizon_days") or 1))
-            return {"available": True, **pred}
+            return _json_safe({"available": True, **pred})
         except Exception as e:
-            return {"available": False, "symbol": symbol.upper(), "reason": f"Prediction failed: {getattr(e, 'detail', e)}", "history_points": len(hist)}
+            return _json_safe({"available": False, "symbol": symbol.upper(), "reason": f"Prediction failed: {getattr(e, 'detail', e)}", "history_points": len(hist)})
     if not settings.allow_prediction_fallback:
-        return {"available": False, "symbol": symbol.upper(), "reason": "Model not trained yet. Run training before showing predictions.", "history_points": len(hist)}
+        return _json_safe({"available": False, "symbol": symbol.upper(), "reason": "Model not trained yet. Run training before showing predictions.", "history_points": len(hist)})
     try:
         idx = indices().get("ASPI")
         pred = demo_prediction(hist, index_series=idx if isinstance(idx, list) else None)
         pred["available"] = True
         pred.setdefault("model", {"version": "heuristic"})
         pred.setdefault("quality_flags", []).append("heuristic_fallback")
-        return pred
+        return _json_safe(pred)
     except Exception as e:
-        return {"available": False, "symbol": symbol.upper(), "reason": f"Fallback prediction failed: {getattr(e, 'detail', e)}", "history_points": len(hist)}
+        return _json_safe({"available": False, "symbol": symbol.upper(), "reason": f"Fallback prediction failed: {getattr(e, 'detail', e)}", "history_points": len(hist)})
 
 
 def top_signals(limit: int = 5) -> List[Dict[str, Any]]:
@@ -780,9 +794,37 @@ def top_signals(limit: int = 5) -> List[Dict[str, Any]]:
 
 
 def model_status() -> Dict[str, Any]:
+    store_info = inspect_model_store(Path(settings.model_dir))
+    active = store_info.get("active") or {}
+    if active and not active.get("loadable"):
+        meta = dict(active.get("meta") or {})
+        status = {
+            "available": False,
+            "status": "incompatible_active_model",
+            "model_version": meta.get("model_version"),
+            "active_model": {
+                "model_id": meta.get("model_id") or active.get("name"),
+                "path": active.get("name"),
+                "saved_runtime": active.get("saved_runtime") or {},
+                "runtime": store_info.get("runtime") or {},
+                "load_error": active.get("load_error"),
+                "compatibility": active.get("compatibility") or {},
+            },
+            "reason": "The active saved model cannot be loaded in the current runtime. Retrain a fresh model with this environment or reinstall the saved model's scikit-learn/joblib versions.",
+        }
+        latest_loadable = store_info.get("latest_loadable") or {}
+        if latest_loadable:
+            latest_meta = dict(latest_loadable.get("meta") or {})
+            status["latest_loadable_model"] = {
+                "model_id": latest_meta.get("model_id") or latest_loadable.get("name"),
+                "path": latest_loadable.get("name"),
+                "is_active": bool(latest_loadable.get("is_active")),
+            }
+        return _json_safe(status)
+
     bundle = latest_bundle(Path(settings.model_dir))
     if bundle is None:
-        return {"available": False, "model_version": None}
+        return {"available": False, "model_version": None, "status": "missing"}
     metrics = bundle.meta.get("metrics_holdout") or {}
     quality = "experimental"
     auc = metrics.get("auc_up")
@@ -791,7 +833,7 @@ def model_status() -> Dict[str, Any]:
             quality = "promising"
         elif auc >= 0.55:
             quality = "watch"
-    return {"available": True, "quality": quality, **bundle.meta}
+    return _json_safe({"available": True, "quality": quality, **bundle.meta})
 
 
 def get_watchlist(profile: str = "default") -> Dict[str, Any]:
@@ -864,6 +906,39 @@ def _filesystem_models() -> List[Dict[str, Any]]:
     return out
 
 
+
+
+def _infer_model_family(meta: Dict[str, Any]) -> str:
+    requested = str(meta.get("model_family_requested") or "").strip()
+    if requested:
+        return requested
+    models = meta.get("models") or {}
+    direction = str(models.get("direction") or "").strip()
+    mean = str(models.get("mean") or "").strip()
+    if direction == "RandomForestClassifier" and mean == "GradientBoostingRegressor":
+        return "legacy_boosted"
+    if direction == "LogisticRegression" and mean == "Ridge":
+        return "baseline"
+    if direction in {"XGBoost", "XGBClassifier"} or mean in {"XGBoost", "XGBRegressor"}:
+        return "xgboost"
+    if direction == "CatBoost" or mean == "CatBoost":
+        return "catboost"
+    if direction in {"LightGBM", "LGBMClassifier"} or mean in {"LightGBM", "LGBMRegressor"}:
+        return "lightgbm"
+    if direction in {"SklearnGBC", "GradientBoostingClassifier", "RandomForest"} or mean in {"SklearnGBR", "GradientBoostingRegressor"}:
+        return "sklearn_gbdt"
+    return "unknown"
+
+
+def _model_display_name(meta: Dict[str, Any], default_id: str) -> str:
+    display = str(meta.get("display_name") or "").strip()
+    if display:
+        return display
+    family = _infer_model_family(meta)
+    if family == "legacy_boosted":
+        return f"Legacy boosted 1D ({default_id})"
+    return default_id
+
 def list_models() -> List[Dict[str, Any]]:
     db_rows = {str(item.get("model_id") or item.get("id")): dict(item) for item in _storage.list_models()}
     for item in _filesystem_models():
@@ -886,6 +961,23 @@ def list_models() -> List[Dict[str, Any]]:
             db_rows[model_id] = item
 
     rows = list(db_rows.values())
+    for row in rows:
+        meta = dict(row.get("meta") or {})
+        lifecycle = str(meta.get("lifecycle_status") or ("active" if row.get("is_active") else "beta")).lower()
+        if row.get("is_active"):
+            lifecycle = "active"
+        row["lifecycle_status"] = lifecycle
+        meta["lifecycle_status"] = lifecycle
+        row["meta"] = meta
+        blocks = meta.get("feature_blocks") or {}
+        row["summary"] = {
+            "family": _infer_model_family(meta),
+            "direction_model": (meta.get("models") or {}).get("direction"),
+            "sentiment": bool(blocks.get("sentiment")),
+            "macro": bool(blocks.get("macro")),
+            "finbert_ready": bool(blocks.get("finbert_ready")),
+            "validation": meta.get("validation_summary") or {},
+        }
     rows.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
     return rows
 
@@ -904,9 +996,59 @@ def activate_model(model_id: str) -> bool:
     if ok_fs and not ok_db:
         match = next((item for item in _filesystem_models() if str(item.get("model_id")) == model_id), None)
         if match is not None:
-            _storage.register_model(model_id=model_id, path=str(match.get("path") or model_id), meta=match.get("meta") or {}, is_active=True)
+            meta = dict(match.get("meta") or {})
+            meta["lifecycle_status"] = "active"
+            _storage.register_model(model_id=model_id, path=str(match.get("path") or model_id), meta=meta, is_active=True)
             ok_db = True
     return bool(ok_fs and ok_db)
+
+
+def archive_model(model_id: str) -> bool:
+    return _storage.archive_model(model_id)
+
+
+def delete_model(model_id: str) -> bool:
+    model = next((m for m in list_models() if str(m.get("model_id") or m.get("id")) == model_id), None)
+    if not model or bool(model.get("is_active")):
+        return False
+    ok_db = _storage.delete_model(model_id)
+    ok_fs = delete_bundle(Path(settings.model_dir), model_id)
+    return bool(ok_db and ok_fs)
+
+
+def compare_models(model_a_id: str, model_b_id: str) -> Dict[str, Any]:
+    models = {str(item.get("model_id") or item.get("id")): item for item in list_models()}
+    left = models.get(model_a_id)
+    right = models.get(model_b_id)
+    if not left or not right:
+        raise HTTPException(status_code=404, detail="Model not found")
+    def summary(item: Dict[str, Any]) -> Dict[str, Any]:
+        meta = item.get("meta") or {}
+        metrics = meta.get("metrics_holdout") or {}
+        blocks = meta.get("feature_blocks") or {}
+        return {
+            "model_id": item.get("model_id") or item.get("id"),
+            "display_name": _model_display_name(meta, str(item.get("model_id") or item.get("id") or "Model")),
+            "family": _infer_model_family(meta),
+            "status": item.get("lifecycle_status") or meta.get("lifecycle_status") or "beta",
+            "metrics": {
+                "auc_up": metrics.get("auc_up"),
+                "acc_up": metrics.get("acc_up"),
+                "baseline_acc_up": metrics.get("baseline_acc_up"),
+                "strong_signal_acc_up": metrics.get("strong_signal_acc_up"),
+                "strong_signal_coverage": metrics.get("strong_signal_coverage"),
+            },
+            "feature_blocks": {
+                "price": bool(blocks.get("price")),
+                "index": bool(blocks.get("index")),
+                "sentiment": bool(blocks.get("sentiment")),
+                "macro": bool(blocks.get("macro")),
+                "finbert_ready": bool(blocks.get("finbert_ready")),
+            },
+            "validation_summary": meta.get("validation_summary") or {},
+            "trained_at_utc": meta.get("trained_at_utc"),
+        }
+    return {"left": summary(left), "right": summary(right)}
 
 
 
@@ -2919,6 +3061,39 @@ def event_calendar(symbol: Optional[str] = None, portfolio_id: Optional[str] = N
     return {'symbols': symbols, 'upcoming': upcoming, 'recent': list(reversed(recent)), 'count': len(events)}
 
 
+def _model_capabilities() -> Dict[str, Any]:
+    def _module_available(name: str) -> bool:
+        try:
+            return importlib.util.find_spec(name) is not None
+        except Exception:
+            return False
+
+    available = {
+        "baseline": True,
+        "sklearn_gbdt": True,
+        "lightgbm": _module_available("lightgbm"),
+        "xgboost": _module_available("xgboost"),
+        "catboost": _module_available("catboost"),
+        "finbert_enabled": str(os.getenv("FINBERT_ENABLED", "false")).lower() in {"1", "true", "yes", "on"},
+        "finbert_available": _module_available("transformers") and _module_available("torch"),
+        "finbert_model": os.getenv("FINBERT_MODEL", "ProsusAI/finbert"),
+    }
+    notes = []
+    available["auto_candidates"] = [name for name, ok in [("baseline", True), ("sklearn_gbdt", True), ("lightgbm", available["lightgbm"]), ("xgboost", available["xgboost"]), ("catboost", available["catboost"])] if ok]
+    available["workflow"] = {
+        "sync": "Fetches and stores market data into the database.",
+        "train": "Trains a model using data already stored in the database.",
+        "sync_train": "Runs sync first, then rebuilds intelligence and trains.",
+        "activate": "Makes one trained model live on stock pages.",
+    }
+    if not available["finbert_enabled"]:
+        notes.append("FinBERT is optional and currently disabled by environment setting.")
+    elif available["finbert_enabled"] and not available["finbert_available"]:
+        notes.append("FinBERT is enabled in config but transformers is not installed, so rule-based sentiment will be used.")
+    available["notes"] = notes
+    return available
+
+
 def admin_model_health() -> Dict[str, Any]:
     model = model_status()
     latest_compare = None
@@ -2930,6 +3105,7 @@ def admin_model_health() -> Dict[str, Any]:
     docs_count = len(_storage.get_document_intelligence(limit=5000))
     news_count = len(_storage.get_external_news_items(limit=5000))
     macro_count = len(_storage.get_macro_series(limit=8000))
+    capabilities = _model_capabilities()
     score = 0
     if model.get('available'):
         score += 35
@@ -2953,9 +3129,10 @@ def admin_model_health() -> Dict[str, Any]:
             'macro_points': macro_count,
         },
         'coverage': coverage,
+        'capabilities': capabilities,
         'health_score': min(100, score),
         'health_label': 'healthy' if score >= 75 else 'warming_up' if score >= 50 else 'needs_attention',
-        'note': 'Predictions are probabilistic. Use model health, confidence, and comparison results to judge reliability rather than assuming guaranteed correctness.',
+        'note': 'Use Sync to fetch/store data. Use Train to build a model from stored data. Activate one trained model to make it live on stock pages.',
     }
 
 def admin_status() -> Dict[str, Any]:
@@ -2995,6 +3172,7 @@ def admin_status() -> Dict[str, Any]:
             "selected_news_items": len(_storage.get_external_news_items(limit=5000)),
         },
         "model": model_status(),
+        "model_capabilities": _model_capabilities(),
         "models": models,
         "active_model": active_model,
         "users": _storage.list_users(),
@@ -3021,5 +3199,6 @@ def system_status() -> Dict[str, Any]:
         "coverage": {k: a["coverage"].get(k) for k in ("symbols", "symbols_with_history", "symbols_ready_for_prediction", "latest_price_date")},
         "freshness": a["freshness"],
         "model": a["model"],
+        "model_capabilities": a.get("model_capabilities"),
         "ready": ready,
     }

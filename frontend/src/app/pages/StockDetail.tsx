@@ -35,8 +35,8 @@ export function StockDetail() {
   useEffect(() => {
     let alive = true;
     (async () => {
-      const stockData = await marketApi.getStock(symbol);
-      const [historyData, predictionData, announcementData, resourceData, sentimentData, documentData, newsData, calendarData] = await Promise.all([
+      const stockData = await marketApi.getStock(symbol).catch(() => emptyStock);
+      const [historyResult, predictionResult, announcementResult, resourceResult, sentimentResult, documentResult, newsResult, calendarResult] = await Promise.allSettled([
         marketApi.getStockHistory(symbol, 180),
         marketApi.getStockPrediction(symbol, stockData.lastPrice),
         announcementsApi.getAll({ symbol, limit: 20 }),
@@ -48,14 +48,18 @@ export function StockDetail() {
       ]);
       if (!alive) return;
       setStock(stockData);
-      setHistory(historyData);
-      setPrediction(predictionData);
-      setAnnouncements(announcementData);
-      setResources(resourceData);
-      setSentiment(sentimentData);
-      setDocuments(documentData);
-      setNews(newsData);
-      setCalendar(calendarData);
+      setHistory(historyResult.status === "fulfilled" ? historyResult.value : []);
+      setPrediction(
+        predictionResult.status === "fulfilled"
+          ? predictionResult.value
+          : { ...emptyPrediction, error: String(predictionResult.reason?.message || predictionResult.reason || "Prediction unavailable") }
+      );
+      setAnnouncements(announcementResult.status === "fulfilled" ? announcementResult.value : []);
+      setResources(resourceResult.status === "fulfilled" ? resourceResult.value : emptyResources);
+      setSentiment(sentimentResult.status === "fulfilled" ? sentimentResult.value : emptySentiment);
+      setDocuments(documentResult.status === "fulfilled" ? documentResult.value : emptyDocuments);
+      setNews(newsResult.status === "fulfilled" ? newsResult.value : emptyNews);
+      setCalendar(calendarResult.status === "fulfilled" ? calendarResult.value : emptyCalendar);
       try {
         const watchlist = await watchlistApi.get();
         if (!alive) return;

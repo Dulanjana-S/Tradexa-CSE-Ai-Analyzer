@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Switch } from "../../components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { RefreshCw, Play, Database, CheckCircle2, Clock, Loader2, Upload, Brain, FolderArchive } from "lucide-react";
 import { adminApi } from "../../../lib/api/services";
 import type { Job, AdminStatus } from "../../../lib/api/types";
@@ -20,6 +21,7 @@ export function DataSync() {
   const [days, setDays] = useState(520);
   const [announcements, setAnnouncements] = useState(100);
   const [horizonDays, setHorizonDays] = useState(1);
+  const [modelFamily, setModelFamily] = useState("auto");
   const [trainAfterImport, setTrainAfterImport] = useState(true);
   const [lastImport, setLastImport] = useState<any>(null);
   const [uploadPreview, setUploadPreview] = useState<any>(null);
@@ -74,7 +76,7 @@ export function DataSync() {
   const runTraining = async () => {
     setBusyAction("train");
     try {
-      await adminApi.triggerTraining({ horizon_days: horizonDays });
+      await adminApi.triggerTraining({ horizon_days: horizonDays, model_family: modelFamily });
       await load();
     } finally {
       setBusyAction(null);
@@ -84,7 +86,7 @@ export function DataSync() {
   const runSyncTraining = async () => {
     setBusyAction("sync-train");
     try {
-      await adminApi.triggerSyncTraining({ top_n: topN, days, announcements, horizon_days: horizonDays });
+      await adminApi.triggerSyncTraining({ top_n: topN, days, announcements, horizon_days: horizonDays, model_family: modelFamily });
       await load();
     } finally {
       setBusyAction(null);
@@ -226,14 +228,14 @@ export function DataSync() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1.5">
             <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[#e6edf3]">Data Operations</h1>
-            <p className="text-[13px] text-[#768390]">Upload historical data, sync live CSE data, and retrain the production model from one admin workspace.</p>
+            <p className="text-[13px] text-[#768390]">Run market data, intelligence, and model operations from one control panel.</p>
           </div>
           <div className="flex gap-3">
             <Button variant="outline" className="border-[#30363d] text-[#e6edf3] hover:bg-[#1c2128]" onClick={() => load()}>
               <RefreshCw className="mr-2 h-4 w-4" /> Refresh
             </Button>
             <Button onClick={runSyncTraining} disabled={busyAction !== null} className="bg-emerald-600 text-white hover:bg-emerald-700">
-              {busyAction === "sync-train" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />} Sync + Train
+              {busyAction === "sync-train" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />} Sync Then Train
             </Button>
           </div>
         </div>
@@ -245,6 +247,12 @@ export function DataSync() {
           <Card className="border-[#30363d] bg-[#161b22]"><CardHeader className="pb-2"><CardDescription className="text-[#768390]">Latest Price Date</CardDescription></CardHeader><CardContent><div className="text-[18px] font-bold text-[#e6edf3] break-all">{status?.freshness?.latest_price_date || "—"}</div></CardContent></Card>
         </div>
 
+        <div className="flex flex-wrap gap-2">
+          {[["Market Data","Sync"],["Intelligence","Refresh"],["Model Training","Train"],["Live Prediction","Activate in Model Management"]].map(([title, statusLabel]) => (
+            <Badge key={String(title)} className="border-[#30363d] bg-[#161b22] px-3 py-1 text-[#c9d1d9]">{title}: {statusLabel}</Badge>
+          ))}
+        </div>
+
         <div className="grid gap-6 xl:grid-cols-2">
           <Card className="border-[#30363d] bg-[#161b22]">
             <CardHeader>
@@ -252,7 +260,7 @@ export function DataSync() {
                 <Upload className="h-5 w-5 text-blue-500" />
                 <div>
                   <CardTitle className="text-[18px] text-[#e6edf3]">Historical Data Upload</CardTitle>
-                  <CardDescription className="text-[13px] text-[#768390]">Drag and drop one ZIP or multiple symbol CSV files, then optionally train immediately.</CardDescription>
+                  <CardDescription className="text-[13px] text-[#768390]">Import price history datasets into the database.</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -260,7 +268,7 @@ export function DataSync() {
               <label onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop} className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed px-6 py-10 text-center ${dragActive ? "border-emerald-500 bg-emerald-500/10" : "border-[#30363d] bg-[#0d1117]"}`}>
                 <FolderArchive className="mb-3 h-8 w-8 text-[#768390]" />
                 <div className="text-[14px] font-medium text-[#e6edf3]">Drop ZIP or CSV files here</div>
-                <div className="mt-1 text-[12px] text-[#768390]">CSV files can be uploaded together. The backend will bundle them and import them safely.</div>
+                <div className="mt-1 text-[12px] text-[#768390]">Upload one ZIP or multiple CSV files.</div>
                 <Input ref={fileInputRef} type="file" multiple accept=".csv,.zip" className="mt-4 max-w-sm border-[#30363d] bg-[#161b22] text-[#e6edf3]" onChange={onFileChange} />
               </label>
 
@@ -272,7 +280,7 @@ export function DataSync() {
                 <div className="flex items-center justify-between rounded-md border border-[#30363d] bg-[#0d1117] px-4 py-3">
                   <div>
                     <div className="text-[13px] font-medium text-[#e6edf3]">Train after import</div>
-                    <div className="text-[12px] text-[#768390]">Best option for new historical datasets</div>
+                    <div className="text-[12px] text-[#768390]">Queue training after import</div>
                   </div>
                   <Switch checked={trainAfterImport} onCheckedChange={setTrainAfterImport} />
                 </div>
@@ -311,12 +319,30 @@ export function DataSync() {
                 <Database className="h-5 w-5 text-emerald-500" />
                 <div>
                   <CardTitle className="text-[18px] text-[#e6edf3]">Sync & Training Controls</CardTitle>
-                  <CardDescription className="text-[13px] text-[#768390]">Save future CSE end-of-day data, then retrain the active prediction model.</CardDescription>
+                  <CardDescription className="text-[13px] text-[#768390]">Run sync, intelligence refresh, and training jobs.</CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="rounded-md border border-[#30363d] bg-[#0d1117] p-4 text-[12px] text-[#c9d1d9]">
+                <div className="font-semibold text-[#e6edf3]">Model engines</div>
+                <div className="mt-3 grid gap-2 md:grid-cols-3 xl:grid-cols-6">
+                  {[
+                    ["Baseline", true],
+                    ["Sklearn GBDT", Boolean(modelHealth?.capabilities?.sklearnGbdt)],
+                    ["LightGBM", Boolean(modelHealth?.capabilities?.lightgbm)],
+                    ["XGBoost", Boolean(modelHealth?.capabilities?.xgboost)],
+                    ["CatBoost", Boolean(modelHealth?.capabilities?.catboost)],
+                    ["FinBERT runtime", Boolean(modelHealth?.capabilities?.finbertAvailable)],
+                  ].map(([name, ok]) => (
+                    <div key={String(name)} className={`rounded-md border px-3 py-2 ${ok ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200" : "border-[#30363d] bg-[#08090c] text-[#768390]"}`}>{name}: {ok ? "Available" : "Unavailable"}</div>
+                  ))}
+                </div>
+                <div className="mt-3 text-[#768390]">Auto mode uses only engines available in the running backend environment.</div>
+                {(modelHealth?.capabilities?.notes || []).length ? <div className="mt-2 text-amber-300">{modelHealth.capabilities.notes.join(' | ')}</div> : null}
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-4">
                 <div className="space-y-2">
                   <Label className="text-[#768390]">Top symbols</Label>
                   <Input type="number" min={1} max={500} value={topN} onChange={(e) => setTopN(Number(e.target.value) || 80)} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
@@ -329,17 +355,31 @@ export function DataSync() {
                   <Label className="text-[#768390]">Announcements</Label>
                   <Input type="number" min={0} max={500} value={announcements} onChange={(e) => setAnnouncements(Number(e.target.value) || 100)} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
                 </div>
+                <div className="space-y-2">
+                  <Label className="text-[#768390]">Model family</Label>
+                  <Select value={modelFamily} onValueChange={setModelFamily}>
+                    <SelectTrigger className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]"><SelectValue /></SelectTrigger>
+                    <SelectContent className="border-[#30363d] bg-[#161b22]">
+                      <SelectItem value="auto">Auto boosted</SelectItem>
+                      <SelectItem value="baseline">Baseline</SelectItem>
+                      <SelectItem value="sklearn_gbdt">Sklearn GBDT</SelectItem>
+                      <SelectItem value="lightgbm">LightGBM</SelectItem>
+                      <SelectItem value="xgboost">XGBoost</SelectItem>
+                      <SelectItem value="catboost">CatBoost</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3">
                 <Button onClick={runSync} disabled={busyAction !== null} variant="outline" className="border-[#30363d] text-[#e6edf3] hover:bg-[#1c2128]">
-                  {busyAction === "sync" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />} Run Sync
+                  {busyAction === "sync" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />} Sync Database
                 </Button>
                 <Button onClick={runTraining} disabled={busyAction !== null} variant="outline" className="border-[#30363d] text-[#e6edf3] hover:bg-[#1c2128]">
-                  {busyAction === "train" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Brain className="mr-2 h-4 w-4" />} Train Only
+                  {busyAction === "train" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Brain className="mr-2 h-4 w-4" />} Train From Stored Data
                 </Button>
                 <Button onClick={runSyncTraining} disabled={busyAction !== null} className="bg-emerald-600 text-white hover:bg-emerald-700">
-                  {busyAction === "sync-train" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />} Sync + Train
+                  {busyAction === "sync-train" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />} Sync Then Train
                 </Button>
               </div>
 
@@ -383,7 +423,7 @@ export function DataSync() {
               {documentResult ? <div className="rounded-md border border-indigo-500/30 bg-indigo-500/10 p-4 text-[13px] text-indigo-100">Documents analyzed: {documentResult.documents_analyzed || 0} • Document sentiment rows: {documentResult.sentiment_rows_upserted || 0}</div> : null}
               {selectedNewsResult ? <div className="rounded-md border border-sky-500/30 bg-sky-500/10 p-4 text-[13px] text-sky-100">News items: {selectedNewsResult.news_items_upserted || 0} • Symbol rows: {selectedNewsResult.symbol_sentiment_rows_upserted || 0} • Market features: {selectedNewsResult.market_feature_points_upserted || 0}</div> : null}
               {comparisonResult ? <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-4 text-[13px] text-emerald-100">Recommendation: {comparisonResult.recommendation || "—"} • Accuracy delta: {comparisonResult.deltas?.acc_up ?? "—"} • Added features: {comparisonResult.deltas?.added_features ?? 0}</div> : null}
-              {modelHealth ? <div className="rounded-md border border-[#30363d] bg-[#0d1117] p-4 text-[13px]"><div className="flex items-center justify-between"><span className="text-[#768390]">Model health</span><span className="font-semibold text-[#e6edf3]">{modelHealth.healthScore || 0}/100 · {modelHealth.healthLabel || 'needs_attention'}</span></div><div className="mt-2 text-[#768390]">{modelHealth.note}</div>{modelHealth.model?.metricsHoldout ? null : null}</div> : null}
+              {modelHealth ? <div className="rounded-md border border-[#30363d] bg-[#0d1117] p-4 text-[13px]"><div className="flex items-center justify-between"><span className="text-[#768390]">Model workflow health</span><span className="font-semibold text-[#e6edf3]">{modelHealth.healthScore || 0}/100 · {modelHealth.healthLabel || 'needs_attention'}</span></div><div className="mt-2 text-[#768390]">{modelHealth.note}</div>{modelHealth.model?.metricsHoldout ? null : null}</div> : null}
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="rounded-md border border-[#30363d] bg-[#0d1117] p-4 text-[13px] text-[#e6edf3]"><div className="mb-1 text-[#768390]">PDF docs</div>{status?.counts?.document_intelligence ?? 0}</div>
                 <div className="rounded-md border border-[#30363d] bg-[#0d1117] p-4 text-[13px] text-[#e6edf3]"><div className="mb-1 text-[#768390]">Selected news</div>{status?.counts?.selected_news_items ?? 0}</div>
@@ -433,7 +473,7 @@ export function DataSync() {
             </div>
             <div className="flex gap-3">
               <Button onClick={saveScheduler} disabled={busyAction !== null} className="bg-blue-600 text-white hover:bg-blue-700">{busyAction === "scheduler" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Clock className="mr-2 h-4 w-4" />} Save Scheduler</Button>
-              <Button onClick={async () => { setBusyAction("daily-pipeline"); try { await adminApi.triggerDailyPipeline({ top_n: topN, days, announcements, horizon_days: horizonDays, train_after_sync: true }); await load(); } finally { setBusyAction(null); } }} disabled={busyAction !== null} variant="outline" className="border-[#30363d] text-[#e6edf3] hover:bg-[#1c2128]">{busyAction === "daily-pipeline" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />} Run Daily Pipeline Now</Button>
+              <Button onClick={async () => { setBusyAction("daily-pipeline"); try { await adminApi.triggerDailyPipeline({ top_n: topN, days, announcements, horizon_days: horizonDays, train_after_sync: true, model_family: modelFamily }); await load(); } finally { setBusyAction(null); } }} disabled={busyAction !== null} variant="outline" className="border-[#30363d] text-[#e6edf3] hover:bg-[#1c2128]">{busyAction === "daily-pipeline" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />} Run Daily Pipeline Now</Button>
             </div>
           </CardContent>
         </Card>

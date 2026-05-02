@@ -271,5 +271,6 @@
       "mae_return": 0.014090232205512957,
       "avg_abs_return": 0.012800402326761736
     }
-  ]
+  ],
+  "lifecycle_status": "active"
 }
