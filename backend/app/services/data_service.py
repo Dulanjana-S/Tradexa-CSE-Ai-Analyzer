@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import csv
 import io
+import importlib.util
 import json
 import math
+import os
 import statistics
 from datetime import date, timedelta, datetime
 from pathlib import Path
@@ -14,7 +16,7 @@ from fastapi import HTTPException, UploadFile
 from ..config import settings
 from ..intelligence import DEFAULT_NEWS_WHITELIST, build_document_intelligence_row, build_sentiment_rows, document_row_to_sentiment, enrich_external_news_item, external_news_to_sentiment_row, extract_links_from_html, is_report_or_corporate_document, preview_macro_rows, summarize_sentiment, validate_whitelisted_url
 from ..mock_data import DEMO_SYMBOLS, demo_prediction
-from ..ml.model_store import activate_bundle, latest_bundle
+from ..ml.model_store import activate_bundle, delete_bundle, inspect_model_store, latest_bundle
 from ..ml.predict import predict_next
 from ..providers.base import MarketDataProvider
 from ..providers.cse_provider import CSEProvider
@@ -780,9 +782,37 @@ def top_signals(limit: int = 5) -> List[Dict[str, Any]]:
 
 
 def model_status() -> Dict[str, Any]:
+    store_info = inspect_model_store(Path(settings.model_dir))
+    active = store_info.get("active") or {}
+    if active and not active.get("loadable"):
+        meta = dict(active.get("meta") or {})
+        status = {
+            "available": False,
+            "status": "incompatible_active_model",
+            "model_version": meta.get("model_version"),
+            "active_model": {
+                "model_id": meta.get("model_id") or active.get("name"),
+                "path": active.get("name"),
+                "saved_runtime": active.get("saved_runtime") or {},
+                "runtime": store_info.get("runtime") or {},
+                "load_error": active.get("load_error"),
+                "compatibility": active.get("compatibility") or {},
+            },
+            "reason": "The active saved model cannot be loaded in the current runtime. Retrain a fresh model with this environment or reinstall the saved model's scikit-learn/joblib versions.",
+        }
+        latest_loadable = store_info.get("latest_loadable") or {}
+        if latest_loadable:
+            latest_meta = dict(latest_loadable.get("meta") or {})
+            status["latest_loadable_model"] = {
+                "model_id": latest_meta.get("model_id") or latest_loadable.get("name"),
+                "path": latest_loadable.get("name"),
+                "is_active": bool(latest_loadable.get("is_active")),
+            }
+        return status
+
     bundle = latest_bundle(Path(settings.model_dir))
     if bundle is None:
-        return {"available": False, "model_version": None}
+        return {"available": False, "model_version": None, "status": "missing"}
     metrics = bundle.meta.get("metrics_holdout") or {}
     quality = "experimental"
     auc = metrics.get("auc_up")
@@ -886,6 +916,23 @@ def list_models() -> List[Dict[str, Any]]:
             db_rows[model_id] = item
 
     rows = list(db_rows.values())
+    for row in rows:
+        meta = dict(row.get("meta") or {})
+        lifecycle = str(meta.get("lifecycle_status") or ("active" if row.get("is_active") else "beta")).lower()
+        if row.get("is_active"):
+            lifecycle = "active"
+        row["lifecycle_status"] = lifecycle
+        meta["lifecycle_status"] = lifecycle
+        row["meta"] = meta
+        blocks = meta.get("feature_blocks") or {}
+        row["summary"] = {
+            "family": meta.get("model_family_requested") or "baseline",
+            "direction_model": (meta.get("models") or {}).get("direction"),
+            "sentiment": bool(blocks.get("sentiment")),
+            "macro": bool(blocks.get("macro")),
+            "finbert_ready": bool(blocks.get("finbert_ready")),
+            "validation": meta.get("validation_summary") or {},
+        }
     rows.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
     return rows
 
@@ -904,9 +951,59 @@ def activate_model(model_id: str) -> bool:
     if ok_fs and not ok_db:
         match = next((item for item in _filesystem_models() if str(item.get("model_id")) == model_id), None)
         if match is not None:
-            _storage.register_model(model_id=model_id, path=str(match.get("path") or model_id), meta=match.get("meta") or {}, is_active=True)
+            meta = dict(match.get("meta") or {})
+            meta["lifecycle_status"] = "active"
+            _storage.register_model(model_id=model_id, path=str(match.get("path") or model_id), meta=meta, is_active=True)
             ok_db = True
     return bool(ok_fs and ok_db)
+
+
+def archive_model(model_id: str) -> bool:
+    return _storage.archive_model(model_id)
+
+
+def delete_model(model_id: str) -> bool:
+    model = next((m for m in list_models() if str(m.get("model_id") or m.get("id")) == model_id), None)
+    if not model or bool(model.get("is_active")):
+        return False
+    ok_db = _storage.delete_model(model_id)
+    ok_fs = delete_bundle(Path(settings.model_dir), model_id)
+    return bool(ok_db and ok_fs)
+
+
+def compare_models(model_a_id: str, model_b_id: str) -> Dict[str, Any]:
+    models = {str(item.get("model_id") or item.get("id")): item for item in list_models()}
+    left = models.get(model_a_id)
+    right = models.get(model_b_id)
+    if not left or not right:
+        raise HTTPException(status_code=404, detail="Model not found")
+    def summary(item: Dict[str, Any]) -> Dict[str, Any]:
+        meta = item.get("meta") or {}
+        metrics = meta.get("metrics_holdout") or {}
+        blocks = meta.get("feature_blocks") or {}
+        return {
+            "model_id": item.get("model_id") or item.get("id"),
+            "display_name": meta.get("display_name") or item.get("model_id") or item.get("id"),
+            "family": meta.get("model_family_requested") or "baseline",
+            "status": item.get("lifecycle_status") or meta.get("lifecycle_status") or "beta",
+            "metrics": {
+                "auc_up": metrics.get("auc_up"),
+                "acc_up": metrics.get("acc_up"),
+                "baseline_acc_up": metrics.get("baseline_acc_up"),
+                "strong_signal_acc_up": metrics.get("strong_signal_acc_up"),
+                "strong_signal_coverage": metrics.get("strong_signal_coverage"),
+            },
+            "feature_blocks": {
+                "price": bool(blocks.get("price")),
+                "index": bool(blocks.get("index")),
+                "sentiment": bool(blocks.get("sentiment")),
+                "macro": bool(blocks.get("macro")),
+                "finbert_ready": bool(blocks.get("finbert_ready")),
+            },
+            "validation_summary": meta.get("validation_summary") or {},
+            "trained_at_utc": meta.get("trained_at_utc"),
+        }
+    return {"left": summary(left), "right": summary(right)}
 
 
 
@@ -2919,6 +3016,39 @@ def event_calendar(symbol: Optional[str] = None, portfolio_id: Optional[str] = N
     return {'symbols': symbols, 'upcoming': upcoming, 'recent': list(reversed(recent)), 'count': len(events)}
 
 
+def _model_capabilities() -> Dict[str, Any]:
+    def _module_available(name: str) -> bool:
+        try:
+            return importlib.util.find_spec(name) is not None
+        except Exception:
+            return False
+
+    available = {
+        "baseline": True,
+        "sklearn_gbdt": True,
+        "lightgbm": _module_available("lightgbm"),
+        "xgboost": _module_available("xgboost"),
+        "catboost": _module_available("catboost"),
+        "finbert_enabled": str(os.getenv("FINBERT_ENABLED", "false")).lower() in {"1", "true", "yes", "on"},
+        "finbert_available": _module_available("transformers") and _module_available("torch"),
+        "finbert_model": os.getenv("FINBERT_MODEL", "ProsusAI/finbert"),
+    }
+    notes = []
+    available["auto_candidates"] = [name for name, ok in [("baseline", True), ("sklearn_gbdt", True), ("lightgbm", available["lightgbm"]), ("xgboost", available["xgboost"]), ("catboost", available["catboost"])] if ok]
+    available["workflow"] = {
+        "sync": "Fetches and stores market data into the database.",
+        "train": "Trains a model using data already stored in the database.",
+        "sync_train": "Runs sync first, then rebuilds intelligence and trains.",
+        "activate": "Makes one trained model live on stock pages.",
+    }
+    if not available["finbert_enabled"]:
+        notes.append("FinBERT is optional and currently disabled by environment setting.")
+    elif available["finbert_enabled"] and not available["finbert_available"]:
+        notes.append("FinBERT is enabled in config but transformers is not installed, so rule-based sentiment will be used.")
+    available["notes"] = notes
+    return available
+
+
 def admin_model_health() -> Dict[str, Any]:
     model = model_status()
     latest_compare = None
@@ -2930,6 +3060,7 @@ def admin_model_health() -> Dict[str, Any]:
     docs_count = len(_storage.get_document_intelligence(limit=5000))
     news_count = len(_storage.get_external_news_items(limit=5000))
     macro_count = len(_storage.get_macro_series(limit=8000))
+    capabilities = _model_capabilities()
     score = 0
     if model.get('available'):
         score += 35
@@ -2953,9 +3084,10 @@ def admin_model_health() -> Dict[str, Any]:
             'macro_points': macro_count,
         },
         'coverage': coverage,
+        'capabilities': capabilities,
         'health_score': min(100, score),
         'health_label': 'healthy' if score >= 75 else 'warming_up' if score >= 50 else 'needs_attention',
-        'note': 'Predictions are probabilistic. Use model health, confidence, and comparison results to judge reliability rather than assuming guaranteed correctness.',
+        'note': 'Use Sync to fetch/store data. Use Train to build a model from stored data. Activate one trained model to make it live on stock pages.',
     }
 
 def admin_status() -> Dict[str, Any]:
@@ -2995,6 +3127,7 @@ def admin_status() -> Dict[str, Any]:
             "selected_news_items": len(_storage.get_external_news_items(limit=5000)),
         },
         "model": model_status(),
+        "model_capabilities": _model_capabilities(),
         "models": models,
         "active_model": active_model,
         "users": _storage.list_users(),
@@ -3021,5 +3154,6 @@ def system_status() -> Dict[str, Any]:
         "coverage": {k: a["coverage"].get(k) for k in ("symbols", "symbols_with_history", "symbols_ready_for_prediction", "latest_price_date")},
         "freshness": a["freshness"],
         "model": a["model"],
+        "model_capabilities": a.get("model_capabilities"),
         "ready": ready,
     }

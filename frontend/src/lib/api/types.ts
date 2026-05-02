@@ -258,6 +258,20 @@ export interface AuditLog {
   createdAt?: string;
 }
 
+export interface AdminModelCapabilities {
+  baseline: boolean;
+  sklearnGbdt: boolean;
+  lightgbm: boolean;
+  xgboost: boolean;
+  catboost: boolean;
+  finbertEnabled: boolean;
+  finbertAvailable: boolean;
+  finbertModel?: string;
+  autoCandidates?: string[];
+  workflow?: Record<string, string>;
+  notes?: string[];
+}
+
 export interface AdminModelHealth {
   healthScore: number;
   healthLabel: string;
@@ -266,6 +280,7 @@ export interface AdminModelHealth {
   latestComparison?: any;
   featureStore: Record<string, number>;
   coverage: Record<string, any>;
+  capabilities?: AdminModelCapabilities;
 }
 
 export interface PortfolioPerformancePoint {
@@ -489,6 +504,15 @@ export interface Model {
   accuracy?: number;
   createdAt?: string;
   isActive?: boolean;
+  lifecycleStatus?: string;
+  summary?: {
+    family?: string;
+    directionModel?: string;
+    sentiment?: boolean;
+    macro?: boolean;
+    finbertReady?: boolean;
+    validation?: Record<string, any>;
+  };
   meta?: Record<string, any>;
   path?: string;
 }
@@ -617,4 +641,21 @@ export interface StockNews {
   symbol: string;
   linkedNews: ExternalNewsItem[];
   marketContext: ExternalNewsItem[];
+}
+
+
+export interface ModelComparisonSide {
+  modelId: string;
+  displayName: string;
+  family: string;
+  status: string;
+  metrics: Record<string, number | null>;
+  featureBlocks: Record<string, boolean>;
+  validationSummary?: Record<string, any>;
+  trainedAtUtc?: string;
+}
+
+export interface ModelComparison {
+  left: ModelComparisonSide;
+  right: ModelComparisonSide;
 }

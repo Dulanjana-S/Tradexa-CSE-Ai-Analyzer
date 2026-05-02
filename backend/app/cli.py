@@ -17,6 +17,7 @@ from .config import settings
 from .intelligence import parse_macro_csv_bytes
 from .mock_data import generate_dataset, load_dataset
 from .ml.train import train_from_db
+from .ml.model_store import activate_bundle, inspect_model_store
 from .storage import Storage
 from .services.auth_service import ensure_bootstrap_admin
 
@@ -228,17 +229,26 @@ def cmd_train(args: argparse.Namespace) -> None:
     run_id = getattr(args, "run_id", None) or st.record_job_run(job_name="train", status="running", details={}, started_at=started)
     if getattr(args, "run_id", None):
         st.record_job_run(job_name="train", status="running", details={}, run_id=run_id, started_at=started, finished_at=None)
-    details = {"symbols": args.symbols or None, "horizon_days": args.horizon_days}
+    details = {"symbols": args.symbols or None, "horizon_days": args.horizon_days, "model_family": getattr(args, "model_family", "auto")}
     try:
-        res = train_from_db(database_url=settings.database_url, model_dir=settings.model_dir, symbols=[s.upper() for s in args.symbols] if args.symbols else None, horizon_days=args.horizon_days)
+        res = train_from_db(database_url=settings.database_url, model_dir=settings.model_dir, symbols=[s.upper() for s in args.symbols] if args.symbols else None, horizon_days=args.horizon_days, model_family=getattr(args, "model_family", "auto"))
         meta = {}
         try:
             meta = json.loads((Path(res.model_path) / "metadata.json").read_text(encoding="utf-8"))
         except Exception:
             meta = {"metrics_holdout": res.metrics}
         model_id = meta.get("model_id") or Path(res.model_path).name
-        st.register_model(model_id=model_id, path=Path(res.model_path).name, meta=meta, is_active=True)
-        details.update({"rows": res.rows, "symbols_count": res.symbols, "metrics": res.metrics, "model_path": str(res.model_path), "model_id": model_id})
+        store_info = inspect_model_store(Path(settings.model_dir))
+        active_info = store_info.get("active") or {}
+        active_unavailable = not bool(active_info) or not bool(active_info.get("loadable"))
+        auto_activate = st.get_active_model() is None or active_unavailable
+        if auto_activate:
+            meta["lifecycle_status"] = "active"
+            activate_bundle(Path(settings.model_dir), model_id)
+        else:
+            meta.setdefault("lifecycle_status", "beta")
+        st.register_model(model_id=model_id, path=Path(res.model_path).name, meta=meta, is_active=auto_activate)
+        details.update({"rows": res.rows, "symbols_count": res.symbols, "metrics": res.metrics, "model_path": str(res.model_path), "model_id": model_id, "lifecycle_status": meta.get("lifecycle_status"), "auto_activated": auto_activate, "replaced_incompatible_active_model": bool(active_info) and not bool(active_info.get("loadable"))})
         st.record_job_run(job_name="train", status="completed", details=details, run_id=run_id, started_at=started, finished_at=_utc_now())
         print("Training complete")
         print(f"Rows: {res.rows} | Symbols: {res.symbols}")
@@ -587,6 +597,7 @@ def main(argv: Optional[List[str]] = None) -> None:
     s2 = sub.add_parser("train", help="Train ML model from the database")
     s2.add_argument("--symbols", nargs="*", help="Train using specific symbols only")
     s2.add_argument("--horizon-days", type=int, default=1, help="Prediction horizon in trading days")
+    s2.add_argument("--model-family", choices=["auto", "baseline", "sklearn_gbdt", "lightgbm", "xgboost", "catboost"], default="auto", help="Model family to train. auto compares all installed candidates.")
     s2.set_defaults(func=cmd_train)
 
     ssent = sub.add_parser("refresh-sentiment", help="Analyze stored CSE announcements into sentiment/event features")

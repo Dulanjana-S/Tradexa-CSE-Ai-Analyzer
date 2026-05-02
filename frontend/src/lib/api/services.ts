@@ -34,6 +34,7 @@ import type {
   EventCalendar,
   AuditLog,
   AdminModelHealth,
+  ModelComparison,
 } from "./types";
 
 function num(value: any, fallback = 0): number {
@@ -463,11 +464,20 @@ function mapModel(raw: any): Model {
       : undefined;
   return {
     id: String(raw?.model_id || raw?.id || ""),
-    name: String(raw?.model_id || raw?.name || "Model"),
-    status: raw?.is_active ? "active" : "inactive",
+    name: String(meta?.display_name || raw?.model_id || raw?.name || "Model"),
+    status: String(raw?.lifecycle_status || meta?.lifecycle_status || (raw?.is_active ? "active" : "beta")),
     accuracy,
     createdAt: raw?.created_at || meta?.trained_at_utc,
     isActive: Boolean(raw?.is_active),
+    lifecycleStatus: String(raw?.lifecycle_status || meta?.lifecycle_status || (raw?.is_active ? "active" : "beta")),
+    summary: raw?.summary ? {
+      family: raw.summary.family,
+      directionModel: raw.summary.direction_model ?? raw.summary.directionModel,
+      sentiment: Boolean(raw.summary.sentiment),
+      macro: Boolean(raw.summary.macro),
+      finbertReady: Boolean(raw.summary.finbert_ready ?? raw.summary.finbertReady),
+      validation: raw.summary.validation || {},
+    } : undefined,
     meta,
     path: raw?.path,
   };
@@ -1158,17 +1168,20 @@ export const adminApi = {
   },
 
   activateModel: (modelId: string) => api.post<any>(`/api/admin/models/${encodeURIComponent(modelId)}/activate`, {}),
+  archiveModel: (modelId: string) => api.post<any>(`/api/admin/models/${encodeURIComponent(modelId)}/archive`, {}),
+  deleteModel: (modelId: string) => api.delete<any>(`/api/admin/models/${encodeURIComponent(modelId)}`),
+  compareModels: (modelA: string, modelB: string) => api.get<ModelComparison>(`/api/admin/models/compare?model_a=${encodeURIComponent(modelA)}&model_b=${encodeURIComponent(modelB)}`),
 
   triggerSync: (payload?: { symbols?: string[]; top_n?: number; days?: number; announcements?: number }) =>
     api.post<any>("/api/admin/actions/sync", payload || {}),
 
-  triggerTraining: (payload?: { symbols?: string[]; horizon_days?: number }) =>
+  triggerTraining: (payload?: { symbols?: string[]; horizon_days?: number; model_family?: string }) =>
     api.post<any>("/api/admin/actions/train", payload || {}),
 
-  triggerSyncTraining: (payload?: { symbols?: string[]; top_n?: number; days?: number; announcements?: number; horizon_days?: number }) =>
+  triggerSyncTraining: (payload?: { symbols?: string[]; top_n?: number; days?: number; announcements?: number; horizon_days?: number; model_family?: string }) =>
     api.post<any>("/api/admin/actions/sync-train", payload || {}),
 
-  triggerDailyPipeline: (payload?: { symbols?: string[]; top_n?: number; days?: number; announcements?: number; horizon_days?: number; train_after_sync?: boolean }) =>
+  triggerDailyPipeline: (payload?: { symbols?: string[]; top_n?: number; days?: number; announcements?: number; horizon_days?: number; train_after_sync?: boolean; model_family?: string }) =>
     api.post<any>("/api/admin/actions/daily-pipeline", payload || {}),
 
   previewHistoricalData: async (files: File[]) => {
@@ -1259,6 +1272,7 @@ export const adminApi = {
 
   getModelHealth: async (): Promise<AdminModelHealth> => {
     const response = await api.get<any>("/api/admin/model-health");
+    const caps = response?.capabilities || {};
     return {
       healthScore: num(response?.health_score ?? response?.healthScore),
       healthLabel: String(response?.health_label || response?.healthLabel || 'needs_attention'),
@@ -1267,6 +1281,19 @@ export const adminApi = {
       latestComparison: response?.latest_comparison || response?.latestComparison,
       featureStore: response?.feature_store || response?.featureStore || {},
       coverage: response?.coverage || {},
+      capabilities: {
+        baseline: Boolean(caps?.baseline ?? true),
+        sklearnGbdt: Boolean(caps?.sklearnGbdt ?? caps?.sklearn_gbdt),
+        lightgbm: Boolean(caps?.lightgbm),
+        xgboost: Boolean(caps?.xgboost),
+        catboost: Boolean(caps?.catboost),
+        finbertEnabled: Boolean(caps?.finbertEnabled ?? caps?.finbert_enabled),
+        finbertAvailable: Boolean(caps?.finbertAvailable ?? caps?.finbert_available),
+        finbertModel: caps?.finbertModel ?? caps?.finbert_model,
+        autoCandidates: Array.isArray(caps?.autoCandidates) ? caps.autoCandidates : Array.isArray(caps?.auto_candidates) ? caps.auto_candidates : [],
+        workflow: caps?.workflow || {},
+        notes: Array.isArray(caps?.notes) ? caps.notes : [],
+      },
     };
   },
 

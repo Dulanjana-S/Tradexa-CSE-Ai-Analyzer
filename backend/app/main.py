@@ -444,6 +444,28 @@ def api_admin_activate_model(model_id: str, request: Request, x_admin_key: Optio
     return {"ok": True, "active_model": model_id}
 
 
+@app.post("/api/admin/models/{model_id}/archive")
+def api_admin_archive_model(model_id: str, request: Request, x_admin_key: Optional[str] = Header(default=None)):
+    _check_admin_access(request, x_admin_key)
+    if not data_service.archive_model(model_id):
+        raise HTTPException(status_code=400, detail="Only inactive models can be archived")
+    return {"ok": True, "model_id": model_id}
+
+
+@app.delete("/api/admin/models/{model_id}")
+def api_admin_delete_model(model_id: str, request: Request, x_admin_key: Optional[str] = Header(default=None)):
+    _check_admin_access(request, x_admin_key)
+    if not data_service.delete_model(model_id):
+        raise HTTPException(status_code=400, detail="Only inactive models can be deleted")
+    return {"ok": True, "model_id": model_id}
+
+
+@app.get("/api/admin/models/compare")
+def api_admin_compare_models(request: Request, model_a: str = Query(...), model_b: str = Query(...), x_admin_key: Optional[str] = Header(default=None)):
+    _check_admin_access(request, x_admin_key)
+    return data_service.compare_models(model_a, model_b)
+
+
 @app.get("/api/admin/users")
 def api_admin_users(request: Request, x_admin_key: Optional[str] = Header(default=None)):
     _check_admin_access(request, x_admin_key)
@@ -477,7 +499,7 @@ def api_admin_run_sync(request: Request, payload: Dict[str, Any] = Body(default=
 @app.post("/api/admin/actions/train")
 def api_admin_run_train(request: Request, payload: Dict[str, Any] = Body(default={}), x_admin_key: Optional[str] = Header(default=None)):
     actor = _check_admin_access(request, x_admin_key)
-    job = run_train_now({"symbols": payload.get("symbols"), "horizon_days": int(payload.get("horizon_days") or 1)})
+    job = run_train_now({"symbols": payload.get("symbols"), "horizon_days": int(payload.get("horizon_days") or 1), "model_family": payload.get("model_family") or "auto"})
     _audit_admin_action(request, actor, 'model.train', target_type='job', target_id=str(job.get('run_id') or 'train'), details=payload)
     return {"ok": True, "job": job}
 
@@ -494,6 +516,7 @@ def api_admin_run_sync_train(request: Request, payload: Dict[str, Any] = Body(de
         "sleep_ms": int(payload.get("sleep_ms") or 250),
         "train_symbols": payload.get("train_symbols") or payload.get("symbols"),
         "horizon_days": int(payload.get("horizon_days") or 1),
+        "model_family": payload.get("model_family") or "auto",
         "train_after_sync": True,
     })
     _audit_admin_action(request, actor, 'data.sync_train', target_type='job', target_id=str(job.get('run_id') or 'sync-train'), details=payload)
@@ -510,6 +533,7 @@ def api_admin_run_daily_pipeline(request: Request, payload: Dict[str, Any] = Bod
         "announcements": int(payload.get("announcements") or 100),
         "sleep_ms": int(payload.get("sleep_ms") or 250),
         "horizon_days": int(payload.get("horizon_days") or 1),
+        "model_family": payload.get("model_family") or "auto",
         "train_after_sync": _to_bool(payload.get("train_after_sync"), True),
     })
     _audit_admin_action(request, actor, 'pipeline.daily_run', target_type='job', target_id=str(job.get('run_id') or 'daily-pipeline'), details=payload)

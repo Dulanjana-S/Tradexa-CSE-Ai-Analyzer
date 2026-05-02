@@ -153,6 +153,7 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json().get("settings", {}).get("default_timeframe"), "1Y")
 
+        self.client.post("/api/admin/system-settings", json={"settings": {"userAlertsEnabled": True}}, headers={"X-Admin-Key": os.environ.get("ADMIN_API_KEY", "")})
         resp = self.client.post("/api/alerts", json={"symbol": self.symbol, "alert_type": "above_price", "target_value": 0.01})
         self.assertEqual(resp.status_code, 200)
         alerts = resp.json().get("alerts") or []
@@ -176,6 +177,7 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(resp.status_code, 200, msg=resp.text)
         resp = self.client.post("/api/alerts", json={"symbol": self.symbol, "alert_type": "above_price", "target_value": 0.01})
         self.assertEqual(resp.status_code, 403)
+        self.client.post("/api/admin/system-settings", json={"settings": {"userAlertsEnabled": True}}, headers=admin_headers)
         self.client.post("/api/admin/system-settings", json={"settings": {"userAlertsEnabled": True}}, headers=admin_headers)
 
 
@@ -225,6 +227,18 @@ class SmokeTest(unittest.TestCase):
             user_rows = user_feed.json().get("announcements") or []
             self.assertTrue(all(item.get("ann_id") != ann_id for item in user_rows))
 
+
+    def test_admin_workflow_basics(self):
+        admin_headers = {"X-Admin-Key": os.environ.get("ADMIN_API_KEY", "")}
+        resp = self.client.get("/api/admin/model-health", headers=admin_headers)
+        self.assertEqual(resp.status_code, 200, msg=resp.text)
+        body = resp.json()
+        self.assertIn("capabilities", body)
+        self.assertTrue(body.get("capabilities", {}).get("baseline"))
+
+        resp = self.client.get("/api/admin/models", headers=admin_headers)
+        self.assertEqual(resp.status_code, 200, msg=resp.text[:300])
+        self.assertTrue(isinstance(resp.json().get("models"), list))
 
 if __name__ == "__main__":
     unittest.main()

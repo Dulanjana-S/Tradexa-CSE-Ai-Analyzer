@@ -5,6 +5,7 @@ import hashlib
 import io
 import json
 import math
+import os
 import re
 from html import unescape
 from collections import Counter, defaultdict
@@ -114,6 +115,49 @@ def _extract_keywords(text: str) -> List[str]:
     return hits[:8]
 
 
+
+_FINBERT_PIPELINE = None
+_FINBERT_ERROR: Optional[str] = None
+
+
+def _finbert_enabled() -> bool:
+    return str(os.getenv("FINBERT_ENABLED", "false")).lower() in {"1", "true", "yes", "on"}
+
+
+def _run_finbert_sentiment(text: str) -> Optional[Dict[str, Any]]:
+    """Optional FinBERT inference. Safe fallback if transformers/torch/model are unavailable.
+
+    Set FINBERT_ENABLED=true and optionally FINBERT_MODEL=ProsusAI/finbert.
+    The model is lazy-loaded on first use so normal app startup is not slowed or broken.
+    """
+    global _FINBERT_PIPELINE, _FINBERT_ERROR
+    if not _finbert_enabled():
+        return None
+    if _FINBERT_ERROR:
+        return None
+    try:
+        if _FINBERT_PIPELINE is None:
+            from transformers import pipeline  # type: ignore
+            model_name = os.getenv("FINBERT_MODEL", "ProsusAI/finbert")
+            _FINBERT_PIPELINE = pipeline("sentiment-analysis", model=model_name, tokenizer=model_name, truncation=True)
+        result = _FINBERT_PIPELINE(text[:1800])
+        item = result[0] if isinstance(result, list) and result else result
+        label_raw = str(item.get("label") or "neutral").lower()
+        score = float(item.get("score") or 0.0)
+        if "positive" in label_raw:
+            label = "positive"
+            signed = score
+        elif "negative" in label_raw:
+            label = "negative"
+            signed = -score
+        else:
+            label = "neutral"
+            signed = 0.0
+        return {"sentiment_label": label, "sentiment_score": max(-1.0, min(1.0, signed)), "confidence": max(0.0, min(1.0, score)), "provider": "finbert"}
+    except Exception as exc:
+        _FINBERT_ERROR = str(exc)
+        return None
+
 def detect_event_type(title: str, category: Optional[str] = None) -> str:
     hay = f"{title or ''} {category or ''}".lower()
     for event_type, patterns in EVENT_PATTERNS:
@@ -153,6 +197,20 @@ def analyze_text_sentiment(title: str, category: Optional[str] = None) -> Dict[s
         label = "neutral"
 
     confidence = min(0.95, 0.45 + 0.08 * weight_hits + 0.15 * impact)
+    provider = "lexicon_event_rules"
+    finbert = _run_finbert_sentiment(text)
+    if finbert:
+        # Blend domain model score with transparent event/keyword score instead of blindly replacing it.
+        normalized = max(-1.0, min(1.0, 0.70 * float(finbert["sentiment_score"]) + 0.30 * normalized))
+        if normalized >= 0.18:
+            label = "positive"
+        elif normalized <= -0.18:
+            label = "negative"
+        else:
+            label = "neutral"
+        confidence = max(confidence, float(finbert.get("confidence") or 0.0))
+        provider = "finbert_plus_event_rules"
+
     return {
         "sentiment_score": round(normalized, 4),
         "sentiment_label": label,
@@ -160,6 +218,7 @@ def analyze_text_sentiment(title: str, category: Optional[str] = None) -> Dict[s
         "event_type": event_type,
         "confidence": round(confidence, 4),
         "keywords": _extract_keywords(text),
+        "sentiment_provider": provider,
     }
 
 
@@ -186,7 +245,7 @@ def build_sentiment_rows(announcements: Iterable[Dict[str, Any]]) -> List[Dict[s
                 "event_type": info["event_type"],
                 "confidence": info["confidence"],
                 "keywords": info["keywords"],
-                "meta": {"category": ann.get("category")},
+                "meta": {"category": ann.get("category"), "sentiment_provider": info.get("sentiment_provider")},
             }
         )
     return rows

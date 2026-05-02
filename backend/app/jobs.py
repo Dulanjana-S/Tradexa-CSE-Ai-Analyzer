@@ -150,6 +150,7 @@ def _run_train(params: Dict[str, Any], run_id: str) -> None:
     args = argparse.Namespace(
         symbols=params.get("symbols"),
         horizon_days=int(params.get("horizon_days") or 1),
+        model_family=params.get("model_family") or "auto",
         run_id=run_id,
     )
     cmd_train(args)
@@ -205,6 +206,7 @@ def _run_daily_pipeline(params: Dict[str, Any], run_id: str) -> None:
         _run_train({
             "symbols": params.get("train_symbols") or params.get("symbols"),
             "horizon_days": int(params.get("horizon_days") or params.get("dailyPipelineHorizonDays") or 1),
+            "model_family": params.get("model_family") or params.get("dailyPipelineModelFamily") or "auto",
         }, f"{run_id}:train")
         details["steps"].append("train")
     st.set_meta("last_daily_pipeline_utc", utc_now())

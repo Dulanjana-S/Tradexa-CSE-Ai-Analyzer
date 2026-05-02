@@ -1,0 +1,460 @@
+{
+  "model_version": "v9-commercial-registry",
+  "model_id": "beta_auto_1d_20260502_0333",
+  "display_name": "AUTO 1D 2026-05-02 03:33 UTC",
+  "lifecycle_status": "beta",
+  "trained_at_utc": "2026-05-02T03:33:18+00:00",
+  "horizon_days": 1,
+  "model_family_requested": "auto",
+  "feature_names": [
+    "ret_1d",
+    "ret_5d",
+    "ret_20d",
+    "ret_60d",
+    "trend_20d",
+    "vol_20d",
+    "vol_60d",
+    "gap_1d",
+    "range_pct",
+    "close_to_high",
+    "close_to_low",
+    "breakout_20",
+    "drawdown_60",
+    "atr_14_ratio",
+    "rsi_14",
+    "macd",
+    "macd_signal",
+    "macd_hist",
+    "bb_pct",
+    "bb_width",
+    "vol_chg",
+    "vol_z_20",
+    "turnover_proxy",
+    "turnover_trend_5",
+    "liquidity_ratio_20",
+    "zero_vol_20",
+    "sma_ratio_5",
+    "ema_ratio_5",
+    "sma_ratio_10",
+    "ema_ratio_10",
+    "sma_ratio_20",
+    "ema_ratio_20",
+    "sma_ratio_50",
+    "ema_ratio_50",
+    "idx_ret_1d",
+    "idx_ret_5d",
+    "idx_ret_20d",
+    "idx_trend",
+    "idx_vol_20",
+    "rel_ret_20d",
+    "rel_ret_5d",
+    "rel_vol_20",
+    "beta_60"
+  ],
+  "symbols": [
+    "ABAN.N0000",
+    "ABL.N0000",
+    "ACL.N0000",
+    "ACME.N0000",
+    "AEL.N0000",
+    "AFS.N0000",
+    "AFSL.N0000",
+    "AGAL.N0000",
+    "AGPL.N0000",
+    "AGST.N0000",
+    "AHUN.N0000",
+    "AINS.N0000",
+    "ALLI.N0000",
+    "ALUM.N0000",
+    "APLA.N0000",
+    "ATL.N0000",
+    "ATLL.N0000",
+    "BFL.N0000",
+    "CARG.N0000",
+    "COMB.N0000",
+    "CTC.N0000",
+    "DFCC.N0000",
+    "DIPD.N0000",
+    "GREG.N0000",
+    "HAYL.N0000",
+    "HNB.N0000",
+    "JKH.N0000",
+    "LFIN.N0000",
+    "LIOC.N0000",
+    "LOLC.N0000",
+    "MELS.N0000",
+    "RICH.N0000",
+    "SPEN.N0000",
+    "TAP.N0000",
+    "TKYO.N0000"
+  ],
+  "metrics_holdout": {
+    "acc_up": 0.567458019687319,
+    "auc_up": 0.5846273647565389,
+    "mae_return": 0.021476112514011315,
+    "rmse_return": 0.04575027086516854,
+    "baseline_acc_up": 0.5544296467863347,
+    "test_up_rate": 0.44557035321366534,
+    "pred_up_rate": 0.3674001158077591,
+    "avg_abs_test_return": 0.020694730870926693,
+    "rows_train": 11731,
+    "rows_test": 3454,
+    "features": 43,
+    "residual_q10": -0.02588701893555832,
+    "residual_q90": 0.02690906187497158,
+    "neutral_zone_threshold": 0.006,
+    "target_action_rate": 0.7072958888245513,
+    "strong_signal_coverage": 0.09264620729588882,
+    "strong_signal_acc_up": 0.690625
+  },
+  "train_period": {
+    "start": "2023-03-30",
+    "end": "2025-10-13"
+  },
+  "test_period": {
+    "start": "2025-10-14",
+    "end": "2026-04-23"
+  },
+  "models": {
+    "mean": "CatBoost",
+    "quantiles": "ResidualOffsetAroundMean",
+    "direction": "CatBoost",
+    "meta_filter": false
+  },
+  "validation_summary": {
+    "primary_metric": "auc_up",
+    "primary_value": 0.5846273647565389,
+    "secondary_metric": "acc_up",
+    "secondary_value": 0.567458019687319,
+    "strong_signal_metric": "strong_signal_acc_up",
+    "strong_signal_value": 0.690625
+  },
+  "feature_blocks": {
+    "price": true,
+    "index": true,
+    "sentiment": false,
+    "macro": false,
+    "finbert_ready": true
+  },
+  "optional_model_libraries_available": [
+    "CatBoost",
+    "LightGBM",
+    "XGBoost"
+  ],
+  "runtime": {
+    "python": "3.12.10",
+    "joblib": "1.4.2",
+    "scikit_learn": "1.5.2"
+  },
+  "regressor_comparison": {
+    "RidgeBaseline": {
+      "error": "Input X contains NaN.\nRidge does not accept missing values encoded as NaN natively. For supervised learning, you might want to consider sklearn.ensemble.HistGradientBoostingClassifier and Regressor which accept missing values encoded as NaNs natively. Alternatively, it is possible to preprocess the data, for instance by using an imputer transformer in a pipeline or drop samples with missing values. See https://scikit-learn.org/stable/modules/impute.html You can find a list of all estimators that handle NaN values at the following page: https://scikit-learn.org/stable/modules/impute.html#estimators-that-handle-nan-values"
+    },
+    "SklearnGBR": {
+      "error": "Input X contains NaN.\nGradientBoostingRegressor does not accept missing values encoded as NaN natively. For supervised learning, you might want to consider sklearn.ensemble.HistGradientBoostingClassifier and Regressor which accept missing values encoded as NaNs natively. Alternatively, it is possible to preprocess the data, for instance by using an imputer transformer in a pipeline or drop samples with missing values. See https://scikit-learn.org/stable/modules/impute.html You can find a list of all estimators that handle NaN values at the following page: https://scikit-learn.org/stable/modules/impute.html#estimators-that-handle-nan-values"
+    },
+    "LightGBM": {
+      "mae_return": 0.022858802394234278,
+      "rmse_return": 0.04854191684499044
+    },
+    "XGBoost": {
+      "mae_return": 0.023370633485335145,
+      "rmse_return": 0.05304891823610067
+    },
+    "CatBoost": {
+      "mae_return": 0.021476112514011315,
+      "rmse_return": 0.04575027086516854
+    }
+  },
+  "model_comparison": {
+    "LogisticRegressionBaseline": {
+      "error": "Input X contains NaN.\nLogisticRegression does not accept missing values encoded as NaN natively. For supervised learning, you might want to consider sklearn.ensemble.HistGradientBoostingClassifier and Regressor which accept missing values encoded as NaNs natively. Alternatively, it is possible to preprocess the data, for instance by using an imputer transformer in a pipeline or drop samples with missing values. See https://scikit-learn.org/stable/modules/impute.html You can find a list of all estimators that handle NaN values at the following page: https://scikit-learn.org/stable/modules/impute.html#estimators-that-handle-nan-values"
+    },
+    "SklearnGBC": {
+      "error": "Input X contains NaN.\nGradientBoostingClassifier does not accept missing values encoded as NaN natively. For supervised learning, you might want to consider sklearn.ensemble.HistGradientBoostingClassifier and Regressor which accept missing values encoded as NaNs natively. Alternatively, it is possible to preprocess the data, for instance by using an imputer transformer in a pipeline or drop samples with missing values. See https://scikit-learn.org/stable/modules/impute.html You can find a list of all estimators that handle NaN values at the following page: https://scikit-learn.org/stable/modules/impute.html#estimators-that-handle-nan-values"
+    },
+    "RandomForest": {
+      "acc_up": 0.5005790387955993,
+      "auc_up": 0.5918583326123064,
+      "pred_up_rate": 0.8604516502605675,
+      "coverage_p55": 0.650839606253619,
+      "acc_p55": 0.5155693950177936,
+      "coverage_p60": 0.2576722640416908,
+      "acc_p60": 0.5606741573033708,
+      "coverage_p65": 0.08917197452229299,
+      "acc_p65": 0.564935064935065,
+      "neutral_zone_threshold": 0.006,
+      "actionable_rows_rate": 0.7072958888245513,
+      "actionable_acc_up": 0.5223086369218174
+    },
+    "LightGBM": {
+      "acc_up": 0.5023161551823973,
+      "auc_up": 0.5668677059634872,
+      "pred_up_rate": 0.7863346844238563,
+      "coverage_p55": 0.7559351476548929,
+      "acc_p55": 0.5017234775947913,
+      "coverage_p60": 0.5240301100173712,
+      "acc_p60": 0.5171270718232044,
+      "coverage_p65": 0.3254198031268095,
+      "acc_p65": 0.5444839857651246,
+      "neutral_zone_threshold": 0.006,
+      "actionable_rows_rate": 0.7072958888245513,
+      "actionable_acc_up": 0.5161686451084732
+    },
+    "XGBoost": {
+      "acc_up": 0.5454545454545454,
+      "auc_up": 0.575884445665949,
+      "pred_up_rate": 0.5445859872611465,
+      "coverage_p55": 0.6424435437174291,
+      "acc_p55": 0.5651194231635872,
+      "coverage_p60": 0.36595251881876084,
+      "acc_p60": 0.6004746835443038,
+      "coverage_p65": 0.17921250723798496,
+      "acc_p65": 0.6122778675282714,
+      "neutral_zone_threshold": 0.006,
+      "actionable_rows_rate": 0.7072958888245513,
+      "actionable_acc_up": 0.5566925910765452
+    },
+    "CatBoost": {
+      "acc_up": 0.567458019687319,
+      "auc_up": 0.5846273647565389,
+      "pred_up_rate": 0.3674001158077591,
+      "coverage_p55": 0.5512449334105385,
+      "acc_p55": 0.6024159663865546,
+      "coverage_p60": 0.23161551823972207,
+      "acc_p60": 0.65,
+      "coverage_p65": 0.09264620729588882,
+      "acc_p65": 0.690625,
+      "neutral_zone_threshold": 0.006,
+      "actionable_rows_rate": 0.7072958888245513,
+      "actionable_acc_up": 0.5751125665165779
+    }
+  },
+  "meta_model": {
+    "enabled": false,
+    "error": "Input X contains NaN.\nLogisticRegression does not accept missing values encoded as NaN natively. For supervised learning, you might want to consider sklearn.ensemble.HistGradientBoostingClassifier and Regressor which accept missing values encoded as NaNs natively. Alternatively, it is possible to preprocess the data, for instance by using an imputer transformer in a pipeline or drop samples with missing values. See https://scikit-learn.org/stable/modules/impute.html You can find a list of all estimators that handle NaN values at the following page: https://scikit-learn.org/stable/modules/impute.html#estimators-that-handle-nan-values"
+  },
+  "walk_forward": [
+    {
+      "train_end": "2025-05-09",
+      "test_start": "2025-05-14",
+      "test_end": "2026-04-23",
+      "rows_train": 8178,
+      "rows_test": 7007,
+      "acc_up": 0.5460254031682603,
+      "auc_up": 0.5448266351457841
+    },
+    {
+      "train_end": "2025-08-22",
+      "test_start": "2025-08-25",
+      "test_end": "2026-04-23",
+      "rows_train": 10517,
+      "rows_test": 4668,
+      "acc_up": 0.565981148243359,
+      "auc_up": 0.5774988679706533
+    }
+  ],
+  "per_symbol_holdout": [
+    {
+      "symbol": "ALUM.N0000",
+      "rows": 100,
+      "acc_up": 0.68,
+      "auc_up": 0.5829941203075532,
+      "mae_return": 0.013352455780562055,
+      "avg_abs_return": 0.012845102160834246
+    },
+    {
+      "symbol": "AGPL.N0000",
+      "rows": 100,
+      "acc_up": 0.67,
+      "auc_up": 0.6514756944444445,
+      "mae_return": 0.015390893898556317,
+      "avg_abs_return": 0.0152057357516359
+    },
+    {
+      "symbol": "ACME.N0000",
+      "rows": 100,
+      "acc_up": 0.65,
+      "auc_up": 0.6827256944444444,
+      "mae_return": 0.06552058714383223,
+      "avg_abs_return": 0.06462609155659842
+    },
+    {
+      "symbol": "ATL.N0000",
+      "rows": 100,
+      "acc_up": 0.65,
+      "auc_up": 0.6019016122364614,
+      "mae_return": 0.024225057396136052,
+      "avg_abs_return": 0.02277717093378351
+    },
+    {
+      "symbol": "ABAN.N0000",
+      "rows": 100,
+      "acc_up": 0.63,
+      "auc_up": 0.6494325346784364,
+      "mae_return": 0.024906268171145034,
+      "avg_abs_return": 0.022505138887833877
+    },
+    {
+      "symbol": "AGAL.N0000",
+      "rows": 100,
+      "acc_up": 0.63,
+      "auc_up": 0.5948739148408433,
+      "mae_return": 0.01720317733549015,
+      "avg_abs_return": 0.016801849580016327
+    },
+    {
+      "symbol": "TAP.N0000",
+      "rows": 100,
+      "acc_up": 0.63,
+      "auc_up": 0.5879166666666666,
+      "mae_return": 0.024504999892327975,
+      "avg_abs_return": 0.01907265159724642
+    },
+    {
+      "symbol": "ATLL.N0000",
+      "rows": 100,
+      "acc_up": 0.62,
+      "auc_up": 0.6770691994572592,
+      "mae_return": 0.02553271642487844,
+      "avg_abs_return": 0.02187947334596234
+    },
+    {
+      "symbol": "ABL.N0000",
+      "rows": 100,
+      "acc_up": 0.6,
+      "auc_up": 0.5933333333333334,
+      "mae_return": 0.012482345951707673,
+      "avg_abs_return": 0.012268040631892624
+    },
+    {
+      "symbol": "AFS.N0000",
+      "rows": 100,
+      "acc_up": 0.59,
+      "auc_up": 0.5632183908045977,
+      "mae_return": 0.03239688751832829,
+      "avg_abs_return": 0.03220771904608543
+    },
+    {
+      "symbol": "AGST.N0000",
+      "rows": 100,
+      "acc_up": 0.58,
+      "auc_up": 0.6235632183908045,
+      "mae_return": 0.021052283931552385,
+      "avg_abs_return": 0.02085260647135017
+    },
+    {
+      "symbol": "ALLI.N0000",
+      "rows": 100,
+      "acc_up": 0.58,
+      "auc_up": 0.5795783381562629,
+      "mae_return": 0.015253300698484327,
+      "avg_abs_return": 0.015016636920592574
+    },
+    {
+      "symbol": "AHUN.N0000",
+      "rows": 100,
+      "acc_up": 0.57,
+      "auc_up": 0.5876736111111112,
+      "mae_return": 0.015999264790443772,
+      "avg_abs_return": 0.015823153361750945
+    },
+    {
+      "symbol": "GREG.N0000",
+      "rows": 100,
+      "acc_up": 0.57,
+      "auc_up": 0.5721153846153846,
+      "mae_return": 0.013597329115774043,
+      "avg_abs_return": 0.013779752720840217
+    },
+    {
+      "symbol": "SPEN.N0000",
+      "rows": 100,
+      "acc_up": 0.55,
+      "auc_up": 0.5498139727159983,
+      "mae_return": 0.009982913580486568,
+      "avg_abs_return": 0.009501559975725804
+    },
+    {
+      "symbol": "AEL.N0000",
+      "rows": 100,
+      "acc_up": 0.52,
+      "auc_up": 0.46428571428571425,
+      "mae_return": 0.013312123097567288,
+      "avg_abs_return": 0.013059236427112667
+    },
+    {
+      "symbol": "AFSL.N0000",
+      "rows": 100,
+      "acc_up": 0.52,
+      "auc_up": 0.4745484400656814,
+      "mae_return": 0.039257445734563315,
+      "avg_abs_return": 0.03609191666860298
+    },
+    {
+      "symbol": "COMB.N0000",
+      "rows": 99,
+      "acc_up": 0.5757575757575758,
+      "auc_up": 0.5845588235294118,
+      "mae_return": 0.038058671668293874,
+      "avg_abs_return": 0.03690924146953101
+    },
+    {
+      "symbol": "CTC.N0000",
+      "rows": 99,
+      "acc_up": 0.5151515151515151,
+      "auc_up": 0.5644897959183673,
+      "mae_return": 0.025250069469744486,
+      "avg_abs_return": 0.025136327089404893
+    },
+    {
+      "symbol": "BFL.N0000",
+      "rows": 99,
+      "acc_up": 0.45454545454545453,
+      "auc_up": 0.446078431372549,
+      "mae_return": 0.017748907198540206,
+      "avg_abs_return": 0.017488731267577926
+    },
+    {
+      "symbol": "AINS.N0000",
+      "rows": 98,
+      "acc_up": 0.6836734693877551,
+      "auc_up": 0.6801390699695784,
+      "mae_return": 0.032982695180701904,
+      "avg_abs_return": 0.02966827767245619
+    },
+    {
+      "symbol": "TKYO.N0000",
+      "rows": 98,
+      "acc_up": 0.5816326530612245,
+      "auc_up": 0.5815789473684211,
+      "mae_return": 0.009164183243537684,
+      "avg_abs_return": 0.009301824537911318
+    },
+    {
+      "symbol": "LOLC.N0000",
+      "rows": 98,
+      "acc_up": 0.5714285714285714,
+      "auc_up": 0.6166040884438883,
+      "mae_return": 0.015746519172661524,
+      "avg_abs_return": 0.016153233242856613
+    },
+    {
+      "symbol": "RICH.N0000",
+      "rows": 98,
+      "acc_up": 0.5714285714285714,
+      "auc_up": 0.4789222077357671,
+      "mae_return": 0.010425311338814332,
+      "avg_abs_return": 0.010167275789250557
+    },
+    {
+      "symbol": "HAYL.N0000",
+      "rows": 98,
+      "acc_up": 0.5204081632653061,
+      "auc_up": 0.5090146750524109,
+      "mae_return": 0.028925600144511062,
+      "avg_abs_return": 0.028267485847850892
+    }
+  ],
+  "accuracy_note": "Use strong_signal_acc_up and coverage for filtered high-confidence predictions; acc_up is the broad all-row holdout metric."
+}

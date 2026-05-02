@@ -45,6 +45,7 @@ class NotificationFlowTest(unittest.TestCase):
 
     def test_alert_retrigger_after_condition_clears(self):
         data_service.update_user_settings(self.username, {"alert_notifications": True})
+        self.client.post("/api/admin/system-settings", json={"settings": {"userAlertsEnabled": True}}, headers={"X-Admin-Key": os.environ.get("ADMIN_API_KEY", "")})
         resp = self.client.post("/api/alerts", json={"symbol": self.symbol, "alert_type": "above_price", "target_value": 0.01, "recurring": True, "cooldown_minutes": 1})
         self.assertEqual(resp.status_code, 200, msg=resp.text)
         alerts = resp.json().get("alerts") or []
