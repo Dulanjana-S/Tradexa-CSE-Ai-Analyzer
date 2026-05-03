@@ -33,8 +33,11 @@ backend/data/*.db-journal
 backend/data/*.sqlite-journal
 backend/data/*.zip
 backend/data/uploads/
+backend/catboost_info/
 backend/models/latest/
 backend/models/tmp/
+backend/models/beta_*/
+backend/models/model_*/
 *.joblib
 *.pkl
 

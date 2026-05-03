@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 import json
 
 import shutil
@@ -12,14 +11,14 @@ from typing import Any, Dict, List, Optional
 from fastapi import Body, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
-from fastapi.responses import JSONResponse, RedirectResponse, Response
+from fastapi.responses import JSONResponse, Response
 
 from .config import settings
 from .import_tools import persist_upload_zip, preview_dataset
 from .intelligence import parse_macro_csv_bytes, preview_macro_rows
-from .jobs import enqueue_daily_pipeline, enqueue_import, enqueue_sync, enqueue_sync_train, enqueue_train, run_daily_pipeline_now, run_import_now, run_sync_now, run_train_now, start_job_system
+from .jobs import enqueue_daily_pipeline, enqueue_import, enqueue_sync, enqueue_sync_train, run_train_now, start_job_system
 from .services import data_service
-from .services.auth_service import SESSION_COOKIE, change_password, complete_password_reset, create_user, current_user_from_request, ensure_bootstrap_admin, is_staff_role, list_users, login, logout, require_admin, require_user, set_role, start_password_reset, update_profile
+from .services.auth_service import SESSION_COOKIE, change_password, complete_password_reset, create_user, current_user_from_request, ensure_bootstrap_admin, is_staff_role, list_users, login, logout, require_user, set_role, start_password_reset, update_profile
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
