@@ -12,9 +12,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import Body, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 
 from .config import settings
 from .import_tools import persist_upload_zip, preview_dataset
@@ -48,18 +46,8 @@ def _custom_openapi() -> Dict[str, Any]:
 
 
 app.openapi = _custom_openapi
-app.mount("/static", StaticFiles(directory=Path(__file__).resolve().parent / "static"), name="static")
-templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent / "templates"))
 ensure_bootstrap_admin()
 start_job_system()
-
-
-def _render(request: Request, template: str, context: Optional[Dict[str, Any]] = None, status_code: int = 200):
-    user = current_user_from_request(request)
-    base = {"request": request, "current_user": user, "is_admin": bool(user and is_staff_role(user.get("role")))}
-    if context:
-        base.update(context)
-    return templates.TemplateResponse(request, template, base, status_code=status_code)
 
 
 
@@ -252,61 +240,7 @@ def _audit_admin_action(request: Request, actor: Dict[str, Any], action: str, *,
         pass
 
 
-# ---- Pages ----
-@app.get("/", response_class=HTMLResponse)
-def page_home(request: Request):
-    comps = data_service.companies()
-    symbols = [c["symbol"] for c in comps][:80]
-    return _render(request, "index.html", {"title": "Dashboard", "symbols": symbols})
 
-
-@app.get("/login", response_class=HTMLResponse)
-def page_login(request: Request):
-    if current_user_from_request(request):
-        return RedirectResponse(url="/", status_code=302)
-    return _render(request, "login.html", {"title": "Login"})
-
-
-@app.get("/register", response_class=HTMLResponse)
-def page_register(request: Request):
-    if current_user_from_request(request):
-        return RedirectResponse(url="/", status_code=302)
-    return _render(request, "register.html", {"title": "Register"})
-
-
-@app.get("/profile", response_class=HTMLResponse)
-def page_profile(request: Request):
-    user = require_user(request)
-    prefs = data_service.get_preferences(user["username"])
-    return _render(request, "profile.html", {"title": "Profile", "profile_user": user, "preferences": prefs.get("preferences") or {}})
-
-
-@app.get("/watchlist", response_class=HTMLResponse)
-def page_watchlist(request: Request):
-    user = require_user(request)
-    return _render(request, "watchlist.html", {"title": "Watchlist", "watchlist_profile": user["username"]})
-
-
-@app.get("/stock/{symbol}", response_class=HTMLResponse)
-def page_stock(symbol: str, request: Request):
-    company = data_service.stock(symbol)
-    return _render(request, "stock.html", {"title": f"{company.get('symbol', symbol.upper())} — {company.get('name','Stock')}", "company": company})
-
-
-@app.get("/screener", response_class=HTMLResponse)
-def page_screener(request: Request):
-    return _render(request, "screener.html", {"title": "Screener"})
-
-
-@app.get("/announcements", response_class=HTMLResponse)
-def page_announcements(request: Request):
-    return _render(request, "announcements.html", {"title": "Announcements"})
-
-
-@app.get("/admin/status", response_class=HTMLResponse)
-def page_admin_status(request: Request, x_admin_key: Optional[str] = Header(default=None)):
-    _check_admin_access(request, x_admin_key)
-    return _render(request, "admin_status.html", {"title": "Admin status", "admin_protected": True})
 
 
 # ---- API: auth ----
