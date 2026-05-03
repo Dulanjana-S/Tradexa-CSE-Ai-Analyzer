@@ -121,7 +121,8 @@ _FINBERT_ERROR: Optional[str] = None
 
 
 def _finbert_enabled() -> bool:
-    return str(os.getenv("FINBERT_ENABLED", "false")).lower() in {"1", "true", "yes", "on"}
+    value = str(os.getenv("FINBERT_ENABLED", "false")).strip().strip('"').strip("'").lower()
+    return value in {"1", "true", "yes", "on"}
 
 
 def _run_finbert_sentiment(text: str) -> Optional[Dict[str, Any]]:

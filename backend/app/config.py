@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 
 try:
     from dotenv import load_dotenv  # type: ignore
-    load_dotenv()
+    # Load backend/.env regardless of current working directory.
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
 except Exception:
     pass
 
