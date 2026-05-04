@@ -2922,7 +2922,7 @@ def export_user_account_data(username: str) -> Dict[str, Any]:
         "settings": get_user_settings(username).get("settings") or {},
         "watchlist": {
             "symbols": watchlist_symbols,
-            "items": watchlist(username).get("items") if username else [],
+            "items": get_watchlist(username).get("items") if username else [],
         },
         "portfolios": portfolio_payload,
         "alerts": alerts,

@@ -22,6 +22,8 @@ import type {
   UserSettings,
   Watchlist,
   PortfolioData,
+  PortfolioAccount,
+  PortfolioCashMovement,
   PortfolioPerformancePoint,
   PortfolioPosition,
   CorporateAction,
@@ -35,6 +37,7 @@ import type {
   AuditLog,
   AdminModelHealth,
   ModelComparison,
+  PortfolioPeriodPerformance,
 } from "./types";
 
 function num(value: any, fallback = 0): number {
