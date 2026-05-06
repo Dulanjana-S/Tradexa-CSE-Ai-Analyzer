@@ -27,6 +27,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { user, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [marketStatus, setMarketStatus] = useState("closed");
+  const [clockNow, setClockNow] = useState(() => Date.now());
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Stock[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -71,6 +72,21 @@ export function Header({ onMenuClick }: HeaderProps) {
     };
   }, [marketStatus]);
 
+  const cseClockLabel = useMemo(() => {
+    return new Date(clockNow).toLocaleTimeString("en-LK", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+      timeZone: "Asia/Colombo",
+    });
+  }, [clockNow]);
+
+  useEffect(() => {
+    const tickId = window.setInterval(() => setClockNow(Date.now()), 1000);
+    return () => window.clearInterval(tickId);
+  }, []);
+
   useEffect(() => {
     let alive = true;
 
@@ -78,10 +94,12 @@ export function Header({ onMenuClick }: HeaderProps) {
       marketApi
         .getOverview()
         .then((overview) => {
-          if (alive) setMarketStatus(overview.marketStatus);
+          if (!alive) return;
+          setMarketStatus(overview.marketStatus);
         })
         .catch(() => {
-          if (alive) setMarketStatus("Unavailable");
+          if (!alive) return;
+          setMarketStatus("Unavailable");
         });
     };
 
@@ -209,13 +227,15 @@ export function Header({ onMenuClick }: HeaderProps) {
 
       <div className="flex items-center gap-3">
         <div className="hidden items-center gap-2 lg:flex">
-        
           <div className={`inline-flex items-center gap-2.5 rounded-full border px-3 py-1.5 text-[12px] font-bold tracking-wide backdrop-blur ${statusBadge.badgeClass}`}>
             <div className="flex h-2 w-2 items-center justify-center">
               <div className={`h-2 w-2 rounded-full ${statusBadge.dotClass}`} />
             </div>
             <span>{statusBadge.label}</span>
           </div>
+          <span className="text-[15px] font-bold tabular-nums text-white leading-none">
+            {cseClockLabel}
+          </span>
         </div>
 
         <Button
