@@ -31,33 +31,43 @@ export function Header({ onMenuClick }: HeaderProps) {
   const [searchResults, setSearchResults] = useState<Stock[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const trimmedQuery = useMemo(() => searchQuery.trim(), [searchQuery]);
+  const normalizedStatus = marketStatus.toLowerCase();
+  const isFastStatus = /open|pre|auction|session|trading/.test(normalizedStatus);
+  const pollMs = isFastStatus ? 10000 : 30000;
   const statusBadge = useMemo(() => {
     const normalized = marketStatus.toLowerCase();
-    if (normalized.includes("open") && !normalized.includes("pre")) {
-      return {
-        label: "OPEN",
-        dotClass: "bg-emerald-500 animate-pulse",
-        badgeClass: "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
-      };
-    }
     if (normalized.includes("pre")) {
       return {
-        label: "PRE-OPEN",
+        label: marketStatus,
         dotClass: "bg-amber-500",
-        badgeClass: "border-amber-500/30 bg-amber-500/10 text-amber-400",
+        badgeClass: "border-amber-400/60 bg-amber-500/20 text-amber-200 shadow-[0_0_14px_rgba(245,158,11,0.35)]",
       };
     }
-    if (normalized.includes("close")) {
+    if (normalized.includes("halt") || normalized.includes("suspend")) {
       return {
-        label: "CLOSED",
+        label: marketStatus,
+        dotClass: "bg-orange-500",
+        badgeClass: "border-orange-400/60 bg-orange-500/20 text-orange-200 shadow-[0_0_14px_rgba(249,115,22,0.35)]",
+      };
+    }
+    if (normalized.includes("open") || normalized.includes("trading") || normalized.includes("session")) {
+      return {
+        label: marketStatus,
+        dotClass: "bg-emerald-500 animate-pulse",
+        badgeClass: "border-emerald-400/60 bg-emerald-500/20 text-emerald-200 shadow-[0_0_14px_rgba(16,185,129,0.35)]",
+      };
+    }
+    if (normalized.includes("close") || normalized.includes("holiday")) {
+      return {
+        label: marketStatus,
         dotClass: "bg-rose-500",
-        badgeClass: "border-rose-500/30 bg-rose-500/10 text-rose-400",
+        badgeClass: "border-rose-400/60 bg-rose-500/20 text-rose-200 shadow-[0_0_14px_rgba(244,63,94,0.35)]",
       };
     }
     return {
-      label: "UNKNOWN",
+      label: marketStatus,
       dotClass: "bg-slate-400",
-      badgeClass: "border-slate-500/30 bg-slate-500/10 text-slate-300",
+      badgeClass: "border-slate-400/60 bg-slate-500/20 text-slate-100 shadow-[0_0_14px_rgba(148,163,184,0.28)]",
     };
   }, [marketStatus]);
 
@@ -71,18 +81,18 @@ export function Header({ onMenuClick }: HeaderProps) {
           if (alive) setMarketStatus(overview.marketStatus);
         })
         .catch(() => {
-          if (alive) setMarketStatus("closed");
+          if (alive) setMarketStatus("Unavailable");
         });
     };
 
     refreshStatus();
-    const intervalId = window.setInterval(refreshStatus, 30000);
+    const intervalId = window.setInterval(refreshStatus, pollMs);
 
     return () => {
       alive = false;
       window.clearInterval(intervalId);
     };
-  }, []);
+  }, [pollMs]);
 
   useEffect(() => {
     let alive = true;
@@ -199,12 +209,10 @@ export function Header({ onMenuClick }: HeaderProps) {
 
       <div className="flex items-center gap-3">
         <div className="hidden items-center gap-2 lg:flex">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">
-            CSE Status
-          </span>
-          <div className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-semibold tracking-wide ${statusBadge.badgeClass}`}>
-            <div className="flex h-1.5 w-1.5 items-center justify-center">
-              <div className={`h-1.5 w-1.5 rounded-full ${statusBadge.dotClass}`} />
+        
+          <div className={`inline-flex items-center gap-2.5 rounded-full border px-3 py-1.5 text-[12px] font-bold tracking-wide backdrop-blur ${statusBadge.badgeClass}`}>
+            <div className="flex h-2 w-2 items-center justify-center">
+              <div className={`h-2 w-2 rounded-full ${statusBadge.dotClass}`} />
             </div>
             <span>{statusBadge.label}</span>
           </div>

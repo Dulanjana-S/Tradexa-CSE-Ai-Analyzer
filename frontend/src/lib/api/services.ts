@@ -46,10 +46,8 @@ function num(value: any, fallback = 0): number {
 }
 
 function normalizeMarketStatus(value: any): string {
-  const text = String(value || "closed").trim().toLowerCase();
-  if (!text) return "closed";
-  if (text.includes("open")) return "open";
-  if (text.includes("close")) return "closed";
+  const text = String(value ?? "").replace(/\s+/g, " ").trim();
+  if (!text) return "Unknown";
   return text;
 }
 
