@@ -31,6 +31,35 @@ export function Header({ onMenuClick }: HeaderProps) {
   const [searchResults, setSearchResults] = useState<Stock[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const trimmedQuery = useMemo(() => searchQuery.trim(), [searchQuery]);
+  const statusBadge = useMemo(() => {
+    const normalized = marketStatus.toLowerCase();
+    if (normalized.includes("open") && !normalized.includes("pre")) {
+      return {
+        label: "OPEN",
+        dotClass: "bg-emerald-500 animate-pulse",
+        badgeClass: "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
+      };
+    }
+    if (normalized.includes("pre")) {
+      return {
+        label: "PRE-OPEN",
+        dotClass: "bg-amber-500",
+        badgeClass: "border-amber-500/30 bg-amber-500/10 text-amber-400",
+      };
+    }
+    if (normalized.includes("close")) {
+      return {
+        label: "CLOSED",
+        dotClass: "bg-rose-500",
+        badgeClass: "border-rose-500/30 bg-rose-500/10 text-rose-400",
+      };
+    }
+    return {
+      label: "UNKNOWN",
+      dotClass: "bg-slate-400",
+      badgeClass: "border-slate-500/30 bg-slate-500/10 text-slate-300",
+    };
+  }, [marketStatus]);
 
   useEffect(() => {
     let alive = true;
@@ -170,12 +199,15 @@ export function Header({ onMenuClick }: HeaderProps) {
 
       <div className="flex items-center gap-3">
         <div className="hidden items-center gap-2 lg:flex">
-          <div className="flex h-1.5 w-1.5 items-center justify-center">
-            <div className={`h-1.5 w-1.5 rounded-full ${marketStatus === "open" ? "animate-pulse bg-emerald-500" : "bg-red-500"}`} />
-          </div>
-          <span className="text-[13px] font-medium text-[var(--color-text-secondary)]">
-            Market {marketStatus === "open" ? "Open" : "Closed"}
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">
+            CSE Status
           </span>
+          <div className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-semibold tracking-wide ${statusBadge.badgeClass}`}>
+            <div className="flex h-1.5 w-1.5 items-center justify-center">
+              <div className={`h-1.5 w-1.5 rounded-full ${statusBadge.dotClass}`} />
+            </div>
+            <span>{statusBadge.label}</span>
+          </div>
         </div>
 
         <Button

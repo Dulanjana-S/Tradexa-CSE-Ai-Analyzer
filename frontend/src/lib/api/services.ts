@@ -45,6 +45,14 @@ function num(value: any, fallback = 0): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function normalizeMarketStatus(value: any): string {
+  const text = String(value || "closed").trim().toLowerCase();
+  if (!text) return "closed";
+  if (text.includes("open")) return "open";
+  if (text.includes("close")) return "closed";
+  return text;
+}
+
 function formatRelativeTime(value?: string): string {
   if (!value) return "just now";
   const date = new Date(value);
@@ -773,7 +781,7 @@ export const marketApi = {
     const sp20Change = num(sp20Last.value) - num(sp20Prev.value);
 
     return {
-      marketStatus: String(overviewRaw?.status || "CLOSED").toLowerCase(),
+      marketStatus: normalizeMarketStatus(overviewRaw?.status),
       lastUpdated: String(overviewRaw?.as_of || new Date().toISOString()),
       turnover: num(overviewRaw?.turnover_lkr),
       trades: num(overviewRaw?.trades),
