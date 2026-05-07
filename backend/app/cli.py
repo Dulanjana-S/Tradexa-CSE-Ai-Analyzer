@@ -168,6 +168,14 @@ def cmd_sync(args: argparse.Namespace) -> None:
             symbols = [s.upper() for s in args.symbols]
         else:
             symbols = [c.get("symbol") for c in comps[: args.top_n] if c.get("symbol")] if comps else []
+            if getattr(args, "include_stored_symbols", False):
+                stored_symbols = st.list_price_symbols()
+                seen = {s for s in symbols if s}
+                for sym in stored_symbols:
+                    usym = str(sym or "").upper()
+                    if usym and usym not in seen:
+                        symbols.append(usym)
+                        seen.add(usym)
         if not symbols:
             print("No symbols selected for price sync.")
         elif args.skip_prices:

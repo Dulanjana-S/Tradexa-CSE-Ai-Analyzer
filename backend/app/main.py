@@ -113,6 +113,7 @@ def _system_settings_defaults() -> Dict[str, Any]:
         'dailyPipelineAnnouncements': '100',
         'dailyPipelineHorizonDays': '1',
         'dailyPipelineSleepMs': '250',
+        'dailyPipelineIncludeStoredSymbols': True,
         'syncNotifications': True,
         'emailNotifications': True,
         'pushNotifications': False,
@@ -141,7 +142,8 @@ def _normalize_system_setting_value(key: str, value: Any, default: Any) -> Any:
 
 
 def _system_settings() -> Dict[str, Any]:
-    values = data_service.get_preferences('__system__').get('preferences') or {}
+    raw_values = data_service.get_preferences('__system__') or {}
+    values = raw_values.get('preferences') if isinstance(raw_values.get('preferences'), dict) else raw_values
     defaults = _system_settings_defaults()
     merged = dict(defaults)
     for key, default in defaults.items():
