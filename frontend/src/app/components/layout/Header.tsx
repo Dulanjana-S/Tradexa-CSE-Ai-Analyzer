@@ -27,10 +27,65 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { user, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [marketStatus, setMarketStatus] = useState("closed");
+  const [clockNow, setClockNow] = useState(() => Date.now());
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Stock[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const trimmedQuery = useMemo(() => searchQuery.trim(), [searchQuery]);
+  const normalizedStatus = marketStatus.toLowerCase();
+  const isFastStatus = /open|pre|auction|session|trading/.test(normalizedStatus);
+  const pollMs = isFastStatus ? 10000 : 30000;
+  const statusBadge = useMemo(() => {
+    const normalized = marketStatus.toLowerCase();
+    if (normalized.includes("pre")) {
+      return {
+        label: marketStatus,
+        dotClass: "bg-amber-500",
+        badgeClass: "border-amber-400/60 bg-amber-500/20 text-amber-200 shadow-[0_0_14px_rgba(245,158,11,0.35)]",
+      };
+    }
+    if (normalized.includes("halt") || normalized.includes("suspend")) {
+      return {
+        label: marketStatus,
+        dotClass: "bg-orange-500",
+        badgeClass: "border-orange-400/60 bg-orange-500/20 text-orange-200 shadow-[0_0_14px_rgba(249,115,22,0.35)]",
+      };
+    }
+    if (normalized.includes("open") || normalized.includes("trading") || normalized.includes("session")) {
+      return {
+        label: marketStatus,
+        dotClass: "bg-emerald-500 animate-pulse",
+        badgeClass: "border-emerald-400/60 bg-emerald-500/20 text-emerald-200 shadow-[0_0_14px_rgba(16,185,129,0.35)]",
+      };
+    }
+    if (normalized.includes("close") || normalized.includes("holiday")) {
+      return {
+        label: marketStatus,
+        dotClass: "bg-rose-500",
+        badgeClass: "border-rose-400/60 bg-rose-500/20 text-rose-200 shadow-[0_0_14px_rgba(244,63,94,0.35)]",
+      };
+    }
+    return {
+      label: marketStatus,
+      dotClass: "bg-slate-400",
+      badgeClass: "border-slate-400/60 bg-slate-500/20 text-slate-100 shadow-[0_0_14px_rgba(148,163,184,0.28)]",
+    };
+  }, [marketStatus]);
+
+  const cseClockLabel = useMemo(() => {
+    return new Date(clockNow).toLocaleTimeString("en-LK", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+      timeZone: "Asia/Colombo",
+    });
+  }, [clockNow]);
+
+  useEffect(() => {
+    const tickId = window.setInterval(() => setClockNow(Date.now()), 1000);
+    return () => window.clearInterval(tickId);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -39,21 +94,23 @@ export function Header({ onMenuClick }: HeaderProps) {
       marketApi
         .getOverview()
         .then((overview) => {
-          if (alive) setMarketStatus(overview.marketStatus);
+          if (!alive) return;
+          setMarketStatus(overview.marketStatus);
         })
         .catch(() => {
-          if (alive) setMarketStatus("closed");
+          if (!alive) return;
+          setMarketStatus("Unavailable");
         });
     };
 
     refreshStatus();
-    const intervalId = window.setInterval(refreshStatus, 30000);
+    const intervalId = window.setInterval(refreshStatus, pollMs);
 
     return () => {
       alive = false;
       window.clearInterval(intervalId);
     };
-  }, []);
+  }, [pollMs]);
 
   useEffect(() => {
     let alive = true;
@@ -170,11 +227,14 @@ export function Header({ onMenuClick }: HeaderProps) {
 
       <div className="flex items-center gap-3">
         <div className="hidden items-center gap-2 lg:flex">
-          <div className="flex h-1.5 w-1.5 items-center justify-center">
-            <div className={`h-1.5 w-1.5 rounded-full ${marketStatus === "open" ? "animate-pulse bg-emerald-500" : "bg-red-500"}`} />
+          <div className={`inline-flex items-center gap-2.5 rounded-full border px-3 py-1.5 text-[12px] font-bold tracking-wide backdrop-blur ${statusBadge.badgeClass}`}>
+            <div className="flex h-2 w-2 items-center justify-center">
+              <div className={`h-2 w-2 rounded-full ${statusBadge.dotClass}`} />
+            </div>
+            <span>{statusBadge.label}</span>
           </div>
-          <span className="text-[13px] font-medium text-[var(--color-text-secondary)]">
-            Market {marketStatus === "open" ? "Open" : "Closed"}
+          <span className="text-[15px] font-bold tabular-nums text-white leading-none">
+            {cseClockLabel}
           </span>
         </div>
 

@@ -22,6 +22,8 @@ import type {
   UserSettings,
   Watchlist,
   PortfolioData,
+  PortfolioAccount,
+  PortfolioCashMovement,
   PortfolioPerformancePoint,
   PortfolioPosition,
   CorporateAction,
@@ -35,11 +37,18 @@ import type {
   AuditLog,
   AdminModelHealth,
   ModelComparison,
+  PortfolioPeriodPerformance,
 } from "./types";
 
 function num(value: any, fallback = 0): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizeMarketStatus(value: any): string {
+  const text = String(value ?? "").replace(/\s+/g, " ").trim();
+  if (!text) return "Unknown";
+  return text;
 }
 
 function formatRelativeTime(value?: string): string {
@@ -770,7 +779,7 @@ export const marketApi = {
     const sp20Change = num(sp20Last.value) - num(sp20Prev.value);
 
     return {
-      marketStatus: String(overviewRaw?.status || "CLOSED").toLowerCase(),
+      marketStatus: normalizeMarketStatus(overviewRaw?.status),
       lastUpdated: String(overviewRaw?.as_of || new Date().toISOString()),
       turnover: num(overviewRaw?.turnover_lkr),
       trades: num(overviewRaw?.trades),

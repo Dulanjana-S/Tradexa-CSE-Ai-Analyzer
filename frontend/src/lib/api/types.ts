@@ -193,6 +193,7 @@ export interface PortfolioSummary {
   dividendIncome?: number;
   totalPl: number;
   totalReturn?: number;
+  returnPct?: number;
 }
 
 export interface CorporateAction {

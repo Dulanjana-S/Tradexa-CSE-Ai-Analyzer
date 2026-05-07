@@ -34,12 +34,13 @@ def _default_scheduler_settings() -> Dict[str, Any]:
         "dailyPipelineAnnouncements": 100,
         "dailyPipelineHorizonDays": 1,
         "dailyPipelineSleepMs": 250,
+        "dailyPipelineIncludeStoredSymbols": True,
     }
 
 
 def _system_settings() -> Dict[str, Any]:
     st = _storage()
-    values = st.get_preferences("__system__")
+    values = st.get_preferences("__system__") or {}
     merged = _default_scheduler_settings()
     merged.update(values)
     return merged
@@ -139,6 +140,7 @@ def _run_sync(params: Dict[str, Any], run_id: str) -> None:
         announcements=int(params.get("announcements") or 100),
         skip_prices=bool(params.get("skip_prices", False)),
         sleep_ms=int(params.get("sleep_ms") or 250),
+        include_stored_symbols=bool(params.get("include_stored_symbols", False)),
         run_id=run_id,
     )
     cmd_sync(args)
@@ -187,6 +189,7 @@ def _run_daily_pipeline(params: Dict[str, Any], run_id: str) -> None:
         "announcements": int(params.get("announcements") or params.get("dailyPipelineAnnouncements") or 100),
         "skip_prices": bool(params.get("skip_prices", False)),
         "sleep_ms": int(params.get("sleep_ms") or params.get("dailyPipelineSleepMs") or 250),
+        "include_stored_symbols": bool(params.get("include_stored_symbols", params.get("dailyPipelineIncludeStoredSymbols", True))),
     }, f"{run_id}:sync")
     details["steps"].append("sync")
     try:

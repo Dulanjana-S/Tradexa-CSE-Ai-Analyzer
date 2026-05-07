@@ -235,12 +235,28 @@ def indices() -> Dict[str, Any]:
                 pass
         return out
 
+    # For live-capable providers, prefer fresh provider data and only fall
+    # back to DB when provider data is unavailable.
+    if prov.name in {"db", "mock"}:
+        if settings.db_cache_enabled:
+            aspi = _storage.get_index_series("ASPI", limit=400)
+            sl20 = _storage.get_index_series("S&P SL20", limit=400)
+            if aspi or sl20:
+                return {"ASPI": aspi or [], "S&P SL20": sl20 or [], "source": "db"}
+        return _cache.get_or_set(("indices", prov.name), _factory)
+
+    live = _cache.get_or_set(("indices", prov.name), _factory)
+    aspi_live = live.get("ASPI") if isinstance(live, dict) else []
+    sl20_live = live.get("S&P SL20") if isinstance(live, dict) else []
+    if (isinstance(aspi_live, list) and aspi_live) or (isinstance(sl20_live, list) and sl20_live):
+        return live
+
     if settings.db_cache_enabled:
         aspi = _storage.get_index_series("ASPI", limit=400)
         sl20 = _storage.get_index_series("S&P SL20", limit=400)
         if aspi or sl20:
             return {"ASPI": aspi or [], "S&P SL20": sl20 or [], "source": "db"}
-    return _cache.get_or_set(("indices", prov.name), _factory)
+    return live
 
 
 def _merge_latest_bar(target: Dict[str, Any], bar: Optional[Dict[str, Any]]) -> Dict[str, Any]:
@@ -2922,7 +2938,7 @@ def export_user_account_data(username: str) -> Dict[str, Any]:
         "settings": get_user_settings(username).get("settings") or {},
         "watchlist": {
             "symbols": watchlist_symbols,
-            "items": watchlist(username).get("items") if username else [],
+            "items": get_watchlist(username).get("items") if username else [],
         },
         "portfolios": portfolio_payload,
         "alerts": alerts,
