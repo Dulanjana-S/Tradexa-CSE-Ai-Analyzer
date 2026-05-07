@@ -38,6 +38,7 @@ backend/models/latest/
 backend/models/tmp/
 backend/models/beta_*/
 backend/models/model_*/
+backend/models/test_real_suite/
 *.joblib
 *.pkl
 
