@@ -217,6 +217,25 @@ def market_overview() -> Dict[str, Any]:
 def indices() -> Dict[str, Any]:
     prov = get_provider()
 
+    def _prefer_cached_history(series_name: str, live_series: Any) -> List[Dict[str, Any]]:
+        def _clean(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+            cleaned: List[Dict[str, Any]] = []
+            for row in rows:
+                try:
+                    value = float(row.get("value"))
+                except Exception:
+                    continue
+                if value <= 100:
+                    continue
+                cleaned.append({"date": row.get("date"), "value": value})
+            return cleaned
+
+        rows = _clean(live_series if isinstance(live_series, list) else [])
+        if len(rows) >= 2 or not settings.db_cache_enabled:
+            return rows
+        cached = _clean(_storage.get_index_series(series_name, limit=400))
+        return cached if len(cached) > len(rows) else rows
+
     def _factory():
         out: Dict[str, Any] = {"ASPI": [], "S&P SL20": [], "source": getattr(prov, "name", "")}
         try:
@@ -224,8 +243,8 @@ def indices() -> Dict[str, Any]:
         except Exception:
             idx = {}
         if isinstance(idx, dict):
-            out["ASPI"] = idx.get("ASPI") or []
-            out["S&P SL20"] = idx.get("S&P SL20") or idx.get("SNP_SL20") or idx.get("SNP SL20") or []
+            out["ASPI"] = _prefer_cached_history("ASPI", idx.get("ASPI") or [])
+            out["S&P SL20"] = _prefer_cached_history("S&P SL20", idx.get("S&P SL20") or idx.get("SNP_SL20") or idx.get("SNP SL20") or [])
             out["source"] = idx.get("source") or prov.name
         if settings.db_cache_enabled and prov.name not in {"mock", "db"}:
             try:
