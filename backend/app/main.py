@@ -581,7 +581,47 @@ def api_admin_upload_data(
 # ---- API: Market ----
 @app.get("/api/market/overview")
 def api_market_overview():
-    return data_service.market_overview()
+    result = data_service.market_overview()
+    # Ensure live ASPI/SL20 values are always present.
+    # The normalized output should include them, but if missing (e.g. during
+    # hot-reload), we enrich from the raw provider data on the fly.
+    if result.get("aspi_value") is None or result.get("sl20_value") is None:
+        try:
+            prov = data_service.get_provider()
+            raw = prov.get_market_overview() if hasattr(prov, "get_market_overview") else {}
+            daily = raw.get("daily") if isinstance(raw.get("daily"), dict) else {}
+            aspi_raw = raw.get("aspi") if isinstance(raw.get("aspi"), dict) else {}
+            sl20_raw = raw.get("snp_sl20") if isinstance(raw.get("snp_sl20"), dict) else {}
+
+            def _f(v):
+                try:
+                    return float(v) if v is not None else None
+                except (ValueError, TypeError):
+                    return None
+
+            if result.get("aspi_value") is None:
+                result["aspi_value"] = _f(
+                    aspi_raw.get("value") or daily.get("asi")
+                )
+                result["aspi_change"] = _f(
+                    aspi_raw.get("change") or daily.get("asiChange")
+                )
+                result["aspi_change_pct"] = _f(
+                    aspi_raw.get("percentage") or daily.get("asiChangePct")
+                )
+            if result.get("sl20_value") is None:
+                result["sl20_value"] = _f(
+                    sl20_raw.get("value") or daily.get("spp")
+                )
+                result["sl20_change"] = _f(
+                    sl20_raw.get("change") or daily.get("sppChange")
+                )
+                result["sl20_change_pct"] = _f(
+                    sl20_raw.get("percentage") or daily.get("sppChangePct")
+                )
+        except Exception:
+            pass
+    return result
 
 
 @app.get("/api/indices")

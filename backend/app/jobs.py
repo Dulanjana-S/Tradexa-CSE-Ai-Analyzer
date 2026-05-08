@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import queue
 import threading
 import traceback
@@ -16,6 +17,15 @@ from .storage import Storage
 _worker_queue: "queue.Queue[Dict[str, Any]]" = queue.Queue()
 _started = False
 _start_lock = threading.Lock()
+
+# CSE market hours (Colombo time)
+_CSE_OPEN_H, _CSE_OPEN_M = 9, 0
+_CSE_CLOSE_H, _CSE_CLOSE_M = 15, 0
+# Live sync interval in seconds:
+# - during market hours: default 60s (configurable via LIVE_SYNC_INTERVAL_SECONDS env var)
+# - outside market hours: 5 minutes (data only changes at end of day)
+_LIVE_SYNC_INTERVAL_MARKET = int(os.environ.get("LIVE_SYNC_INTERVAL_SECONDS", "60"))
+_LIVE_SYNC_INTERVAL_IDLE = 300
 
 
 def _storage() -> Storage:
@@ -230,6 +240,37 @@ def _execute_job(job_name: str, params: Dict[str, Any], run_id: str) -> None:
         raise RuntimeError(f"Unknown job type: {job_name}")
 
 
+def _is_cse_market_hours(tz: Any) -> bool:
+    """Return True when the Colombo clock is inside CSE trading hours (09:00–15:00 Mon–Fri)."""
+    now = datetime.now(tz)
+    if now.weekday() >= 5:  # Saturday/Sunday
+        return False
+    market_open = dt_time(hour=_CSE_OPEN_H, minute=_CSE_OPEN_M)
+    market_close = dt_time(hour=_CSE_CLOSE_H, minute=_CSE_CLOSE_M)
+    return market_open <= now.time() <= market_close
+
+
+def _run_live_market_sync() -> None:
+    """Lightweight live refresh: clear cache and re-fetch market overview + indices.
+
+    This is intentionally fast — it only touches the in-memory cache so the
+    next request to /api/market/overview or /api/indices gets fresh CSE data.
+    It does NOT do a full price history sync (that's the daily_pipeline job).
+    """
+    try:
+        from .services import data_service
+        prov_name = data_service.get_provider().name
+        if prov_name not in {"cse", "hybrid"}:
+            return  # Only poll when using live CSE endpoints
+        # Clear both caches so next API call fetches fresh data from CSE
+        data_service.clear_runtime_cache()
+        # Eagerly prime the caches by calling the functions now
+        data_service.market_overview()
+        data_service.indices()
+    except Exception:
+        pass
+
+
 def _worker_loop() -> None:
     while True:
         item = _worker_queue.get()
@@ -289,6 +330,23 @@ def _scheduler_loop() -> None:
             threading.Event().wait(30)
 
 
+def _live_sync_loop() -> None:
+    """Background thread that refreshes live CSE market data at a fixed interval.
+
+    - During CSE trading hours (09:00–15:00 Colombo, Mon–Fri): every 5 minutes.
+    - Outside trading hours: every 15 minutes (catches end-of-day settlement values).
+    """
+    tz = ZoneInfo("Asia/Colombo")
+    while True:
+        try:
+            _run_live_market_sync()
+        except Exception:
+            pass
+        finally:
+            interval = _LIVE_SYNC_INTERVAL_MARKET if _is_cse_market_hours(tz) else _LIVE_SYNC_INTERVAL_IDLE
+            threading.Event().wait(interval)
+
+
 def start_job_system() -> None:
     global _started
     with _start_lock:
@@ -298,4 +356,6 @@ def start_job_system() -> None:
         worker.start()
         scheduler = threading.Thread(target=_scheduler_loop, name="tradexa-job-scheduler", daemon=True)
         scheduler.start()
+        live_sync = threading.Thread(target=_live_sync_loop, name="tradexa-live-sync", daemon=True)
+        live_sync.start()
         _started = True

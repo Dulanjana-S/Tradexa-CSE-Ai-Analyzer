@@ -231,9 +231,20 @@ class CSEProvider(MarketDataProvider):
         # Fallback for market summary when marketSummery endpoint is empty/unavailable.
         if (not isinstance(summary, dict) or not summary) and isinstance(daily_latest, dict):
             summary = {
-                "marketTurnover": daily_latest.get("marketTurnover"),
-                "marketCap": daily_latest.get("marketCap"),
-                "marketTrades": daily_latest.get("marketTrades"),
+                "marketTurnover": (
+                    daily_latest.get("marketTurnover") or daily_latest.get("equityTurnover") or
+                    daily_latest.get("turnOverValue") or daily_latest.get("equityTurnOver") or
+                    daily_latest.get("totalTurnOver") or daily_latest.get("totalTurnover")
+                ),
+                "marketCap": (
+                    daily_latest.get("marketCap") or daily_latest.get("marketCapitalization") or
+                    daily_latest.get("mktCap") or daily_latest.get("totalMarketCap")
+                ),
+                "marketTrades": (
+                    daily_latest.get("marketTrades") or daily_latest.get("tradesNo") or
+                    daily_latest.get("noOfTrades") or daily_latest.get("totalTrades") or
+                    daily_latest.get("tradeCount") or daily_latest.get("numberOfTrades")
+                ),
             }
 
         # Fallback for S&P SL20 snapshot when snpData endpoint is empty/unavailable.

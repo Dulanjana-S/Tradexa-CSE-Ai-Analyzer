@@ -28,6 +28,7 @@ class Settings:
     cse_chart_period: int = int(os.getenv("CSE_CHART_PERIOD", "1"))
     cse_company_chart_period: int = int(os.getenv("CSE_COMPANY_CHART_PERIOD", "1"))
     cache_ttl_seconds: int = int(os.getenv("CACHE_TTL_SECONDS", "120"))
+    market_live_cache_ttl_seconds: int = int(os.getenv("MARKET_LIVE_CACHE_TTL_SECONDS", "15"))
     yahoo_exchange_suffix: str = os.getenv("YF_EXCHANGE_SUFFIX", ".CM")
 
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///data/cse_real.db")

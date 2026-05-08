@@ -766,17 +766,38 @@ export const marketApi = {
     ]);
 
     const aspiSeries = Array.isArray(indicesRaw?.ASPI) ? indicesRaw.ASPI : [];
-    const sp20Series = Array.isArray(indicesRaw?.SP_SL20 || indicesRaw?.SP20 || indicesRaw?.["S&P SL20"]) 
-      ? (indicesRaw.SP_SL20 || indicesRaw.SP20 || indicesRaw["S&P SL20"])
-      : [];
+    // Resolve S&P SL20 safely — backend can return key as "S&P SL20", "SNP_SL20", "SP_SL20", or "SP20"
+    const sp20RawSeries =
+      indicesRaw?.["S&P SL20"] ??
+      indicesRaw?.SNP_SL20 ??
+      indicesRaw?.SP_SL20 ??
+      indicesRaw?.SP20 ??
+      [];
+    const sp20Series = Array.isArray(sp20RawSeries) ? sp20RawSeries : [];
 
+    // Series fallback values (from historical dailyMarketSummery)
     const aspiLast = aspiSeries.at(-1) || { value: 0 };
     const aspiPrev = aspiSeries.at(-2) || aspiLast;
     const sp20Last = sp20Series.at(-1) || { value: 0 };
     const sp20Prev = sp20Series.at(-2) || sp20Last;
 
-    const aspiChange = num(aspiLast.value) - num(aspiPrev.value);
-    const sp20Change = num(sp20Last.value) - num(sp20Prev.value);
+    // Prefer live snapshot values from aspiData/snpData (today's intraday) over series last point
+    const aspiLiveValue = num(overviewRaw?.aspi_value) || num(aspiLast.value);
+    const sp20LiveValue = num(overviewRaw?.sl20_value) || num(sp20Last.value);
+
+    // Change: prefer direct from CSE endpoint, fall back to series delta
+    const aspiChange = overviewRaw?.aspi_change != null
+      ? num(overviewRaw.aspi_change)
+      : num(aspiLast.value) - num(aspiPrev.value);
+    const aspiChangePct = overviewRaw?.aspi_change_pct != null
+      ? num(overviewRaw.aspi_change_pct)
+      : num(aspiPrev.value) ? (aspiChange / num(aspiPrev.value)) * 100 : 0;
+    const sp20Change = overviewRaw?.sl20_change != null
+      ? num(overviewRaw.sl20_change)
+      : num(sp20Last.value) - num(sp20Prev.value);
+    const sp20ChangePct = overviewRaw?.sl20_change_pct != null
+      ? num(overviewRaw.sl20_change_pct)
+      : num(sp20Prev.value) ? (sp20Change / num(sp20Prev.value)) * 100 : 0;
 
     return {
       marketStatus: normalizeMarketStatus(overviewRaw?.status),
@@ -785,15 +806,15 @@ export const marketApi = {
       trades: num(overviewRaw?.trades),
       marketCap: num(overviewRaw?.market_cap_lkr),
       aspi: {
-        value: num(aspiLast.value),
+        value: aspiLiveValue,
         change: aspiChange,
-        changePercent: num(aspiPrev.value) ? (aspiChange / num(aspiPrev.value)) * 100 : 0,
+        changePercent: aspiChangePct,
         series: aspiSeries.map((item: any) => ({ date: item.date, value: num(item.value) })),
       },
       sp20: {
-        value: num(sp20Last.value),
+        value: sp20LiveValue,
         change: sp20Change,
-        changePercent: num(sp20Prev.value) ? (sp20Change / num(sp20Prev.value)) * 100 : 0,
+        changePercent: sp20ChangePct,
         series: sp20Series.map((item: any) => ({ date: item.date, value: num(item.value) })),
       },
       topGainers: Array.isArray(overviewRaw?.top_gainers) ? overviewRaw.top_gainers.map(mapStock) : [],
@@ -801,6 +822,7 @@ export const marketApi = {
       mostActive: Array.isArray(overviewRaw?.most_active) ? overviewRaw.most_active.map(mapStock) : [],
     };
   },
+
 
   getStocks: async (limit = 200): Promise<Stock[]> => {
     const response = await api.get<any>(`/api/stocks?limit=${limit}`);

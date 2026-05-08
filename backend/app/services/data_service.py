@@ -32,6 +32,7 @@ DATA_DIR = BASE_DIR / "data" / "mock"
 _storage = Storage(settings.database_url)
 _storage.init()
 _cache = TTLCache(ttl_seconds=settings.cache_ttl_seconds)
+_market_live_cache = TTLCache(ttl_seconds=max(1, settings.market_live_cache_ttl_seconds))
 _provider: Optional[MarketDataProvider] = None
 _provider_key: Optional[str] = None
 
@@ -50,6 +51,7 @@ def _json_safe(value: Any) -> Any:
 
 def clear_runtime_cache() -> None:
     _cache.clear()
+    _market_live_cache.clear()
 
 
 def get_effective_provider_name() -> str:
@@ -145,11 +147,34 @@ def _normalize_market_overview(raw: Any, prov_name: str) -> Dict[str, Any]:
     summary = raw.get("summary") if isinstance(raw.get("summary"), dict) else {}
     daily = raw.get("daily") if isinstance(raw.get("daily"), dict) else {}
 
-    turnover = summary.get("marketTurnover") or summary.get("equityTurnover") or summary.get("turnOver") or summary.get("turnover")
-    turnover = turnover or daily.get("marketTurnover") or daily.get("equityTurnover")
-    trades = summary.get("marketTrades") or summary.get("tradeCount") or summary.get("trades")
-    trades = trades or daily.get("marketTrades") or daily.get("tradesNo")
-    mcap = summary.get("marketCap") or summary.get("marketCapitalization") or daily.get("marketCap")
+    turnover = summary.get("marketTurnover") or summary.get("equityTurnover") or summary.get("turnOver") or summary.get("turnover") or summary.get("turnOverValue") or summary.get("equityTurnOver") or summary.get("totalTurnOver") or summary.get("totalTurnover")
+    turnover = turnover or daily.get("marketTurnover") or daily.get("equityTurnover") or daily.get("turnOverValue") or daily.get("equityTurnOver") or daily.get("totalTurnOver") or daily.get("totalTurnover")
+    trades = summary.get("marketTrades") or summary.get("tradeCount") or summary.get("trades") or summary.get("noOfTrades") or summary.get("totalTrades") or summary.get("tradesNo") or summary.get("numberOfTrades")
+    trades = trades or daily.get("marketTrades") or daily.get("tradesNo") or daily.get("noOfTrades") or daily.get("totalTrades") or daily.get("tradeCount") or daily.get("numberOfTrades")
+    mcap = summary.get("marketCap") or summary.get("marketCapitalization") or summary.get("mktCap") or summary.get("totalMarketCap") or daily.get("marketCap") or daily.get("marketCapitalization") or daily.get("mktCap") or daily.get("totalMarketCap")
+
+    # --- Live index values from CSE aspiData / snpData endpoints ---
+    # Actual CSE fields: {value, change, percentage, lowValue, highValue, ...}
+    aspi_raw = raw.get("aspi") if isinstance(raw.get("aspi"), dict) else {}
+    sl20_raw = raw.get("snp_sl20") if isinstance(raw.get("snp_sl20"), dict) else {}
+    aspi_value = _to_float(
+        aspi_raw.get("value") or daily.get("asi")
+    )
+    aspi_change = _to_float(
+        aspi_raw.get("change") or daily.get("asiChange")
+    )
+    aspi_change_pct = _to_float(
+        aspi_raw.get("percentage") or daily.get("asiChangePct")
+    )
+    sl20_value = _to_float(
+        sl20_raw.get("value") or daily.get("spp")
+    )
+    sl20_change = _to_float(
+        sl20_raw.get("change") or daily.get("sppChange")
+    )
+    sl20_change_pct = _to_float(
+        sl20_raw.get("percentage") or daily.get("sppChangePct")
+    )
 
     def movers(items: Any) -> List[Dict[str, Any]]:
         out: List[Dict[str, Any]] = []
@@ -173,6 +198,12 @@ def _normalize_market_overview(raw: Any, prov_name: str) -> Dict[str, Any]:
         "turnover_lkr": _to_float(turnover),
         "trades": int(_to_float(trades) or 0) if trades is not None else None,
         "market_cap_lkr": _to_float(mcap),
+        "aspi_value": aspi_value,
+        "aspi_change": aspi_change,
+        "aspi_change_pct": aspi_change_pct,
+        "sl20_value": sl20_value,
+        "sl20_change": sl20_change,
+        "sl20_change_pct": sl20_change_pct,
         "top_gainers": movers(raw.get("top_gainers")),
         "top_losers": movers(raw.get("top_losers")),
         "most_active": movers(raw.get("most_active")),
@@ -211,7 +242,8 @@ def market_overview() -> Dict[str, Any]:
                 "error": str(getattr(e, "detail", e)),
             }
 
-    return _cache.get_or_set(("market_overview", prov.name), _factory)
+    cache = _market_live_cache if prov.name in {"cse", "hybrid", "yfinance"} else _cache
+    return cache.get_or_set(("market_overview", prov.name), _factory)
 
 
 def indices() -> Dict[str, Any]:
@@ -264,7 +296,7 @@ def indices() -> Dict[str, Any]:
                 return {"ASPI": aspi or [], "S&P SL20": sl20 or [], "source": "db"}
         return _cache.get_or_set(("indices", prov.name), _factory)
 
-    live = _cache.get_or_set(("indices", prov.name), _factory)
+    live = _market_live_cache.get_or_set(("indices", prov.name), _factory)
     aspi_live = live.get("ASPI") if isinstance(live, dict) else []
     sl20_live = live.get("S&P SL20") if isinstance(live, dict) else []
     if (isinstance(aspi_live, list) and aspi_live) or (isinstance(sl20_live, list) and sl20_live):
