@@ -123,6 +123,8 @@ export function ModelManagement() {
     archived: models.filter((m) => m.lifecycleStatus === "archived").length,
   }), [models]);
 
+  const activeModelObj = useMemo(() => models.find((m) => m.isActive || m.id === activeModel), [models, activeModel]);
+
   return (
     <div className="min-h-screen bg-[#08090c]">
       <div className="mx-auto max-w-[1680px] px-6 py-8 lg:px-8 space-y-6">
@@ -168,8 +170,26 @@ export function ModelManagement() {
           <Card className="border-[#30363d] bg-[#161b22]"><CardHeader className="pb-2"><CardDescription className="text-[#768390]">Archived</CardDescription></CardHeader><CardContent><div className="text-[28px] font-bold text-[#e6edf3]">{modelCounts.archived}</div></CardContent></Card>
         </div>
 
-        {modelHealth?.capabilities ? (
-          <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-5"><div className="text-[13px] font-semibold text-[#e6edf3]">Engine availability</div><div className="mt-3 flex flex-wrap gap-2">{[["Baseline", true],["Sklearn GBDT", Boolean(modelHealth.capabilities.sklearnGbdt)],["LightGBM", Boolean(modelHealth.capabilities.lightgbm)],["XGBoost", Boolean(modelHealth.capabilities.xgboost)],["CatBoost", Boolean(modelHealth.capabilities.catboost)],["FinBERT runtime", Boolean(modelHealth.capabilities.finbertAvailable)]].map(([name, ok]) => <Badge key={String(name)} className={ok ? "bg-emerald-600/20 text-emerald-300 border-emerald-500/30" : "bg-[#1c2128] text-[#768390] border-[#30363d]"}>{name}: {ok ? "Available" : "Unavailable"}</Badge>)}</div></CardContent></Card>
+        {activeModelObj ? (
+          <Card className="border-[#30363d] bg-[#161b22]">
+            <CardContent className="p-5">
+              <div className="text-[13px] font-semibold text-[#e6edf3]">Active model capabilities</div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {[
+                  ["Sentiment", Boolean(activeModelObj.summary?.sentiment)],
+                  ["Macro", Boolean(activeModelObj.summary?.macro)],
+                  ["FinBERT", Boolean(activeModelObj.summary?.finbertReady)],
+                  [`Direction: ${activeModelObj.summary?.directionModel || activeModelObj.meta?.models?.direction || "—"}`, Boolean(activeModelObj.summary?.directionModel || activeModelObj.meta?.models?.direction)],
+                ].map(([name, ok]) => (
+                  <Badge key={String(name)} className={ok ? "bg-emerald-600/20 text-emerald-300 border-emerald-500/30" : "bg-[#1c2128] text-[#768390] border-[#30363d]"}>
+                    {String(name)}
+                  </Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        ) : modelHealth?.capabilities ? (
+          <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-5"><div className="text-[13px] font-semibold text-[#e6edf3]">Engine availability</div><div className="mt-3 flex flex-wrap gap-2">{[["Baseline", true],["Sklearn GBDT", Boolean(modelHealth.capabilities.sklearnGbdt)],["LightGBM", Boolean(modelHealth.capabilities.lightgbm)],["XGBoost", Boolean(modelHealth.capabilities.xgboost)],["CatBoost", Boolean(modelHealth.capabilities.catboost)],["FinBERT", Boolean(modelHealth.capabilities.finbertAvailable)]].map(([name, ok]) => <Badge key={String(name)} className={ok ? "bg-emerald-600/20 text-emerald-300 border-emerald-500/30" : "bg-[#1c2128] text-[#768390] border-[#30363d]"}>{String(name)}</Badge>)}</div></CardContent></Card>
         ) : null}
 
         <Tabs defaultValue="models" className="space-y-6">
