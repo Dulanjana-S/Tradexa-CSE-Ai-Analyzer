@@ -62,12 +62,12 @@ export function Dashboard() {
               Last updated: {new Date(overview.lastUpdated).toLocaleString("en-LK", { dateStyle: "medium", timeStyle: "short" })}
             </p>
           </div>
-          <Badge
-            variant="outline"
-            className="w-fit border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] hover:border-[var(--border-hover)] hover:bg-[var(--color-bg-tertiary)]"
-          >
-            CSE · Colombo Stock Exchange
-          </Badge>
+          <div className="flex items-center gap-3 rounded-md border border-[#bf953f]/20 bg-[#bf953f]/5 px-3 py-1 backdrop-blur-sm transition-all hover:border-[#bf953f]/40">
+            <div className="h-1.5 w-1.5 rounded-full bg-[#bf953f] animate-pulse shadow-[0_0_8px_#bf953f]" />
+            <span className="text-[10px] font-medium uppercase tracking-[0.3em] text-[#bf953f]/90">
+              Trade With Confidence
+            </span>
+          </div>
         </div>
 
         <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">

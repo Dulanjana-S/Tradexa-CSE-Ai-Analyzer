@@ -1094,7 +1094,7 @@ export const alertsApi = {
     return rows.map((row: any) => mapAlert(row, priceMap[row.symbol]?.lastPrice || 0));
   },
 
-  create: async (payload: { symbol?: string; alertType?: Alert["alertType"]; condition?: Alert["condition"]; targetPrice?: number; recurring?: boolean; cooldownMinutes?: number }) => {
+  create: async (payload: { symbol?: string; alertType?: Alert["alertType"] | "reminder"; condition?: Alert["condition"] | "time"; targetPrice?: number; recurring?: boolean; cooldownMinutes?: number; meta?: Record<string, any> }) => {
     const alertType = payload.alertType || (payload.condition === "below" ? "below_price" : payload.condition === "pct_move" ? "pct_move" : payload.condition === "volume_spike" ? "volume_spike" : payload.condition === "important_announcement" ? "important_announcement" : "above_price");
     const response = await api.post<any>("/api/alerts", {
       symbol: payload.symbol,
@@ -1102,6 +1102,7 @@ export const alertsApi = {
       target_value: payload.targetPrice,
       recurring: Boolean(payload.recurring),
       cooldown_minutes: payload.cooldownMinutes || 1440,
+      meta: payload.meta,
     });
     const rows = Array.isArray(response?.alerts) ? response.alerts : [];
     const priceMap = await getPriceMap(rows.map((row: any) => row.symbol).filter(Boolean));

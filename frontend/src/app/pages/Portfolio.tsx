@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { marketApi, portfolioApi, watchlistApi } from "../../lib/api/services";
+import { alertsApi, marketApi, portfolioApi, watchlistApi } from "../../lib/api/services";
 import type { EventCalendar, PortfolioAccount, PortfolioAnalytics, PortfolioData, PortfolioIntelligence, TradeFitPreview, PortfolioPerformancePoint, PortfolioPeriodPerformance, PortfolioTransaction, Stock, Watchlist } from "../../lib/api/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -11,7 +11,7 @@ import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Textarea } from "../components/ui/textarea";
-import { BarChart3, BriefcaseBusiness, FileUp, Landmark, Loader2, Pencil, PieChart, Plus, ShieldAlert, ShoppingBag, Trash2, TrendingDown, TrendingUp, Wallet, ShieldCheck, Lightbulb } from "lucide-react";
+import { BarChart3, BriefcaseBusiness, FileUp, Landmark, Loader2, Pencil, PieChart, Plus, ShieldAlert, ShoppingBag, Trash2, TrendingDown, TrendingUp, Wallet, ShieldCheck, Lightbulb, BrainCircuit, CheckCircle2, AlertTriangle, Clock } from "lucide-react";
 
 const emptyPortfolio: PortfolioData = {
   summary: {
@@ -79,17 +79,25 @@ const defaultForm = () => ({
   notes: "",
 });
 
-type PortfolioPanel = "cash" | "smart" | "analytics" | "performance" | "holdings" | "events" | "import" | "transactions";
+type PortfolioPanel = "cash" | "smart" | "analytics" | "performance" | "holdings" | "events" | "import" | "transactions" | "journal";
+
+type NoteItem = {
+  id: string;
+  text: string;
+  createdAt: string;
+  reminderAt?: string;
+};
 
 const portfolioPanels: Array<{ key: PortfolioPanel; label: string; description: string }> = [
   { key: "cash", label: "Cash", description: "cash balance, deposits and withdrawals" },
-  { key: "smart", label: "Smart", description: "health score, attention and suggestions" },
+  { key: "smart", label: "AI Guidance", description: "fully automated ai intelligence, risk monitoring and guidance" },
   { key: "analytics", label: "Analytics", description: "sectors, gainers, losers and income mix" },
   { key: "performance", label: "Performance", description: "charts, periods and benchmarks" },
   { key: "holdings", label: "Holdings", description: "open positions and smart status" },
   { key: "events", label: "Events", description: "corporate actions and held-stock calendar" },
   { key: "import", label: "Import", description: "broker statements and CSV import" },
   { key: "transactions", label: "Transactions", description: "trade history and corrections" },
+  { key: "journal", label: "Journal", description: "trader notes and strategy" },
 ];
 
 const timeframeOptions = [
@@ -147,6 +155,87 @@ export function Portfolio() {
   const [csvPreview, setCsvPreview] = useState<any | null>(null);
   const [form, setForm] = useState(defaultForm());
   const [symbolSuggestions, setSymbolSuggestions] = useState<Stock[]>([]);
+  const [notes, setNotes] = useState<NoteItem[]>([]);
+  const [newNoteText, setNewNoteText] = useState("");
+  const [isSavingJournal, setIsSavingJournal] = useState(false);
+  const [reminderTime, setReminderTime] = useState("");
+
+  useEffect(() => {
+    if (portfolio?.portfolio) {
+      try {
+        const desc = portfolio.portfolio.description || "";
+        if (desc.startsWith("[") && desc.endsWith("]")) {
+          setNotes(JSON.parse(desc));
+        } else if (desc.trim() !== "") {
+          setNotes([{ id: Date.now().toString(), text: desc, createdAt: new Date().toISOString() }]);
+        } else {
+          setNotes([]);
+        }
+      } catch (e) {
+        setNotes([{ id: Date.now().toString(), text: portfolio.portfolio.description || "", createdAt: new Date().toISOString() }]);
+      }
+    }
+  }, [portfolio?.portfolio]);
+
+  const handleAddNote = async () => {
+    if (!newNoteText.trim() || !portfolio?.portfolio) {
+      setError("Please write a note first.");
+      return;
+    }
+    setIsSavingJournal(true);
+
+    let targetTimestamp: number | undefined;
+    if (reminderTime) {
+      targetTimestamp = new Date(reminderTime).getTime() / 1000;
+      if (targetTimestamp <= Date.now() / 1000) {
+        setError("Reminder time must be in the future.");
+        setIsSavingJournal(false);
+        return;
+      }
+    }
+
+    const noteId = Date.now().toString();
+    const newNote: NoteItem = {
+      id: noteId,
+      text: newNoteText,
+      createdAt: new Date().toISOString(),
+      reminderAt: reminderTime || undefined,
+    };
+
+    const updatedNotes = [newNote, ...notes];
+
+    try {
+      await portfolioApi.updatePortfolio(portfolio.portfolio.portfolioId, { description: JSON.stringify(updatedNotes) });
+      if (targetTimestamp) {
+        await alertsApi.create({
+          alertType: "reminder",
+          targetPrice: targetTimestamp,
+          meta: { note: newNoteText.slice(0, 200), noteId }
+        });
+      }
+      setPortfolio((prev) => prev ? { ...prev, portfolio: { ...prev.portfolio!, description: JSON.stringify(updatedNotes) } } : prev);
+      setNewNoteText("");
+      setReminderTime("");
+      setError(null);
+    } catch (err) {
+      setError("Failed to add note");
+    } finally {
+      setIsSavingJournal(false);
+    }
+  };
+
+  const handleDeleteNote = async (id: string) => {
+    if (!portfolio?.portfolio) return;
+    const updatedNotes = notes.filter(n => n.id !== id);
+    try {
+      await portfolioApi.updatePortfolio(portfolio.portfolio.portfolioId, { description: JSON.stringify(updatedNotes) });
+      setPortfolio((prev) => prev ? { ...prev, portfolio: { ...prev.portfolio!, description: JSON.stringify(updatedNotes) } } : prev);
+      setNotes(updatedNotes);
+    } catch (err) {
+      setError("Failed to delete note");
+    }
+  };
+
   const [symbolSearchOpen, setSymbolSearchOpen] = useState(false);
   const [symbolSearchLoading, setSymbolSearchLoading] = useState(false);
 
@@ -600,10 +689,107 @@ export function Portfolio() {
           <Card className="border-[#30363d] bg-[#161b22]"><CardHeader><CardTitle className="text-[18px] text-[#e6edf3]">Performance by period</CardTitle><CardDescription className="text-[13px] text-[#768390]">Portfolio returns vs ASPI and S&P SL20.</CardDescription></CardHeader><CardContent className="space-y-3">{periodPerformance.length ? periodPerformance.map((row) => <div key={row.label} className="rounded-lg border border-[#30363d] bg-[#0d1117] p-3"><div className="flex items-center justify-between"><span className="font-medium text-[#e6edf3]">{row.label}</span><span className={row.portfolioReturnPct >= 0 ? "text-emerald-400" : "text-red-400"}>{signedPercent(row.portfolioReturnPct)}</span></div><div className="mt-1 flex justify-between text-[12px] text-[#768390]"><span>ASPI {signedPercent(row.aspiReturnPct)}</span><span>Alpha {signedPercent(row.alphaVsAspiPct)}</span></div><div className="mt-1 flex justify-between text-[12px] text-[#768390]"><span>S&P SL20 {signedPercent(row.sp20ReturnPct)}</span><span>Alpha {signedPercent(row.alphaVsSp20Pct)}</span></div></div>) : <p className="text-[13px] text-[#768390]">Add positions to calculate period performance.</p>}</CardContent></Card>
         </div>
 
-        <div className={activePanel === "smart" ? "grid grid-cols-1 gap-4 md:grid-cols-3" : "hidden"}>
-          <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-emerald-500/10"><ShieldCheck className="h-5 w-5 text-emerald-400" /></div><div><p className="text-[13px] text-[#768390]">Portfolio health</p><p className="text-[24px] font-bold text-[#e6edf3]">{intelligence.health.score}/100</p><p className="text-[12px] text-[#768390]">{intelligence.health.label} · {intelligence.health.attentionCount} need attention</p></div></div></CardContent></Card>
-          <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-amber-500/10"><Wallet className="h-5 w-5 text-amber-400" /></div><div><p className="text-[13px] text-[#768390]">Cash management</p><p className="text-[24px] font-bold text-[#e6edf3]">{intelligence.cashManagement.cashPct.toFixed(1)}%</p><p className="text-[12px] text-[#768390]">Target {intelligence.cashManagement.targetMinPct.toFixed(0)}–{intelligence.cashManagement.targetMaxPct.toFixed(0)}%</p></div></div></CardContent></Card>
-          <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-violet-500/10"><Lightbulb className="h-5 w-5 text-violet-400" /></div><div><p className="text-[13px] text-[#768390]">Smart suggestion</p><p className="text-[14px] font-semibold text-[#e6edf3]">{intelligence.suggestions[0] || "Keep monitoring cash, concentration and market events"}</p></div></div></CardContent></Card>
+        <div className={activePanel === "smart" ? "flex flex-col gap-6" : "hidden"}>
+          {/* AI Banner */}
+          <div className="flex items-center gap-4 rounded-xl border border-blue-500/30 bg-blue-500/5 p-6">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-600/20 shadow-[0_0_15px_rgba(37,99,235,0.5)]">
+              <BrainCircuit className="h-6 w-6 text-blue-400" />
+            </div>
+            <div>
+              <h2 className="text-[20px] font-bold text-[#e6edf3]">TradexaLK AI Intelligence</h2>
+              <p className="text-[13px] text-[#768390]">Fully automated monitoring of your broker statements and trades. We analyze risk, cash management, and provide continuous guidance.</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-emerald-500/10"><ShieldCheck className="h-5 w-5 text-emerald-400" /></div><div><p className="text-[13px] text-[#768390]">Portfolio health</p><p className="text-[24px] font-bold text-[#e6edf3]">{intelligence.health.score}/100</p><p className="text-[12px] text-[#768390]">{intelligence.health.label} · {intelligence.health.attentionCount} need attention</p></div></div></CardContent></Card>
+            <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-amber-500/10"><Wallet className="h-5 w-5 text-amber-400" /></div><div><p className="text-[13px] text-[#768390]">Cash management</p><p className="text-[24px] font-bold text-[#e6edf3]">{intelligence.cashManagement.cashPct.toFixed(1)}%</p><p className="text-[12px] text-[#768390]">Target {intelligence.cashManagement.targetMinPct.toFixed(0)}–{intelligence.cashManagement.targetMaxPct.toFixed(0)}%</p></div></div></CardContent></Card>
+            <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-violet-500/10"><ShieldAlert className="h-5 w-5 text-violet-400" /></div><div><p className="text-[13px] text-[#768390]">Risk exposure</p><p className="text-[24px] font-bold text-[#e6edf3]">{analytics.risk.score}/100</p><p className="text-[12px] text-[#768390]">{analytics.risk.label} risk level</p></div></div></CardContent></Card>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* What's Good */}
+            <Card className="border-[#30363d] bg-[#161b22]">
+              <CardHeader className="border-b border-[#30363d] pb-4">
+                <CardTitle className="flex items-center gap-2 text-[18px] text-emerald-400">
+                  <CheckCircle2 className="h-5 w-5" />
+                  What's Good
+                </CardTitle>
+                <CardDescription className="text-[13px] text-[#768390]">Strengths and healthy indicators in your current portfolio.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-4">
+                {intelligence.health.score >= 70 && <div className="flex items-start gap-3"><div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-500" /><div><p className="text-[13px] font-medium text-[#e6edf3]">Strong Overall Health</p><p className="text-[12px] text-[#768390]">Your portfolio score is {intelligence.health.score}, indicating a well-balanced strategy.</p></div></div>}
+                {intelligence.cashManagement.label === "healthy_cash" && <div className="flex items-start gap-3"><div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-500" /><div><p className="text-[13px] font-medium text-[#e6edf3]">Optimal Cash Buffer</p><p className="text-[12px] text-[#768390]">Cash is at {intelligence.cashManagement.cashPct.toFixed(1)}%, providing excellent flexibility for future opportunities.</p></div></div>}
+                {analytics.diversification.score >= 60 && <div className="flex items-start gap-3"><div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-500" /><div><p className="text-[13px] font-medium text-[#e6edf3]">Good Diversification</p><p className="text-[12px] text-[#768390]">Your capital is spread across {analytics.diversification.sectorCount} sectors.</p></div></div>}
+                {analytics.benchmark.alphaVsAspiPct > 0 && <div className="flex items-start gap-3"><div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-500" /><div><p className="text-[13px] font-medium text-[#e6edf3]">Outperforming Market</p><p className="text-[12px] text-[#768390]">Portfolio is generating {signedPercent(analytics.benchmark.alphaVsAspiPct)} alpha compared to ASPI.</p></div></div>}
+                {intelligence.holdings.filter((h) => h.status === "suitable").slice(0, 3).map((h) => (
+                  <div key={`good-${h.symbol}`} className="flex items-start gap-3"><div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-500" /><div><p className="text-[13px] font-medium text-[#e6edf3]">{h.symbol} looks solid</p><p className="text-[12px] text-[#768390]">High AI fit score of {h.fitScore}/100 with manageable risk.</p></div></div>
+                ))}
+                {(!intelligence.holdings.some((h) => h.status === "suitable") && intelligence.health.score < 50 && analytics.diversification.score < 50) && (
+                  <p className="text-[13px] text-[#768390]">Import more trades or add funds to see strengths.</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Risk & Attention */}
+            <Card className="border-[#30363d] bg-[#161b22]">
+              <CardHeader className="border-b border-[#30363d] pb-4">
+                <CardTitle className="flex items-center gap-2 text-[18px] text-amber-400">
+                  <AlertTriangle className="h-5 w-5" />
+                  Risks & Attention Required
+                </CardTitle>
+                <CardDescription className="text-[13px] text-[#768390]">Areas where the AI detected elevated risk or suboptimal allocations.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-4">
+                {intelligence.cashManagement.label !== "healthy_cash" && (
+                  <div className="flex items-start gap-3 rounded-md bg-amber-500/10 p-3"><div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-amber-500" /><div><p className="text-[13px] font-medium text-amber-400">Cash Management Warning</p><p className="text-[12px] text-amber-200/70">{intelligence.cashManagement.reasons[0]}</p></div></div>
+                )}
+                {intelligence.attentionItems.map((item) => (
+                  <div key={`attn-${item.symbol}`} className="flex items-start gap-3 rounded-md border border-[#30363d] p-3">
+                    <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-red-500" />
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[13px] font-medium text-[#e6edf3]">{item.symbol} Risk</p>
+                        <Badge variant="outline" className={statusBadgeClass(item.status)}>{item.statusLabel}</Badge>
+                      </div>
+                      <p className="text-[12px] text-[#768390]">{item.reasons[0]}</p>
+                    </div>
+                  </div>
+                ))}
+                {intelligence.attentionItems.length === 0 && intelligence.cashManagement.label === "healthy_cash" && (
+                  <p className="text-[13px] text-[#768390]">No immediate risks detected. Your portfolio looks clean.</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Overall AI Guidance */}
+          <Card className="border border-blue-500/20 bg-[#0d1117]">
+            <CardHeader>
+              <CardTitle className="text-[18px] text-[#e6edf3]">AI Trader Guidance</CardTitle>
+              <CardDescription className="text-[13px] text-[#768390]">Actionable suggestions based on your entire imported trade history.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {intelligence.suggestions.map((suggestion, i) => (
+                  <div key={i} className="flex items-center gap-3 rounded-lg border border-[#30363d] bg-[#161b22] p-4 transition-colors hover:bg-[#1c2128]">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500/10">
+                      <Lightbulb className="h-4 w-4 text-blue-400" />
+                    </div>
+                    <p className="text-[13px] text-[#e6edf3]">{suggestion}</p>
+                  </div>
+                ))}
+                {intelligence.holdings.filter((h) => h.suggestions && h.suggestions.length > 0).slice(0, 3).map((h) => (
+                  <div key={`sug-${h.symbol}`} className="flex items-center gap-3 rounded-lg border border-[#30363d] bg-[#161b22] p-4 transition-colors hover:bg-[#1c2128]">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500/10">
+                      <Lightbulb className="h-4 w-4 text-blue-400" />
+                    </div>
+                    <p className="text-[13px] text-[#e6edf3]"><span className="font-semibold">{h.symbol}:</span> {h.suggestions[0]}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <div className={activePanel === "analytics" ? "grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4" : "hidden"}>
@@ -990,6 +1176,85 @@ export function Portfolio() {
             </Table>
           </CardContent>
         </Card>
+
+        {/* Journal Panel */}
+        <div className={activePanel === "journal" ? "block space-y-4" : "hidden"}>
+          <Card className="border-[#30363d] bg-[#161b22]">
+            <CardHeader className="border-b border-[#30363d] pb-4">
+              <CardTitle className="text-[18px] text-[#e6edf3]">Trading Journal</CardTitle>
+              <CardDescription className="text-[13px] text-[#768390]">Keep track of multiple notes, strategies, and market thoughts over time.</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-6">
+
+              {/* Add Note Section */}
+              <div className="space-y-3 rounded-lg border border-[#30363d] bg-[#0d1117] p-4">
+                <Textarea
+                  value={newNoteText}
+                  onChange={(e) => setNewNoteText(e.target.value)}
+                  placeholder="What's your strategy? Did you learn anything today?"
+                  className="min-h-[100px] border-none bg-transparent focus-visible:ring-0 p-0 text-[#e6edf3] placeholder:text-[#768390] resize-none"
+                />
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-t border-[#30363d] pt-3">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-[#768390]" />
+                    <input
+                      type="datetime-local"
+                      value={reminderTime}
+                      onChange={(e) => setReminderTime(e.target.value)}
+                      className="bg-transparent text-[13px] text-[#e6edf3] outline-none"
+                      style={{ colorScheme: 'dark' }}
+                    />
+                    {reminderTime && <span className="text-[11px] text-amber-400">Reminder will be set</span>}
+                  </div>
+                  <Button
+                    onClick={handleAddNote}
+                    disabled={isSavingJournal || !newNoteText.trim()}
+                    className="bg-blue-600 text-white hover:bg-blue-700 h-8"
+                  >
+                    {isSavingJournal ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Add Note"}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Notes List */}
+              <div className="space-y-4">
+                {notes.length === 0 ? (
+                  <div className="py-8 text-center text-[#768390]">No notes yet. Add your first note above.</div>
+                ) : (
+                  notes.map(note => (
+                    <div key={note.id} className="relative rounded-lg border border-[#30363d] bg-[#0d1117]/50 p-4 group">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-2 right-2 h-6 w-6 text-[#768390] opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-red-500/10 transition-opacity"
+                        onClick={() => handleDeleteNote(note.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="text-[12px] font-medium text-[#768390]">{new Date(note.createdAt).toLocaleString()}</span>
+                        {note.reminderAt && (() => {
+                          const isTriggered = new Date(note.reminderAt).getTime() <= Date.now();
+                          return (
+                            <Badge variant="outline" className={isTriggered ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-[10px] px-1.5 py-0" : "border-amber-500/30 bg-amber-500/10 text-amber-300 text-[10px] px-1.5 py-0"}>
+                              {isTriggered ? <CheckCircle2 className="mr-1 h-3 w-3" /> : <Clock className="mr-1 h-3 w-3" />}
+                              {isTriggered ? 'Reminder triggered' : `Reminder: ${new Date(note.reminderAt).toLocaleString()}`}
+                            </Badge>
+                          );
+                        })()}
+                      </div>
+                      <div className="whitespace-pre-wrap text-[14px] text-[#e6edf3]">
+                        {note.text}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+            </CardContent>
+          </Card>
+        </div>
+
       </div>
     </div>
   );

@@ -16,6 +16,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { User, Bell, Shield, Palette, Database, CreditCard, Loader2, Mail, CheckCircle2, AlertTriangle } from "lucide-react";
 import { authApi, settingsApi, systemApi } from "../../lib/api/services";
+import { API_BASE_URL } from "../../lib/api/client";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
 
@@ -90,24 +91,37 @@ export function Settings() {
 
   useEffect(() => {
     const load = async () => {
+      // Safety timeout: if backend is extremely slow, don't keep user stuck
+      const timeoutId = setTimeout(() => {
+        setLoading(false);
+      }, 3000);
+
       setLoading(true);
       try {
-        const [me, userSettings, status] = await Promise.all([
-          authApi.me(),
-          settingsApi.getUserSettings(),
-          systemApi.getStatus().catch(() => null),
-        ]);
+        // Load sequentially or with individual catches to prevent hanging entire page
+        const me = await authApi.me().catch(() => ({ name: user?.name || "User", email: user?.email || "" }));
+        const userSettings = await settingsApi.getUserSettings().catch(() => ({ settings: defaultSettings }));
+        const status = await systemApi.getStatus().catch(() => null);
+        
         setSystemStatus(status);
-        setProfile({ name: me.name || "", email: me.email || "", phone: String(userSettings.settings?.phone || "") });
-        const merged = { ...defaultSettings, ...(userSettings.settings || {}) };
+        setProfile({ 
+          name: me.name || "", 
+          email: me.email || "", 
+          phone: String(userSettings?.settings?.phone || "") 
+        });
+        
+        const merged = { ...defaultSettings, ...(userSettings?.settings || {}) };
         setSettings(merged);
+        
         if (merged.theme === "light" || merged.theme === "dark") {
           setTheme(merged.theme);
         }
-      } catch {
+      } catch (err) {
+        console.error("Settings load error:", err);
         setProfile({ name: user?.name || "", email: user?.email || "", phone: "" });
         setSettings(defaultSettings);
       } finally {
+        clearTimeout(timeoutId);
         setLoading(false);
       }
     };
@@ -249,7 +263,7 @@ export function Settings() {
               <CardContent className="space-y-6">
                 {!userAlertsEnabled ? (
                   <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-[12px] text-amber-100">
-                    <div className="mb-1 flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4" /> Personal alerts are currently disabled by the system administrator.</div>
+                    <div className="mb-1 flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4" /> Personal alerts are currently undergoing system optimization.</div>
                     <div>You can still review existing alerts and notifications, but new personal alert triggers are temporarily unavailable.</div>
                   </div>
                 ) : (
@@ -293,7 +307,7 @@ export function Settings() {
                     <div className="text-[13px] font-semibold text-[#e6edf3]">How this works</div>
                     <div className="space-y-3 text-[12px] text-[#9da7b3]">
                       <p>In-app notifications always appear inside the TradexaLK notification center when the matching category is enabled.</p>
-                      <p>Email is optional and only works if the backend email delivery is enabled by the administrator.</p>
+                      <p>Email notifications provide automated daily summaries and instant breakout alerts.</p>
                       <p>Advanced webhook-style delivery was removed from the normal user settings page to keep this screen focused on investor-friendly controls.</p>
                     </div>
                     <div className="rounded-lg border border-[#30363d] bg-[#08090c] p-4 text-[12px] text-[#9da7b3]">
@@ -417,6 +431,60 @@ export function Settings() {
                       try {
                         setSaving(true);
                         setMessage(null);
+                        const response = await fetch(`${API_BASE_URL}/api/account/export`, {
+                          method: "GET",
+                          credentials: "include",
+                        });
+                        if (!response.ok) throw new Error('Export failed');
+                        const data = await response.json();
+                        
+                        // Flatten data for CSV
+                        const rows = [["Category", "Field", "Value", "Detail"]];
+                        
+                        // Profile
+                        if (data.profile) {
+                          Object.entries(data.profile).forEach(([k, v]) => rows.push(["Profile", k, String(v), ""]));
+                        }
+                        
+                        // Settings
+                        if (data.settings) {
+                          Object.entries(data.settings).forEach(([k, v]) => rows.push(["Setting", k, String(v), ""]));
+                        }
+                        
+                        // Watchlist
+                        if (data.watchlist?.symbols) {
+                          data.watchlist.symbols.forEach((s: string) => rows.push(["Watchlist", "Symbol", s, "Active Tracking"]));
+                        }
+                        
+                        // Portfolio
+                        if (data.portfolio?.positions) {
+                          data.portfolio.positions.forEach((p: any) => {
+                            rows.push(["Portfolio", "Holding", p.symbol, `Qty: ${p.quantity}, Avg Price: ${p.average_price}`]);
+                          });
+                        }
+                        
+                        const csvContent = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+                        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `tradexalk-export-${(user?.username || 'user')}.csv`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        URL.revokeObjectURL(url);
+                        setMessage('Excel/CSV export downloaded successfully.');
+                      } catch (error: any) {
+                        setMessage(error?.message || 'Failed to export to CSV.');
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}>{saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />} Export to Excel (CSV)</Button>
+
+                    <Button variant="outline" className="border-[#30363d] text-slate-300 hover:bg-[#1c2128]" disabled={saving} onClick={async () => {
+                      try {
+                        setSaving(true);
+                        setMessage(null);
                         const blob = await settingsApi.exportAccountData();
                         const url = URL.createObjectURL(blob);
                         const a = document.createElement('a');
@@ -426,22 +494,21 @@ export function Settings() {
                         a.click();
                         a.remove();
                         URL.revokeObjectURL(url);
-                        setMessage('Account data export downloaded successfully.');
+                        setMessage('JSON export downloaded successfully.');
                       } catch (error: any) {
                         setMessage(error?.message || 'Failed to export account data.');
                       } finally {
                         setSaving(false);
                       }
-                    }}>{saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />} Download Account Data</Button>
-                    <Badge className="border-[#3a4450] bg-[#111927] text-[#9da7b3]">JSON export</Badge>
+                    }}>JSON Data Dump</Button>
                   </div>
                 </div>
 
                 <div className="rounded-xl border border-[#30363d] bg-[#0d1117] p-5 text-[12px] text-[#9da7b3]">
                   <div className="mb-2 font-semibold text-[#e6edf3]">Data handling notes</div>
                   <ul className="list-disc space-y-2 pl-5">
-                    <li>Your personal settings do not change global admin/system settings.</li>
-                    <li>Email delivery only works if the backend email system is enabled by the administrator.</li>
+                    <li>Preferences are saved to your secure profile.</li>
+                    <li>Automated email delivery requires a verified email address.</li>
                     <li>Billing is not active in this build, so no payment data is stored in this settings area.</li>
                   </ul>
                 </div>

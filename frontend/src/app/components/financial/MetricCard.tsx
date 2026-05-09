@@ -50,20 +50,21 @@ export function MetricCard({
   }
 
   return (
-    <Card className="group bg-[var(--color-bg-secondary)] border-[var(--color-border)] hover:border-[var(--border-hover)] hover:bg-[var(--color-bg-tertiary)] transition-all duration-150 shadow-none">
-      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2 px-5 pt-5">
-        <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--color-text-tertiary)]">
+    <Card className="group relative overflow-hidden bg-[#0d1117] border-[#30363d] hover:border-[#444c56] transition-all duration-200 shadow-none rounded-md">
+      <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-[#30363d] group-hover:bg-[#bf953f]/40 transition-colors" />
+      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-1.5 px-4 pt-4">
+        <CardTitle className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#768390]">
           {title}
         </CardTitle>
         {icon && (
-          <div className="text-[var(--color-text-tertiary)] opacity-50 group-hover:opacity-70 transition-opacity">
+          <div className="text-[#484f58] opacity-60 group-hover:opacity-100 transition-opacity">
             {icon}
           </div>
         )}
       </CardHeader>
-      <CardContent className="px-5 pb-5 pt-1">
-        <div className="flex flex-col gap-2">
-          <div className="text-[28px] font-bold text-[var(--color-text-primary)] tracking-tight leading-none tabular-nums">
+      <CardContent className="px-4 pb-4 pt-0">
+        <div className="flex flex-col gap-1.5">
+          <div className="text-[24px] font-medium text-[#e6edf3] tracking-tight leading-none tabular-nums">
             {value}
           </div>
           {(change !== undefined || changePercent !== undefined || subtitle) && (
@@ -71,8 +72,8 @@ export function MetricCard({
               {trend && (
                 <span
                   className={cn(
-                    "inline-flex items-center gap-1 text-[13px] font-semibold tabular-nums",
-                    getTrendColor()
+                    "inline-flex items-center gap-1 text-[11px] font-mono font-medium tabular-nums px-1.5 py-0.5 rounded-sm",
+                    trend === "up" ? "bg-emerald-500/10 text-emerald-400" : trend === "down" ? "bg-red-500/10 text-red-400" : "bg-slate-500/10 text-slate-400"
                   )}
                 >
                   {getTrendIcon()}
@@ -91,7 +92,7 @@ export function MetricCard({
                 </span>
               )}
               {subtitle && (
-                <span className="text-[13px] text-[var(--color-text-secondary)] font-normal">
+                <span className="text-[11px] text-[#768390] font-medium uppercase tracking-wider">
                   {subtitle}
                 </span>
               )}

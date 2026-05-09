@@ -8,7 +8,7 @@ import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Switch } from "../components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
-import { Bell, Plus, TrendingUp, TrendingDown, Trash2, Activity, Megaphone, Volume2, Percent, Loader2 } from "lucide-react";
+import { Bell, Plus, TrendingUp, TrendingDown, Trash2, Activity, Megaphone, Volume2, Percent, Loader2, Clock } from "lucide-react";
 import { alertsApi, systemApi } from "../../lib/api/services";
 import type { Alert } from "../../lib/api/types";
 
@@ -20,6 +20,7 @@ const alertTypeMeta: Record<AlertType, { label: string; description: string; ico
   pct_move: { label: "Daily % move", description: "Notify when daily absolute move exceeds a percentage", icon: Percent, targetLabel: "Move threshold (%)", targetPlaceholder: "5", needsTarget: true },
   volume_spike: { label: "Volume spike", description: "Notify when volume exceeds recent average by a multiple", icon: Volume2, targetLabel: "Volume multiple", targetPlaceholder: "2", needsTarget: true },
   important_announcement: { label: "Important announcement", description: "Notify when an important CSE announcement is detected", icon: Megaphone, targetLabel: "No target needed", targetPlaceholder: "", needsTarget: false },
+  reminder: { label: "Time reminder", description: "Time-based journal reminder", icon: Clock, targetLabel: "No target needed", targetPlaceholder: "", needsTarget: false },
 };
 
 function alertStatus(alert: Alert) {
@@ -30,6 +31,7 @@ function alertStatus(alert: Alert) {
 
 function conditionText(alert: Alert) {
   const meta = alertTypeMeta[alert.alertType] || alertTypeMeta.above_price;
+  if (alert.alertType === "reminder") return `Scheduled reminder`;
   if (alert.alertType === "important_announcement") return alert.symbol ? `Important announcements for ${alert.symbol}` : "Important announcements for watchlist";
   if (alert.alertType === "pct_move") return `Moves by ${alert.targetPrice.toFixed(2)}% or more`;
   if (alert.alertType === "volume_spike") return `Volume >= ${alert.targetPrice.toFixed(2)}x average`;
@@ -103,9 +105,9 @@ export function Alerts() {
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1.5">
             <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[#e6edf3]">Alerts & Monitoring</h1>
-            <p className="text-[13px] text-[#768390]">Track prices, daily moves, volume spikes, and important CSE announcements. User-created alerts are a normal investor feature and can be globally disabled by admin if needed.</p>
+            <p className="text-[13px] text-[#768390]">Track prices, daily moves, volume spikes, and important CSE announcements in real-time.</p>
           </div>
-          {!userAlertsEnabled && <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">User-created alerts are currently disabled by system settings. Existing alerts remain visible, and you can still delete or switch off old alerts.</div>}
+          {!userAlertsEnabled && <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">Alert notifications are currently undergoing system optimization.</div>}
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button className="flex items-center gap-2 bg-emerald-600 text-white hover:bg-emerald-700" disabled={!userAlertsEnabled}><Plus className="h-4 w-4" />Create Alert</Button>
@@ -137,7 +139,7 @@ export function Alerts() {
         </div>
 
         <Card className="border-[#30363d] bg-[#161b22]">
-          <CardHeader><CardTitle className="text-[18px] text-[#e6edf3]">Your Alerts</CardTitle><CardDescription className="text-[#768390]">Alerts are evaluated when you open alerts, notifications, or when the admin monitor checks them.</CardDescription></CardHeader>
+          <CardHeader><CardTitle className="text-[18px] text-[#e6edf3]">Your Alerts</CardTitle><CardDescription className="text-[#768390]">Track your active market monitors and status.</CardDescription></CardHeader>
           <CardContent>
             {loading ? (
               <div className="py-16 text-center text-[#768390]"><Loader2 className="mr-2 inline h-5 w-5 animate-spin" /> Loading alerts...</div>
@@ -155,7 +157,7 @@ export function Alerts() {
                       <TableRow key={alert.id} className="border-[#30363d]">
                         <TableCell><div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-md bg-[#0d1117]"><Icon className="h-4 w-4 text-emerald-500" /></div><div><div className="font-medium text-[#e6edf3]">{alert.symbol || "Watchlist"}</div><div className="text-[12px] text-[#768390]">{meta.label}</div></div></div></TableCell>
                         <TableCell className="text-[13px] text-[#768390]">{conditionText(alert)}</TableCell>
-                        <TableCell className="text-[13px] text-[#e6edf3]">{alert.alertType === "important_announcement" ? "—" : `Rs. ${alert.currentPrice.toFixed(2)}`}</TableCell>
+                        <TableCell className="text-[13px] text-[#e6edf3]">{alert.alertType === "important_announcement" || alert.alertType === "reminder" ? "—" : `Rs. ${alert.currentPrice.toFixed(2)}`}</TableCell>
                         <TableCell><Badge className={status.className}>{status.label}</Badge></TableCell>
                         <TableCell className="text-[13px] text-[#768390]">{alert.recurring ? `Yes (${alert.cooldownMinutes || 1440}m)` : "No"}</TableCell>
                         <TableCell className="text-right"><div className="flex items-center justify-end gap-2"><Switch checked={alert.enabled} onCheckedChange={(checked) => toggleAlert(alert.id, checked)} /><Button variant="ghost" size="icon" onClick={() => deleteAlert(alert.id)} className="text-red-400 hover:bg-red-500/10 hover:text-red-300"><Trash2 className="h-4 w-4" /></Button></div></TableCell>

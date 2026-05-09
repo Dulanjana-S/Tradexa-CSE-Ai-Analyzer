@@ -2465,7 +2465,7 @@ import smtplib
 from email.message import EmailMessage
 from urllib import request as urllib_request
 
-ALERT_TYPES = {"above_price", "below_price", "pct_move", "volume_spike", "important_announcement"}
+ALERT_TYPES = {"above_price", "below_price", "pct_move", "volume_spike", "important_announcement", "reminder"}
 ALERT_TYPE_ALIASES = {
     "above": "above_price",
     "price_above": "above_price",
@@ -2742,7 +2742,7 @@ def _parse_alert_payload(payload: Dict[str, Any]) -> Tuple[Optional[str], str, O
     if alert_type not in ALERT_TYPES:
         raise HTTPException(status_code=400, detail="Unsupported alert type")
     symbol = str(payload.get("symbol") or "").strip().upper() or None
-    if alert_type != "important_announcement" and not symbol:
+    if alert_type not in {"important_announcement", "reminder"} and not symbol:
         raise HTTPException(status_code=400, detail="Symbol is required for this alert type")
     raw_target = payload.get("target_value", payload.get("targetPrice"))
     target = _to_float(raw_target)
@@ -2820,6 +2820,7 @@ def evaluate_alerts(username: str) -> List[Dict[str, Any]]:
         symbol = (alert.get("symbol") or "").upper()
         latest, prev, avg_vol, latest_date = _latest_close_and_prev(symbol) if symbol else (None, None, None, None)
         alert_type = str(alert.get("alert_type") or "")
+        meta = dict(alert.get("meta") or {})
         current_condition = False
         message = None
         severity = "info"
@@ -2848,7 +2849,13 @@ def evaluate_alerts(username: str) -> List[Dict[str, Any]]:
             if current_condition:
                 message = f"{symbol} volume spiked to {int(vol or 0)} against a recent average of {int(avg_vol or 0)}."
                 severity = "warning"
-        meta = dict(alert.get("meta") or {})
+        elif alert_type == "reminder" and alert.get("target_value") is not None:
+            import time
+            current_time = time.time()
+            current_condition = current_time >= float(alert["target_value"])
+            if current_condition:
+                message = str(meta.get("note") or f"Reminder triggered for {symbol or 'portfolio'}")
+                severity = "info"
         if meta.get("last_condition_met") != current_condition:
             meta["last_condition_met"] = current_condition
             _storage.update_alert(str(alert.get("alert_id")), username, meta=meta)
@@ -2874,7 +2881,7 @@ def evaluate_alerts(username: str) -> List[Dict[str, Any]]:
             continue
         if message:
             dedupe = f"alert:{alert.get('alert_id')}:{latest_date or 'na'}:{alert_type}:{int(meta.get('cycle') or 0)}"
-            _ensure_notification(username, "alert", f"Alert triggered for {symbol or 'market'}", message, symbol=symbol or None, severity=severity, link=f"/stock/{symbol}" if symbol else "/alerts", dedupe_key=dedupe, meta={"alert_id": alert.get("alert_id"), "alert_type": alert_type})
+            _ensure_notification(username, "alert", f"Alert triggered for {symbol or 'market'}" if alert_type != "reminder" else "Reminder", message, symbol=symbol or None, severity=severity, link=f"/stock/{symbol}" if symbol else "/alerts", dedupe_key=dedupe, meta={"alert_id": alert.get("alert_id"), "alert_type": alert_type})
             meta["last_fire_key"] = latest_date or datetime.now().astimezone().astimezone().replace(microsecond=0).isoformat()
             meta["armed"] = False if bool(meta.get("recurring", False)) else meta.get("armed", False)
             _storage.update_alert(str(alert.get("alert_id")), username, meta=meta)
