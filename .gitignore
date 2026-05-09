@@ -34,13 +34,14 @@ backend/data/*.sqlite-journal
 backend/data/*.zip
 backend/data/uploads/
 backend/catboost_info/
-backend/models/latest/
 backend/models/tmp/
-backend/models/beta_*/
-backend/models/model_*/
-backend/models/test_real_suite/
-*.joblib
-*.pkl
+# trained model artifacts are intentionally tracked in git
+# backend/models/latest/
+# backend/models/beta_*/
+# backend/models/model_*/
+# backend/models/test_real_suite/
+# *.joblib
+# *.pkl
 
 # Node / frontend
 frontend/node_modules/
