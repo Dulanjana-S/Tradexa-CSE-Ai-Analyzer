@@ -67,6 +67,7 @@ export interface PredictionExplanationReason {
 
 export interface PredictionExplanation {
   direction: string;
+  direction_label?: string;
   summary: string;
   reasons: PredictionExplanationReason[];
 }

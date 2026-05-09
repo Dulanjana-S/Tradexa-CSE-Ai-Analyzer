@@ -100,31 +100,31 @@ def _driver_plain_text(name: str, group: str, direction: str) -> str:
 
     if "vol" in n or "liquidity" in n or "turnover" in n:
         if direction == "supports upside":
-            return f"{display_name} is pointing to easier trading and more buying interest."
+            return f"{display_name} suggests more trading activity, so the stock is easier for buyers and sellers to move in and out of."
         if direction == "supports downside":
-            return f"{display_name} suggests thinner trading, which can make the stock move more unevenly."
-        return f"{display_name} looks balanced, so it is not pushing the price strongly either way."
+            return f"{display_name} suggests lighter trading, which can make the price less stable and harder to exit quickly."
+        return f"{display_name} looks normal, so it is not giving the price a strong push either way."
 
     if "ret" in n or "trend" in n or "breakout" in n or "drawdown" in n or "close_to_high" in n or "close_to_low" in n:
         if direction == "supports upside":
-            return f"{display_name} points to the stock holding up well recently, which often attracts buyers."
+            return f"{display_name} shows the stock has been holding up well recently, and that usually keeps buyers interested."
         if direction == "supports downside":
-            return f"{display_name} points to recent weakness, which can keep sellers in control."
-        return f"{display_name} is not showing a clear push in either direction right now."
+            return f"{display_name} shows recent weakness, so sellers may still have the upper hand for now."
+        return f"{display_name} is mixed, so it is not giving a clear market edge right now."
 
     if "sent_" in n:
         if direction == "supports upside":
-            return f"Recent announcements and news around {display_name.lower()} are leaning positive."
+            return f"Recent announcements and news around {display_name.lower()} are generally positive, which can help sentiment."
         if direction == "supports downside":
-            return f"Recent announcements and news around {display_name.lower()} are leaning negative."
-        return f"Recent announcements and news around {display_name.lower()} look mixed."
+            return f"Recent announcements and news around {display_name.lower()} are leaning negative, which can put pressure on the stock."
+        return f"Recent announcements and news around {display_name.lower()} are mixed, so the market is waiting for a clearer signal."
 
     if "macro_" in n or "idx_" in n or "rel_" in n or "beta" in n:
         if direction == "supports upside":
-            return f"Market conditions are giving this stock a supportive backdrop."
+            return f"The wider market is giving this stock a small tailwind."
         if direction == "supports downside":
-            return f"The broader market backdrop is a small headwind for this stock."
-        return f"The broader market backdrop is not clearly helping or hurting this stock."
+            return f"The wider market is acting like a small drag on this stock right now."
+        return f"The wider market is not clearly helping or hurting this stock."
 
     if direction == "supports upside":
         return f"{display_name} is leaning positive in the current snapshot."
@@ -159,31 +159,33 @@ def _confidence(up_prob: float, p10: float, p90: float, action_probability: floa
 
 
 def _explain_prediction(signal: str, pred_ret: float, up_prob: float, conf: Dict[str, Any], drivers: List[Dict[str, Any]], sentiment_count: int, macro_count: int) -> Dict[str, Any]:
-    direction = "up" if signal == "bullish" else "down" if signal == "bearish" else "sideways / uncertain"
+    direction = "up" if signal == "bullish" else "down" if signal == "bearish" else "sideways"
+    direction_label = "more likely to rise" if signal == "bullish" else "more likely to fall" if signal == "bearish" else "likely to move sideways"
     strength = "strong" if conf.get("label") == "high" else "moderate" if conf.get("label") == "moderate" else "weak"
     reasons = []
     for driver in drivers[:6]:
         name = str(driver.get("name") or "feature")
         impact = float(driver.get("impact") or 0.0)
-        direction = "supports upside" if impact > 0 else "supports downside" if impact < 0 else "neutral"
+        reason_direction = "supports upside" if impact > 0 else "supports downside" if impact < 0 else "neutral"
         reasons.append({
             "feature": name,
             "featureLabel": _feature_plain_name(name),
             "group": _feature_label(name),
-            "direction": direction,
+            "direction": reason_direction,
             "impact": round(impact, 4),
-            "text": _driver_plain_text(name, _feature_label(name), direction),
+            "text": _driver_plain_text(name, _feature_label(name), reason_direction),
         })
-    plain = f"The model currently expects the stock to move {direction}. The signal strength is {strength}, with an up probability of {up_prob*100:.0f}% and an expected return of {pred_ret*100:.2f}%."
+    plain = f"In simple market terms, this stock looks {direction_label}. The call is {strength}, with a {up_prob*100:.0f}% chance of going up and an expected return of {pred_ret*100:.2f}%."
     if conf.get("action_probability") is not None:
-        plain += f" The meta filter estimates a {float(conf.get('action_probability'))*100:.0f}% chance that this is a useful actionable signal."
+        plain += f" There is also a {float(conf.get('action_probability'))*100:.0f}% chance this is a useful signal to act on."
     if sentiment_count:
-        plain += f" Recent disclosure/news sentiment is included using {sentiment_count} stored sentiment items."
+        plain += f" It also takes into account {sentiment_count} recent disclosures and news items."
     if macro_count:
-        plain += f" Macro context is included using {macro_count} stored macro points."
+        plain += f" It also looks at {macro_count} broader market data points."
     if conf.get("label") == "low":
-        plain += " Confidence is low, so treat this as a watch signal rather than a high-conviction forecast."
-    return {"direction": direction, "summary": plain, "reasons": reasons}
+        plain += " Confidence is low, so treat this as a watch signal rather than a strong forecast."
+    plain += " This view comes from price action, trading volume, news, and the wider market backdrop."
+    return {"direction": direction, "direction_label": direction_label, "summary": plain, "reasons": reasons}
 
 
 def _reliability_summary(model_meta: Dict[str, Any], conf: Dict[str, Any], flags: List[str]) -> Dict[str, Any]:
