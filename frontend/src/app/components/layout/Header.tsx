@@ -172,8 +172,8 @@ export function Header({ onMenuClick }: HeaderProps) {
         <Menu className="h-5 w-5" />
       </Button>
 
-      <Link to="/" className="flex min-w-[180px] items-center gap-2.5">
-        <img src="/logo.png" alt="Tradexa.lk" className="h-11 w-auto object-contain" />
+      <Link to="/" className="flex shrink-0 items-center gap-2.5">
+        <img src="/logo.png" alt="Tradexa.lk" className="h-9 w-auto object-contain sm:h-11" />
       </Link>
 
       <div className="relative hidden max-w-2xl flex-1 md:block">
@@ -222,15 +222,15 @@ export function Header({ onMenuClick }: HeaderProps) {
         )}
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="hidden items-center gap-2 lg:flex">
-          <div className={`inline-flex items-center gap-2.5 rounded-full border px-3 py-1.5 text-[12px] font-bold tracking-wide backdrop-blur ${statusBadge.badgeClass}`}>
+      <div className="ml-auto flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2">
+          <div className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[10px] font-bold tracking-wide backdrop-blur sm:gap-2.5 sm:px-3 sm:py-1.5 sm:text-[12px] ${statusBadge.badgeClass}`}>
             <div className="flex h-2 w-2 items-center justify-center">
-              <div className={`h-2 w-2 rounded-full ${statusBadge.dotClass}`} />
+              <div className={`h-1.5 w-1.5 rounded-full sm:h-2 sm:w-2 ${statusBadge.dotClass}`} />
             </div>
-            <span>{statusBadge.label}</span>
+            <span className="hidden min-[450px]:inline sm:inline">{statusBadge.label}</span>
           </div>
-          <span className="text-[15px] font-bold tabular-nums text-white leading-none">
+          <span className="hidden md:inline text-[14px] font-bold tabular-nums text-white lg:text-[15px]">
             {cseClockLabel}
           </span>
         </div>
