@@ -44,16 +44,40 @@ export function Markets() {
     return stocks.filter((stock) => [stock.symbol, stock.company, stock.sector].join(" ").toLowerCase().includes(q));
   }, [stocks, searchQuery]);
 
-  const banking = useMemo(() => filteredStocks.filter((s) => s.sector.toLowerCase().includes("bank")), [filteredStocks]);
-  const telecom = useMemo(() => filteredStocks.filter((s) => s.sector.toLowerCase().includes("tele")), [filteredStocks]);
-  const diversified = useMemo(() => filteredStocks.filter((s) => 
-    s.sector.toLowerCase().includes("divers") || s.sector.toLowerCase().includes("conglom")
-  ), [filteredStocks]);
-  const manufacturing = useMemo(() => filteredStocks.filter((s) => 
-    s.sector.toLowerCase().includes("manufac") || s.sector.toLowerCase().includes("indust")
-  ), [filteredStocks]);
-  const insurance = useMemo(() => filteredStocks.filter((s) => s.sector.toLowerCase().includes("insur")), [filteredStocks]);
-  const energy = useMemo(() => filteredStocks.filter((s) => s.sector.toLowerCase().includes("ener") || s.sector.toLowerCase().includes("utili")), [filteredStocks]);
+  const getEffectiveSector = (s: Stock) => {
+    const text = [s.symbol, s.name, s.sector].join(" ").toLowerCase();
+    return text;
+  };
+
+  const banking = useMemo(() => filteredStocks.filter((s) => {
+    const text = getEffectiveSector(s);
+    return text.includes("bank") || text.includes("finance") || text.includes("leasing");
+  }), [filteredStocks]);
+
+  const telecom = useMemo(() => filteredStocks.filter((s) => {
+    const text = getEffectiveSector(s);
+    return text.includes("tele") || text.includes("dialog") || text.includes("mobitel") || text.includes("slt");
+  }), [filteredStocks]);
+
+  const diversified = useMemo(() => filteredStocks.filter((s) => {
+    const text = getEffectiveSector(s);
+    return text.includes("divers") || text.includes("conglom") || text.includes("holding") || text.includes("invest");
+  }), [filteredStocks]);
+
+  const manufacturing = useMemo(() => filteredStocks.filter((s) => {
+    const text = getEffectiveSector(s);
+    return text.includes("manufac") || text.includes("indust") || text.includes("cable") || text.includes("plastic") || text.includes("print");
+  }), [filteredStocks]);
+
+  const insurance = useMemo(() => filteredStocks.filter((s) => {
+    const text = getEffectiveSector(s);
+    return text.includes("insur");
+  }), [filteredStocks]);
+
+  const energy = useMemo(() => filteredStocks.filter((s) => {
+    const text = getEffectiveSector(s);
+    return text.includes("ener") || text.includes("utili") || text.includes("power") || text.includes("lanka ioc");
+  }), [filteredStocks]);
 
   return (
     <div className="p-6 space-y-6">
