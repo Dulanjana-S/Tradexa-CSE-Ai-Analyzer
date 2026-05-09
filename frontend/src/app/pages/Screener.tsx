@@ -58,22 +58,32 @@ export function Screener() {
       .finally(() => setLoading(false));
   }, []);
 
+  const getEffectiveSector = (s: StockData) => {
+    const text = [s.symbol, s.company, s.sector].join(" ").toLowerCase();
+    if (text.includes("bank") || text.includes("finance") || text.includes("leasing")) return "Banking";
+    if (text.includes("tele") || text.includes("dialog") || text.includes("mobitel") || text.includes("slt")) return "Telecom";
+    if (text.includes("divers") || text.includes("conglom") || text.includes("holding") || text.includes("invest")) return "Diversified";
+    if (text.includes("manufac") || text.includes("indust") || text.includes("cable") || text.includes("plastic") || text.includes("print")) return "Manufacturing";
+    if (text.includes("insur")) return "Insurance";
+    if (text.includes("ener") || text.includes("utili") || text.includes("power") || text.includes("lanka ioc")) return "Energy";
+    return s.sector || "Other";
+  };
+
   const sectors = useMemo(() => {
-    const values = Array.from(new Set(allStocks.map((stock) => stock.sector).filter(Boolean)));
-    return ["All Sectors", ...values.sort()];
-  }, [allStocks]);
+    return ["All Sectors", "Banking", "Telecom", "Diversified", "Manufacturing", "Insurance", "Energy", "Other"];
+  }, []);
 
   const filteredStocks = useMemo(() => {
     return allStocks.filter((stock) => {
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        if (!stock.symbol.toLowerCase().includes(q) && !stock.company.toLowerCase().includes(q)) {
-          return false;
-        }
-      }
-      if (selectedSector !== "All Sectors" && stock.sector !== selectedSector) return false;
+      const q = searchQuery.toLowerCase();
+      if (q && !stock.symbol.toLowerCase().includes(q) && !stock.company.toLowerCase().includes(q)) return false;
+      
+      const effectiveSector = getEffectiveSector(stock);
+      if (selectedSector !== "All Sectors" && effectiveSector !== selectedSector) return false;
+      
       if ((stock.volume || 0) < minVolume[0]) return false;
       if (stock.changePercent < priceChangeRange[0] || stock.changePercent > priceChangeRange[1]) return false;
+      
       return true;
     });
   }, [allStocks, minVolume, priceChangeRange, searchQuery, selectedSector]);
@@ -107,156 +117,120 @@ export function Screener() {
     setPriceChangeRange([...preset.range]);
   };
 
+  const resetFilters = () => {
+    setSearchQuery("");
+    setSelectedSector("All Sectors");
+    setMinVolume([0]);
+    setPriceChangeRange([-20, 20]);
+  };
+
   return (
     <div className="min-h-screen bg-[#0a0e14] p-4 sm:p-6 lg:p-8">
-      <div className="max-w-[1600px] mx-auto space-y-6 sm:space-y-8">
-        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-          <div className="space-y-1">
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-50 tracking-tight">Stock Screener</h1>
-            <p className="text-xs sm:text-sm text-slate-500">
-              Filter and analyze stocks based on technical and fundamental criteria
-            </p>
+      <div className="max-w-[1600px] mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-50">Stock Screener</h1>
+            <p className="text-sm text-slate-500">Filter market data by technical criteria</p>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Button
-              variant="outline"
-              className="border-[#1e2938] text-slate-300 hover:bg-[#1e2938] hover:text-slate-100 h-9"
-            >
-              <Save className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Save Filter</span>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={exportCsv} className="text-slate-400 hover:text-white h-9">
+              <Download className="h-4 w-4 mr-2" /> Export
             </Button>
-            <Button
-              variant="outline"
-              className="border-[#1e2938] text-slate-300 hover:bg-[#1e2938] hover:text-slate-100 h-9"
-              onClick={exportCsv}
-            >
-              <Download className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Export CSV</span>
+            <Button variant="outline" className="border-[#1e2938] text-slate-300 h-9">
+              <Save className="h-4 w-4 mr-2" /> Save
             </Button>
           </div>
         </div>
 
+        {/* Presets Row */}
+        <div className="flex flex-wrap gap-2">
+          <span className="text-xs font-semibold text-slate-600 uppercase tracking-wider self-center mr-2">Presets:</span>
+          {savedPresets.map((preset, idx) => (
+            <Button
+              key={idx}
+              variant="ghost"
+              size="sm"
+              onClick={() => applyPreset(preset)}
+              className="h-8 px-3 rounded-full bg-[#161b22] text-slate-400 hover:text-emerald-400 border border-[#1e2938] text-[11px] font-medium"
+            >
+              {preset.name}
+            </Button>
+          ))}
+        </div>
+
+        {/* Simplified Filter Bar */}
         <Card className="bg-[#111823] border-[#1e2938] shadow-sm">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-sm sm:text-base">Saved Filter Presets</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {savedPresets.map((preset, idx) => (
-                <Button
-                  key={idx}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => applyPreset(preset)}
-                  className="border-[#1e2938] text-slate-300 hover:bg-[#1e2938] hover:text-slate-100 h-auto py-2 px-3 flex-col sm:flex-row items-start sm:items-center gap-1.5"
-                >
-                  <span className="text-xs sm:text-sm font-semibold">{preset.name}</span>
-                  <Badge variant="secondary" className="bg-[#1e2938] text-slate-400 text-xs sm:ml-2">
-                    {preset.sector === "All Sectors" ? `Volume > ${preset.minVolume.toLocaleString()}` : `Sector: ${preset.sector}`}
-                  </Badge>
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              {/* Search */}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Search</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600" />
+                  <Input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Symbol or name..."
+                    className="h-9 bg-[#0a0e14] border-[#1e2938] text-slate-200 pl-9 text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Sector */}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Sector</Label>
+                <Select value={selectedSector} onValueChange={setSelectedSector}>
+                  <SelectTrigger className="h-9 bg-[#0a0e14] border-[#1e2938] text-slate-200 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#111823] border-[#1e2938] text-slate-200">
+                    {sectors.map((sector) => (
+                      <SelectItem key={sector} value={sector}>{sector}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Min Volume */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Min Volume</Label>
+                  <span className="text-[10px] font-mono text-emerald-500">{minVolume[0].toLocaleString()}</span>
+                </div>
+                <Slider value={minVolume} onValueChange={setMinVolume} max={5000000} step={10000} />
+              </div>
+
+              {/* Change % */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Change %</Label>
+                  <span className="text-[10px] font-mono text-slate-300">{priceChangeRange[0]}% to {priceChangeRange[1]}%</span>
+                </div>
+                <Slider value={priceChangeRange} onValueChange={setPriceChangeRange} min={-20} max={20} step={0.1} />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between mt-8 pt-6 border-t border-[#1e2938]">
+              <div className="flex items-center gap-4">
+                <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-500 border-none px-3 py-1">
+                  {filteredStocks.length} Results
+                </Badge>
+                <Button variant="link" onClick={resetFilters} className="text-slate-500 hover:text-slate-300 h-auto p-0 text-xs">
+                  Reset all filters
                 </Button>
-              ))}
+              </div>
             </div>
           </CardContent>
         </Card>
 
+        {/* Results Table */}
         <Card className="bg-[#111823] border-[#1e2938] shadow-sm">
-          <CardHeader className="pb-4 border-b border-[#1e2938]">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-1 h-5 bg-emerald-500 rounded-full" />
-                <CardTitle className="text-sm sm:text-base">Filters</CardTitle>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowFilters(!showFilters)}
-                className="text-slate-400 hover:text-slate-100 hover:bg-[#1e2938] h-8"
-              >
-                {showFilters ? <X className="h-4 w-4" /> : <Filter className="h-4 w-4" />}
-              </Button>
-            </div>
-          </CardHeader>
-          {showFilters && (
-            <CardContent className="space-y-6 pt-6">
-              <div className="grid gap-6 lg:grid-cols-4">
-                <div className="space-y-2">
-                  <Label className="text-slate-300">Search</Label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                    <Input
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Symbol or company"
-                      className="h-10 bg-[#0a0e14] border-[#1e2938] text-slate-200 pl-10"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-slate-300">Sector</Label>
-                  <Select value={selectedSector} onValueChange={setSelectedSector}>
-                    <SelectTrigger className="h-10 bg-[#0a0e14] border-[#1e2938] text-slate-200">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#111823] border-[#1e2938]">
-                      {sectors.map((sector) => (
-                        <SelectItem key={sector} value={sector} className="text-slate-200 focus:bg-[#1e2938] focus:text-slate-100">
-                          {sector}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-slate-300">Min Volume</Label>
-                    <span className="text-xs text-slate-400">{minVolume[0].toLocaleString()}</span>
-                  </div>
-                  <Slider value={minVolume} onValueChange={setMinVolume} max={5000000} step={50000} />
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-slate-300">Change % Range</Label>
-                    <span className="text-xs text-slate-400">
-                      {priceChangeRange[0]}% to {priceChangeRange[1]}%
-                    </span>
-                  </div>
-                  <Slider value={priceChangeRange} onValueChange={setPriceChangeRange} min={-20} max={20} step={0.5} />
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  variant="outline"
-                  className="border-[#1e2938] text-slate-300 hover:bg-[#1e2938] hover:text-slate-100"
-                  onClick={() => {
-                    setSearchQuery("");
-                    setSelectedSector("All Sectors");
-                    setMinVolume([0]);
-                    setPriceChangeRange([-100, 100]);
-                  }}
-                >
-                  Reset Filters
-                </Button>
-                <Badge variant="secondary" className="bg-[#1e2938] text-slate-300">
-                  {filteredStocks.length} results
-                </Badge>
-              </div>
-            </CardContent>
-          )}
-        </Card>
-
-        <Card className="bg-[#111823] border-[#1e2938] shadow-sm">
-          <CardHeader className="border-b border-[#1e2938]">
-            <CardTitle className="text-sm sm:text-base">Screening Results</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
+          <CardContent className="p-0">
             {loading ? (
-              <div className="flex items-center justify-center py-16 text-slate-400">
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading stocks...
+              <div className="flex items-center justify-center py-20 text-slate-500 gap-2">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span className="text-sm">Scanning market...</span>
               </div>
             ) : (
               <StockTable stocks={filteredStocks} />
