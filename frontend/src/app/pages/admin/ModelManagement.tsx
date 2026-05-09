@@ -19,7 +19,7 @@ function metric(value: unknown, pct = true) {
 function statusTone(status?: string) {
   switch (String(status || "").toLowerCase()) {
     case "active":
-      return "bg-emerald-600/20 text-emerald-300 border-emerald-500/30";
+      return "bg-red-600/20 text-red-300 border-red-500/30";
     case "archived":
       return "bg-[#1c2128] text-[#768390] border-[#30363d]";
     case "failed":
@@ -119,7 +119,7 @@ export function ModelManagement() {
 
   const modelCounts = useMemo(() => ({
     total: models.length,
-    beta: models.filter((m) => m.lifecycleStatus === "beta").length,
+    alpha: models.filter((m) => m.lifecycleStatus === "beta" || m.lifecycleStatus === "candidate").length,
     archived: models.filter((m) => m.lifecycleStatus === "archived").length,
   }), [models]);
 
@@ -131,7 +131,7 @@ export function ModelManagement() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="space-y-1.5">
             <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[#e6edf3]">Model Management</h1>
-            <p className="text-[13px] text-[#768390]">Train new beta versions, compare them, then activate one live model.</p>
+            <p className="text-[13px] text-[#768390]">Train new alpha versions, compare them, then activate one live model.</p>
           </div>
           <div className="rounded-md border border-[#30363d] bg-[#161b22] p-4 xl:min-w-[520px]">
             <div className="grid gap-3 sm:grid-cols-[1fr_110px_auto]">
@@ -156,7 +156,7 @@ export function ModelManagement() {
               <div className="flex items-end gap-2">
                 <Button variant="outline" className="border-[#30363d] text-[#e6edf3] hover:bg-[#1c2128]" onClick={() => load()}><RefreshCw className="mr-2 h-4 w-4" /> Refresh</Button>
                 <Button onClick={triggerTraining} disabled={busyId === "__train__"} className="bg-emerald-600 text-white hover:bg-emerald-700">
-                  {busyId === "__train__" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />} Train Beta
+                  {busyId === "__train__" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />} Train Alpha
                 </Button>
               </div>
             </div>
@@ -166,7 +166,7 @@ export function ModelManagement() {
         <div className="grid gap-4 md:grid-cols-4">
           <Card className="border-[#30363d] bg-[#161b22]"><CardHeader className="pb-2"><CardDescription className="text-[#768390]">Registry</CardDescription></CardHeader><CardContent><div className="text-[28px] font-bold text-[#e6edf3]">{modelCounts.total}</div></CardContent></Card>
           <Card className="border-[#30363d] bg-[#161b22]"><CardHeader className="pb-2"><CardDescription className="text-[#768390]">Active</CardDescription></CardHeader><CardContent><div className="text-[16px] font-bold text-[#e6edf3] break-all">{activeModel || "—"}</div></CardContent></Card>
-          <Card className="border-[#30363d] bg-[#161b22]"><CardHeader className="pb-2"><CardDescription className="text-[#768390]">Beta</CardDescription></CardHeader><CardContent><div className="text-[28px] font-bold text-blue-300">{modelCounts.beta}</div></CardContent></Card>
+          <Card className="border-[#30363d] bg-[#161b22]"><CardHeader className="pb-2"><CardDescription className="text-[#768390]">Alpha</CardDescription></CardHeader><CardContent><div className="text-[28px] font-bold text-blue-300">{modelCounts.alpha}</div></CardContent></Card>
           <Card className="border-[#30363d] bg-[#161b22]"><CardHeader className="pb-2"><CardDescription className="text-[#768390]">Archived</CardDescription></CardHeader><CardContent><div className="text-[28px] font-bold text-[#e6edf3]">{modelCounts.archived}</div></CardContent></Card>
         </div>
 
@@ -227,7 +227,7 @@ export function ModelManagement() {
                       <Badge className="border-[#30363d] bg-[#0d1117] text-[#c9d1d9]">Direction: {model.summary?.directionModel || model.meta?.models?.direction || "—"}</Badge>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <Button onClick={() => activate(model.id)} disabled={busyId === model.id || model.isActive} className="bg-blue-600 text-white hover:bg-blue-700">{busyId === model.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Rocket className="mr-2 h-4 w-4" />}{model.isActive ? "Currently Active" : "Activate"}</Button>
+                      <Button onClick={() => activate(model.id)} disabled={busyId === model.id || model.isActive} className={model.isActive ? "bg-red-600 text-white hover:bg-red-700" : "bg-blue-600 text-white hover:bg-blue-700"}>{busyId === model.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Rocket className="mr-2 h-4 w-4" />}{model.isActive ? "Currently Active" : "Activate"}</Button>
                       <Button variant="outline" onClick={() => archiveModel(model.id)} disabled={!!model.isActive || busyId === `archive:${model.id}`} className="border-[#30363d] text-[#e6edf3] hover:bg-[#1c2128]"><Archive className="mr-2 h-4 w-4" /> Archive</Button>
                       <Button variant="outline" onClick={() => deleteModel(model.id)} disabled={!!model.isActive || busyId === `delete:${model.id}`} className="border-red-500/30 text-red-300 hover:bg-red-500/10"><Trash2 className="mr-2 h-4 w-4" /> Delete</Button>
                     </div>
@@ -241,7 +241,7 @@ export function ModelManagement() {
             <Card className="border-[#30363d] bg-[#161b22]">
               <CardHeader>
                 <CardTitle className="text-[18px] text-[#e6edf3]">Compare model versions</CardTitle>
-                <CardDescription className="text-[13px] text-[#768390]">Compare validation quality and feature blocks before activating a beta model.</CardDescription>
+                <CardDescription className="text-[13px] text-[#768390]">Compare validation quality and feature blocks before activating an alpha model.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">

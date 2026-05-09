@@ -450,9 +450,9 @@ def train_from_db(
     installed_optional = sorted(list(_optional_import_models().keys()))
     meta = {
         "model_version": "v9-commercial-registry",
-        "model_id": f"beta_{family}_{horizon_days}d_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}",
-        "display_name": f"{family.upper()} {horizon_days}D {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
-        "lifecycle_status": "beta",
+        "model_id": f"alpha_{family}_{horizon_days}d_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}",
+        "display_name": f"Tradexa Alpha {family.upper()} {horizon_days}D {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
+        "lifecycle_status": "candidate",
         "trained_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "horizon_days": horizon_days,
         "model_family_requested": family,
