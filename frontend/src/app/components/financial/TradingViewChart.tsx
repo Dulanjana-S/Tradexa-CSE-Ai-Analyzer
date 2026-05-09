@@ -4,14 +4,14 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { 
-  createChart, 
+import {
+  createChart,
   CandlestickSeries,
   HistogramSeries,
   LineSeries,
-  IChartApi, 
-  ISeriesApi, 
-  CandlestickData, 
+  IChartApi,
+  ISeriesApi,
+  CandlestickData,
   LineData,
   Time,
   MouseEventParams
@@ -19,7 +19,7 @@ import {
 import { Card, CardContent, CardHeader } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { 
+import {
   TrendingUp,
   TrendingDown,
   Activity,
@@ -109,7 +109,7 @@ export function TradingViewChart({
     const multiplier = 2 / (period + 1);
     let emaValue = data.slice(0, period).reduce((acc, d) => acc + d.close, 0) / period;
     ema.push({ time: data[period - 1].time, value: emaValue });
-    
+
     for (let i = period; i < data.length; i++) {
       emaValue = (data[i].close - emaValue) * multiplier + emaValue;
       ema.push({ time: data[i].time, value: emaValue });
@@ -149,12 +149,12 @@ export function TradingViewChart({
         attributionLogo: false,
       },
       grid: {
-        vertLines: { 
+        vertLines: {
           color: '#161b2244',
           style: 1,
           visible: true,
         },
-        horzLines: { 
+        horzLines: {
           color: '#161b2244',
           style: 1,
           visible: true,
@@ -291,7 +291,7 @@ export function TradingViewChart({
 
     if (indicators.bollingerBands) {
       const bb = calculateBollingerBands(data, 20);
-      
+
       const upperBand = chart.addSeries(LineSeries, {
         color: '#58a6ff44',
         lineWidth: 1,
@@ -389,11 +389,11 @@ export function TradingViewChart({
                 <span className="text-[24px] font-bold tabular-nums text-[#e6edf3]">
                   {currentPrice.toFixed(2)}
                 </span>
-                <Badge 
+                <Badge
                   className={cn(
                     'gap-1 text-[11px] font-bold',
-                    isPositive 
-                      ? 'bg-emerald-600/20 text-emerald-500 border-emerald-500/30' 
+                    isPositive
+                      ? 'bg-emerald-600/20 text-emerald-500 border-emerald-500/30'
                       : 'bg-red-600/20 text-red-500 border-red-500/30'
                   )}
                 >
@@ -594,13 +594,13 @@ export function TradingViewChart({
 
       {/* Chart */}
       <CardContent className="p-0">
-        <div 
-          ref={chartContainerRef} 
-          style={{ 
-            width: '100%', 
+        <div
+          ref={chartContainerRef}
+          style={{
+            width: '100%',
             height: isFullscreen ? window.innerHeight - 200 : chartHeight,
             position: 'relative',
-          }} 
+          }}
         />
       </CardContent>
     </Card>

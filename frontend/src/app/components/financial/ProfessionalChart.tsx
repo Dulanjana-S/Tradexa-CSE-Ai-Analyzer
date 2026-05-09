@@ -145,7 +145,7 @@ export function ProfessionalChart({
   useEffect(() => {
     if (!chartRef.current || candles.length === 0) return;
     const timeScale = chartRef.current.timeScale();
-    
+
     if (timeframe === 'ALL') {
       timeScale.fitContent();
       return;
@@ -186,11 +186,10 @@ export function ProfessionalChart({
                   {currentPrice.toFixed(2)}
                 </span>
                 <Badge
-                  className={`gap-1 text-[11px] font-bold ${
-                    isPositive
+                  className={`gap-1 text-[11px] font-bold ${isPositive
                       ? 'bg-emerald-600/20 text-emerald-500 border-emerald-500/30'
                       : 'bg-red-600/20 text-red-500 border-red-500/30'
-                  }`}
+                    }`}
                 >
                   {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
                   {isPositive ? '+' : ''}{priceChange.toFixed(2)} ({isPositive ? '+' : ''}{priceChangePercent.toFixed(2)}%)
@@ -224,11 +223,10 @@ export function ProfessionalChart({
                   key={tf}
                   variant="ghost"
                   size="sm"
-                  className={`h-7 px-3 text-[11px] font-semibold transition-all ${
-                    timeframe === tf
+                  className={`h-7 px-3 text-[11px] font-semibold transition-all ${timeframe === tf
                       ? 'bg-emerald-600 text-white shadow-sm'
                       : 'text-[#768390] hover:text-[#e6edf3] hover:bg-[#161b22]'
-                  }`}
+                    }`}
                   onClick={() => setTimeframe(tf)}
                 >
                   {tf}
@@ -240,11 +238,10 @@ export function ProfessionalChart({
               <Button
                 variant="ghost"
                 size="sm"
-                className={`h-7 px-2.5 text-[11px] font-semibold ${
-                  showIndicators
+                className={`h-7 px-2.5 text-[11px] font-semibold ${showIndicators
                     ? 'bg-[#161b22] text-[#e6edf3] ring-1 ring-[#30363d]'
                     : 'text-[#768390] hover:bg-[#161b22] hover:text-[#e6edf3]'
-                }`}
+                  }`}
                 onClick={() => setShowIndicators((value) => !value)}
               >
                 <Activity className="mr-1 h-3 w-3" />

@@ -55,7 +55,7 @@ export function IndexChart({
   useEffect(() => {
     if (!chartRef.current || series.length === 0) return;
     const timeScale = chartRef.current.timeScale();
-    
+
     if (timeframe === 'ALL') {
       timeScale.fitContent();
       return;
@@ -151,11 +151,10 @@ export function IndexChart({
                   {currentValue.toFixed(2)}
                 </span>
                 <Badge
-                  className={`gap-1 text-[11px] font-bold ${
-                    isPositive
+                  className={`gap-1 text-[11px] font-bold ${isPositive
                       ? 'bg-emerald-600/20 text-emerald-500 border-emerald-500/30'
                       : 'bg-red-600/20 text-red-500 border-red-500/30'
-                  }`}
+                    }`}
                 >
                   {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
                   {isPositive ? '+' : ''}{change.toFixed(2)} ({isPositive ? '+' : ''}{changePercent.toFixed(2)}%)
@@ -183,11 +182,10 @@ export function IndexChart({
                   key={tf}
                   variant="ghost"
                   size="sm"
-                  className={`h-7 px-3 text-[11px] font-semibold transition-all ${
-                    timeframe === tf
+                  className={`h-7 px-3 text-[11px] font-semibold transition-all ${timeframe === tf
                       ? 'bg-emerald-600 text-white shadow-sm'
                       : 'text-[#768390] hover:text-[#e6edf3] hover:bg-[#161b22]'
-                  }`}
+                    }`}
                   onClick={() => setTimeframe(tf)}
                 >
                   {tf}

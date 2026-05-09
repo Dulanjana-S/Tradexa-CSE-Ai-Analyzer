@@ -8,10 +8,10 @@ import { createChart, CandlestickSeries, HistogramSeries, LineSeries, IChartApi,
 import { Card, CardContent, CardHeader } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  BarChart3, 
+import {
+  TrendingUp,
+  TrendingDown,
+  BarChart3,
   Activity,
   Maximize2,
   Settings,
@@ -82,11 +82,11 @@ export function AdvancedPriceChart({
   const calculateEMA = (data: CandlestickData[], period: number): LineData[] => {
     const ema: LineData[] = [];
     const multiplier = 2 / (period + 1);
-    
+
     // First EMA = SMA
     let emaValue = data.slice(0, period).reduce((acc, d) => acc + d.close, 0) / period;
     ema.push({ time: data[period - 1].time, value: emaValue });
-    
+
     // Calculate rest
     for (let i = period; i < data.length; i++) {
       emaValue = (data[i].close - emaValue) * multiplier + emaValue;
@@ -212,7 +212,7 @@ export function AdvancedPriceChart({
         },
         priceScaleId: '',
       });
-      
+
       volumeSeries.setData(calculateVolume(data));
       volumeSeriesRef.current = volumeSeries;
     }
@@ -270,7 +270,7 @@ export function AdvancedPriceChart({
       // Bollinger Bands
       if (indicators.bollingerBands) {
         const bb = calculateBollingerBands(data, 20);
-        
+
         const upperBandSeries = chart.addSeries(LineSeries, {
           color: '#58a6ff66',
           lineWidth: 1,
@@ -332,7 +332,7 @@ export function AdvancedPriceChart({
   useEffect(() => {
     if (!chartRef.current || data.length === 0) return;
     const timeScale = chartRef.current.timeScale();
-    
+
     if (timeframe === 'ALL') {
       timeScale.fitContent();
       return;
@@ -378,7 +378,7 @@ export function AdvancedPriceChart({
                 <span className="text-[20px] font-bold tabular-nums text-[#e6edf3]">
                   {currentPrice.toFixed(2)}
                 </span>
-                <Badge 
+                <Badge
                   variant={isPositive ? 'default' : 'destructive'}
                   className={cn(
                     'gap-1 text-[11px] font-semibold',
@@ -490,13 +490,13 @@ export function AdvancedPriceChart({
 
       {/* Chart */}
       <CardContent className="p-0">
-        <div 
-          ref={chartContainerRef} 
-          style={{ 
-            width: '100%', 
+        <div
+          ref={chartContainerRef}
+          style={{
+            width: '100%',
             height: isFullscreen ? window.innerHeight - 100 : height,
             position: 'relative'
-          }} 
+          }}
         />
       </CardContent>
     </Card>

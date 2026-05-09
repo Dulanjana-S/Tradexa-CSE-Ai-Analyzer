@@ -24,9 +24,9 @@ export function MetricCard({
   loading,
 }: MetricCardProps) {
   const getTrendIcon = () => {
-    if (trend === "up") return <TrendingUp className="h-3 w-3" />;
-    if (trend === "down") return <TrendingDown className="h-3 w-3" />;
-    return <Minus className="h-3 w-3" />;
+    if (trend === "up") return <TrendingUp className="h-4 w-4" />;
+    if (trend === "down") return <TrendingDown className="h-4 w-4" />;
+    return <Minus className="h-4 w-4" />;
   };
 
   const getTrendColor = () => {
@@ -37,7 +37,7 @@ export function MetricCard({
 
   if (loading) {
     return (
-      <Card className="bg-[var(--color-bg-secondary)] border-[var(--color-border)] shadow-none">
+      <Card className="bg-[var(--color-bg-secondary)] border-[var(--color-border)] shadow-none transition-all duration-200 hover:border-[#bf953f]/45 hover:shadow-[0_0_0_1px_rgba(191,149,63,0.10),0_10px_24px_rgba(0,0,0,0.20)]">
         <CardHeader className="pb-3 px-5 pt-5">
           <div className="h-3 w-20 bg-[var(--color-bg-tertiary)] animate-pulse rounded" />
         </CardHeader>
@@ -50,21 +50,21 @@ export function MetricCard({
   }
 
   return (
-    <Card className="group relative overflow-hidden bg-[#0d1117] border-[#30363d] hover:border-[#444c56] transition-all duration-200 shadow-none rounded-md">
-      <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-[#30363d] group-hover:bg-[#bf953f]/40 transition-colors" />
+    <Card className="group relative overflow-hidden bg-[#0d1117] border-[#30363d] transition-all duration-200 shadow-none rounded-md hover:border-[#bf953f]/55 hover:shadow-[0_0_0_1px_rgba(191,149,63,0.10),0_14px_28px_rgba(0,0,0,0.30)]">
+      <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-[#30363d] transition-colors group-hover:bg-[#bf953f]/55" />
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-1.5 px-4 pt-4">
-        <CardTitle className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#768390]">
+        <CardTitle className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#e6edf3] transition-colors group-hover:text-[#f5efe2]">
           {title}
         </CardTitle>
         {icon && (
-          <div className="text-[#484f58] opacity-60 group-hover:opacity-100 transition-opacity">
+          <div className="text-[#484f58] opacity-60 transition-all group-hover:opacity-100 group-hover:text-[#bf953f]">
             {icon}
           </div>
         )}
       </CardHeader>
       <CardContent className="px-4 pb-4 pt-0">
         <div className="flex flex-col gap-1.5">
-          <div className="text-[24px] font-medium text-[#e6edf3] tracking-tight leading-none tabular-nums">
+          <div className="text-[28px] font-bold text-[#e6edf3] tracking-tight leading-none tabular-nums transition-colors group-hover:text-[#f5efe2]">
             {value}
           </div>
           {(change !== undefined || changePercent !== undefined || subtitle) && (
@@ -72,8 +72,8 @@ export function MetricCard({
               {trend && (
                 <span
                   className={cn(
-                    "inline-flex items-center gap-1 text-[11px] font-mono font-medium tabular-nums px-1.5 py-0.5 rounded-sm",
-                    trend === "up" ? "bg-emerald-500/10 text-emerald-400" : trend === "down" ? "bg-red-500/10 text-red-400" : "bg-slate-500/10 text-slate-400"
+                    "inline-flex items-center gap-1 text-[14px] font-mono font-bold tabular-nums transition-all",
+                    trend === "up" ? "text-emerald-400" : trend === "down" ? "text-red-400" : "text-slate-400"
                   )}
                 >
                   {getTrendIcon()}
@@ -92,7 +92,7 @@ export function MetricCard({
                 </span>
               )}
               {subtitle && (
-                <span className="text-[11px] text-[#768390] font-medium uppercase tracking-wider">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-[#8f98a3] transition-colors group-hover:text-[#f0d9a8]">
                   {subtitle}
                 </span>
               )}
