@@ -18,6 +18,7 @@ from .import_tools import persist_upload_zip, preview_dataset
 from .intelligence import parse_macro_csv_bytes, preview_macro_rows
 from .jobs import enqueue_daily_pipeline, enqueue_import, enqueue_sync, enqueue_sync_train, run_train_now, start_job_system
 from .services import data_service
+from .services.assistant_service import chat_assistant
 from .services.auth_service import SESSION_COOKIE, change_password, complete_password_reset, create_user, current_user_from_request, ensure_bootstrap_admin, is_staff_role, list_users, login, logout, require_user, set_role, start_password_reset, update_profile
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -622,6 +623,15 @@ def api_market_overview():
         except Exception:
             pass
     return result
+
+
+@app.post("/api/assistant/chat")
+def api_assistant_chat(request: Request, payload: Dict[str, Any] = Body(...)):
+    user = current_user_from_request(request)
+    message = str(payload.get("message") or payload.get("query") or "")
+    portfolio_id = payload.get("portfolio_id") or payload.get("portfolioId")
+    response = chat_assistant(message, user=user, portfolio_id=str(portfolio_id) if portfolio_id else None)
+    return response
 
 
 @app.get("/api/indices")

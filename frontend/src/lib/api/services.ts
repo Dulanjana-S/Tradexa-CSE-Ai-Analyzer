@@ -776,10 +776,10 @@ export const marketApi = {
     const sp20Series = Array.isArray(sp20RawSeries) ? sp20RawSeries : [];
 
     // Series fallback values (from historical dailyMarketSummery)
-    const aspiLast = aspiSeries.at(-1) || { value: 0 };
-    const aspiPrev = aspiSeries.at(-2) || aspiLast;
-    const sp20Last = sp20Series.at(-1) || { value: 0 };
-    const sp20Prev = sp20Series.at(-2) || sp20Last;
+    const aspiLast = aspiSeries.length ? aspiSeries[aspiSeries.length - 1] : { value: 0 };
+    const aspiPrev = aspiSeries.length > 1 ? aspiSeries[aspiSeries.length - 2] : aspiLast;
+    const sp20Last = sp20Series.length ? sp20Series[sp20Series.length - 1] : { value: 0 };
+    const sp20Prev = sp20Series.length > 1 ? sp20Series[sp20Series.length - 2] : sp20Last;
 
     // Prefer live snapshot values from aspiData/snpData (today's intraday) over series last point
     const aspiLiveValue = num(overviewRaw?.aspi_value) || num(aspiLast.value);
@@ -1333,4 +1333,13 @@ export const adminApi = {
   setProvider: (provider: string) => api.post<any>("/api/admin/provider", { provider }),
   getSystemSettings: () => api.get<any>("/api/admin/system-settings"),
   saveSystemSettings: (settings: Record<string, any>) => api.post<any>("/api/admin/system-settings", { settings }),
+};
+
+export const assistantApi = {
+  chat: async (message: string, portfolioId?: string): Promise<any> => {
+    const payload: any = { message };
+    if (portfolioId) payload.portfolio_id = portfolioId;
+    const response = await api.post<any>(`/api/assistant/chat`, payload);
+    return response;
+  },
 };

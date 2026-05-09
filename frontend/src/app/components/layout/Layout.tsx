@@ -2,6 +2,7 @@ import { Outlet } from "react-router";
 import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
 import { Footer } from "./Footer";
+import ChatWidget from "../ChatWidget";
 import { useState, useEffect } from "react";
 
 export function Layout() {
@@ -36,6 +37,7 @@ export function Layout() {
             <Outlet />
           </div>
           <Footer />
+          <ChatWidget />
         </main>
       </div>
     </div>
