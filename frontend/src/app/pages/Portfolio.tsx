@@ -1057,124 +1057,137 @@ export function Portfolio() {
           </Card>
         </div>
 
-        <div className={activePanel === "performance" ? "space-y-6" : "hidden"}>
-          {/* Performance by period grid */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
-            {periodPerformance.map((row) => (
-              <Card key={row.label} className="border-[#30363d] bg-[#161b22] hover:border-blue-500/30 transition-colors">
-                <CardContent className="p-4">
-                  <div className="text-[12px] font-medium text-[#768390] mb-1">{row.label}</div>
-                  <div className={`text-[18px] font-bold ${row.portfolioReturnPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                    {signedPercent(row.portfolioReturnPct)}
-                  </div>
-                  <div className="mt-3 space-y-1.5 border-t border-[#30363d] pt-2">
-                    <div className="flex items-center justify-between text-[10px]">
-                      <span className="text-[#768390]">Vs ASPI</span>
-                      <span className={row.alphaVsAspiPct >= 0 ? "text-emerald-400" : "text-red-400"}>{signedPercent(row.alphaVsAspiPct)}</span>
+        {activePanel === "performance" && (
+          <div className="space-y-6">
+            {/* Performance by period grid */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+              {periodPerformance.map((row) => (
+                <Card key={row.label} className="border-[#30363d] bg-[#161b22] hover:border-blue-500/30 transition-colors">
+                  <CardContent className="p-4">
+                    <div className="text-[12px] font-medium text-[#768390] mb-1">{row.label}</div>
+                    <div className={`text-[18px] font-bold ${row.portfolioReturnPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {signedPercent(row.portfolioReturnPct)}
                     </div>
-                    <div className="flex items-center justify-between text-[10px]">
-                      <span className="text-[#768390]">Vs SL20</span>
-                      <span className={row.alphaVsSp20Pct >= 0 ? "text-emerald-400" : "text-red-400"}>{signedPercent(row.alphaVsSp20Pct)}</span>
+                    <div className="mt-3 space-y-1.5 border-t border-[#30363d] pt-2">
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="text-[#768390]">Vs ASPI</span>
+                        <span className={row.alphaVsAspiPct >= 0 ? "text-emerald-400" : "text-red-400"}>{signedPercent(row.alphaVsAspiPct)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="text-[#768390]">Vs SL20</span>
+                        <span className={row.alphaVsSp20Pct >= 0 ? "text-emerald-400" : "text-red-400"}>{signedPercent(row.alphaVsSp20Pct)}</span>
+                      </div>
                     </div>
+                  </CardContent>
+                </Card>
+              ))}
+              {periodPerformance.length === 0 && (
+                <div className="col-span-full py-4 text-center text-[13px] text-[#768390]">
+                  Add positions to calculate period performance metrics.
+                </div>
+              )}
+            </div>
+
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+              <Card className="border-[#30363d] bg-[#161b22]">
+                <CardHeader className="flex flex-col gap-4 border-b border-[#30363d] sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <CardTitle className="text-[18px] text-[#e6edf3]">Portfolio performance</CardTitle>
+                    <CardDescription className="text-[13px] text-[#768390]">Total equity and cost basis using trades, cash movements, and stored price history.</CardDescription>
                   </div>
+                  <div className="flex flex-wrap gap-2">
+                    {timeframeOptions.map((option) => (
+                      <Button 
+                        key={option.label} 
+                        variant={chartDays === option.days ? "default" : "outline"} 
+                        onClick={() => setChartDays(option.days)} 
+                        className={chartDays === option.days ? "bg-blue-600 text-white hover:bg-blue-700" : "border-[#30363d] text-[#768390] hover:bg-[#1c2128] hover:text-[#e6edf3]"}
+                      >
+                        {option.label}
+                      </Button>
+                    ))}
+                  </div>
+                </CardHeader>
+                <CardContent className="p-6">
+                  {chartLoading ? (
+                    <div className="flex h-[340px] items-center justify-center text-[#768390]"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading performance chart...</div>
+                  ) : chartData.length === 0 ? (
+                    <div className="flex h-[340px] items-center justify-center text-center text-[#768390]">Add portfolio trades first to unlock performance history.</div>
+                  ) : (
+                    <div className="h-[340px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={chartData} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="portfolioMarketValue" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#2563eb" stopOpacity={0.35} />
+                              <stop offset="95%" stopColor="#2563eb" stopOpacity={0.02} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid stroke="#30363d" vertical={false} strokeDasharray="3 3" />
+                          <XAxis dataKey="label" tick={{ fill: "#768390", fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={24} />
+                          <YAxis tick={{ fill: "#768390", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(value) => `Rs. ${Number(value).toLocaleString("en-LK")}`} width={92} />
+                          <Tooltip
+                            contentStyle={{ backgroundColor: "#0d1117", border: "1px solid #30363d", borderRadius: 12, color: "#e6edf3" }}
+                            formatter={(value: number, name: string) => [money(Number(value)), name === "totalEquity" ? "Total equity" : name === "marketValue" ? "Market value" : "Cost basis"]}
+                            labelFormatter={(_, payload) => payload?.[0]?.payload?.label || ""}
+                          />
+                          <Area type="monotone" dataKey="totalEquity" stroke="#2563eb" fill="url(#portfolioMarketValue)" strokeWidth={2.5} />
+                          <Area type="monotone" dataKey="costBasis" stroke="#f59e0b" fillOpacity={0} strokeWidth={2} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
-            ))}
-            {periodPerformance.length === 0 && <div className="col-span-full py-4 text-center text-[13px] text-[#768390]">Add positions to calculate period performance metrics.</div>}
+
+              <Card className="border-[#30363d] bg-[#161b22]">
+                <CardHeader>
+                  <CardTitle className="text-[18px] text-[#e6edf3]">Benchmark comparison</CardTitle>
+                  <CardDescription className="text-[13px] text-[#768390]">Current holdings basket compared against ASPI and S&P SL20 on a normalized 100-base chart.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4 p-6">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="rounded-lg border border-[#30363d] bg-[#0d1117] p-3">
+                      <div className="text-[12px] text-[#768390]">Portfolio</div>
+                      <div className={`text-[18px] font-semibold ${analytics.benchmark.portfolioReturnPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>{signedPercent(analytics.benchmark.portfolioReturnPct)}</div>
+                    </div>
+                    <div className="rounded-lg border border-[#30363d] bg-[#0d1117] p-3">
+                      <div className="text-[12px] text-[#768390]">ASPI</div>
+                      <div className={`text-[18px] font-semibold ${analytics.benchmark.aspiReturnPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>{signedPercent(analytics.benchmark.aspiReturnPct)}</div>
+                    </div>
+                    <div className="rounded-lg border border-[#30363d] bg-[#0d1117] p-3">
+                      <div className="text-[12px] text-[#768390]">S&P SL20</div>
+                      <div className={`text-[18px] font-semibold ${analytics.benchmark.sp20ReturnPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>{signedPercent(analytics.benchmark.sp20ReturnPct)}</div>
+                    </div>
+                  </div>
+                  {analyticsLoading ? (
+                    <div className="flex h-[260px] items-center justify-center text-[#768390]"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading benchmark comparison...</div>
+                  ) : benchmarkChartData.length === 0 ? (
+                    <div className="flex h-[260px] items-center justify-center text-center text-[#768390]">Add positions with price history to compare against the market benchmarks.</div>
+                  ) : (
+                    <div className="h-[260px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={benchmarkChartData} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
+                          <CartesianGrid stroke="#30363d" vertical={false} strokeDasharray="3 3" />
+                          <XAxis dataKey="label" tick={{ fill: "#768390", fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={24} />
+                          <YAxis tick={{ fill: "#768390", fontSize: 11 }} axisLine={false} tickLine={false} width={62} />
+                          <Tooltip
+                            contentStyle={{ backgroundColor: "#0d1117", border: "1px solid #30363d", borderRadius: 12, color: "#e6edf3" }}
+                            formatter={(value: number, name: string) => [Number(value).toFixed(2), name === "portfolio" ? "Portfolio" : name === "aspi" ? "ASPI" : "S&P SL20"]}
+                            labelFormatter={(_, payload) => payload?.[0]?.payload?.label || ""}
+                          />
+                          <Line type="monotone" dataKey="portfolio" stroke="#60a5fa" strokeWidth={2.5} dot={false} />
+                          <Line type="monotone" dataKey="aspi" stroke="#f59e0b" strokeWidth={2} dot={false} />
+                          <Line type="monotone" dataKey="sp20" stroke="#10b981" strokeWidth={2} dot={false} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
-
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
-            <Card className="border-[#30363d] bg-[#161b22]">
-            <CardHeader className="flex flex-col gap-4 border-b border-[#30363d] sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <CardTitle className="text-[18px] text-[#e6edf3]">Portfolio performance</CardTitle>
-                <CardDescription className="text-[13px] text-[#768390]">Total equity and cost basis using trades, cash movements, and stored price history.</CardDescription>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {timeframeOptions.map((option) => (
-                  <Button key={option.label} variant={chartDays === option.days ? "default" : "outline"} onClick={() => setChartDays(option.days)} className={chartDays === option.days ? "bg-blue-600 text-white hover:bg-blue-700" : "border-[#30363d] text-[#768390] hover:bg-[#1c2128] hover:text-[#e6edf3]"}>{option.label}</Button>
-                ))}
-              </div>
-            </CardHeader>
-            <CardContent className="p-6">
-              {chartLoading ? (
-                <div className="flex h-[340px] items-center justify-center text-[#768390]"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading performance chart...</div>
-              ) : chartData.length === 0 ? (
-                <div className="flex h-[340px] items-center justify-center text-center text-[#768390]">Add portfolio trades first to unlock performance history.</div>
-              ) : (
-                <div className="h-[340px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="portfolioMarketValue" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#2563eb" stopOpacity={0.35} />
-                          <stop offset="95%" stopColor="#2563eb" stopOpacity={0.02} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid stroke="#30363d" vertical={false} strokeDasharray="3 3" />
-                      <XAxis dataKey="label" tick={{ fill: "#768390", fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={24} />
-                      <YAxis tick={{ fill: "#768390", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(value) => `Rs. ${Number(value).toLocaleString("en-LK")}`} width={92} />
-                      <Tooltip
-                        contentStyle={{ backgroundColor: "#0d1117", border: "1px solid #30363d", borderRadius: 12, color: "#e6edf3" }}
-                        formatter={(value: number, name: string) => [money(Number(value)), name === "totalEquity" ? "Total equity" : name === "marketValue" ? "Market value" : "Cost basis"]}
-                        labelFormatter={(_, payload) => payload?.[0]?.payload?.label || ""}
-                      />
-                      <Area type="monotone" dataKey="totalEquity" stroke="#2563eb" fill="url(#portfolioMarketValue)" strokeWidth={2.5} />
-                      <Area type="monotone" dataKey="costBasis" stroke="#f59e0b" fillOpacity={0} strokeWidth={2} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="border-[#30363d] bg-[#161b22]">
-            <CardHeader>
-              <CardTitle className="text-[18px] text-[#e6edf3]">Benchmark comparison</CardTitle>
-              <CardDescription className="text-[13px] text-[#768390]">Current holdings basket compared against ASPI and S&P SL20 on a normalized 100-base chart.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 p-6">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className="rounded-lg border border-[#30363d] bg-[#0d1117] p-3">
-                  <div className="text-[12px] text-[#768390]">Portfolio</div>
-                  <div className={`text-[18px] font-semibold ${analytics.benchmark.portfolioReturnPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>{signedPercent(analytics.benchmark.portfolioReturnPct)}</div>
-                </div>
-                <div className="rounded-lg border border-[#30363d] bg-[#0d1117] p-3">
-                  <div className="text-[12px] text-[#768390]">ASPI</div>
-                  <div className={`text-[18px] font-semibold ${analytics.benchmark.aspiReturnPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>{signedPercent(analytics.benchmark.aspiReturnPct)}</div>
-                </div>
-                <div className="rounded-lg border border-[#30363d] bg-[#0d1117] p-3">
-                  <div className="text-[12px] text-[#768390]">S&P SL20</div>
-                  <div className={`text-[18px] font-semibold ${analytics.benchmark.sp20ReturnPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>{signedPercent(analytics.benchmark.sp20ReturnPct)}</div>
-                </div>
-              </div>
-              {analyticsLoading ? (
-                <div className="flex h-[260px] items-center justify-center text-[#768390]"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading benchmark comparison...</div>
-              ) : benchmarkChartData.length === 0 ? (
-                <div className="flex h-[260px] items-center justify-center text-center text-[#768390]">Add positions with price history to compare against the market benchmarks.</div>
-              ) : (
-                <div className="h-[260px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={benchmarkChartData} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
-                      <CartesianGrid stroke="#30363d" vertical={false} strokeDasharray="3 3" />
-                      <XAxis dataKey="label" tick={{ fill: "#768390", fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={24} />
-                      <YAxis tick={{ fill: "#768390", fontSize: 11 }} axisLine={false} tickLine={false} width={62} />
-                      <Tooltip
-                        contentStyle={{ backgroundColor: "#0d1117", border: "1px solid #30363d", borderRadius: 12, color: "#e6edf3" }}
-                        formatter={(value: number, name: string) => [Number(value).toFixed(2), name === "portfolio" ? "Portfolio" : name === "aspi" ? "ASPI" : "S&P SL20"]}
-                        labelFormatter={(_, payload) => payload?.[0]?.payload?.label || ""}
-                      />
-                      <Line type="monotone" dataKey="portfolio" stroke="#60a5fa" strokeWidth={2.5} dot={false} />
-                      <Line type="monotone" dataKey="aspi" stroke="#f59e0b" strokeWidth={2} dot={false} />
-                      <Line type="monotone" dataKey="sp20" stroke="#10b981" strokeWidth={2} dot={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+        )}
 
           <Card className="border-[#30363d] bg-[#161b22]">
             <CardHeader>
