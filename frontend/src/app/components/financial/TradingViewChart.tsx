@@ -9,6 +9,7 @@ import {
   CandlestickSeries,
   HistogramSeries,
   LineSeries,
+  createSeriesMarkers,
   IChartApi,
   ISeriesApi,
   CandlestickData,
@@ -337,7 +338,8 @@ export function TradingViewChart({
       },
     ];
 
-    candlestickSeries.setMarkers(tradeMarkers);
+    const markersPlugin = createSeriesMarkers(candlestickSeries);
+    markersPlugin.setMarkers(tradeMarkers as any);
 
     // Fit content
     chart.timeScale().fitContent();

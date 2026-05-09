@@ -55,22 +55,22 @@ export function Dashboard() {
       <div className="mx-auto max-w-[1680px] px-6 py-8 lg:px-8">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1.5">
-            <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[var(--color-text-primary)]">
+            <h1 className="text-[24px] sm:text-[32px] font-bold leading-tight tracking-tight text-[var(--color-text-primary)]">
               Market Overview
             </h1>
             <p className="text-[13px] text-[var(--color-text-secondary)]">
               Last updated: {new Date(overview.lastUpdated).toLocaleString("en-LK", { dateStyle: "medium", timeStyle: "short" })}
             </p>
           </div>
-          <div className="flex items-center gap-3 rounded-md border border-[#bf953f]/20 bg-[#bf953f]/5 px-3 py-1 backdrop-blur-sm transition-all hover:border-[#bf953f]/40">
-            <div className="h-1.5 w-1.5 rounded-full bg-[#bf953f] animate-pulse shadow-[0_0_8px_#bf953f]" />
-            <span className="text-[10px] font-medium uppercase tracking-[0.3em] text-[#bf953f]/90">
+          <div className="flex items-center gap-2.5 rounded-full border border-[#bf953f]/30 bg-[#bf953f]/5 px-4 py-1.5 backdrop-blur-md transition-all hover:border-[#bf953f]/60 hover:bg-[#bf953f]/10 shadow-[0_0_15px_-5px_rgba(191,149,63,0.2)]">
+            <div className="h-1.5 w-1.5 rounded-full bg-[#bf953f] animate-pulse shadow-[0_0_10px_#bf953f]" />
+            <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.25em] text-[#bf953f]">
               Trade With Confidence
             </span>
           </div>
         </div>
 
-        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
           <MetricCard
             title="ASPI Index"
             value={overview.aspi.value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -79,6 +79,7 @@ export function Dashboard() {
             trend={overview.aspi.changePercent > 0 ? "up" : overview.aspi.changePercent < 0 ? "down" : "neutral"}
             icon={<TrendingUp className="h-4 w-4" />}
             loading={loading}
+            center
           />
           <MetricCard
             title="S&P SL20"
@@ -88,6 +89,7 @@ export function Dashboard() {
             trend={overview.sp20.changePercent > 0 ? "up" : overview.sp20.changePercent < 0 ? "down" : "neutral"}
             icon={<TrendingDown className="h-4 w-4" />}
             loading={loading}
+            center
           />
           <MetricCard
             title="Turnover"
@@ -95,6 +97,7 @@ export function Dashboard() {
             subtitle="Today"
             icon={<DollarSign className="h-4 w-4" />}
             loading={loading}
+            center
           />
           <MetricCard
             title="Trades"
@@ -102,6 +105,7 @@ export function Dashboard() {
             subtitle="Today"
             icon={<Activity className="h-4 w-4" />}
             loading={loading}
+            center
           />
           <MetricCard
             title="Market Cap"
@@ -109,6 +113,8 @@ export function Dashboard() {
             subtitle="Total"
             icon={<BarChart3 className="h-4 w-4" />}
             loading={loading}
+            center
+            className="col-span-2 sm:col-span-1 lg:col-span-1"
           />
         </div>
 
