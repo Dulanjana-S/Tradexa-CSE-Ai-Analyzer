@@ -58,6 +58,7 @@ export interface HistoricalDataPoint {
 
 export interface PredictionExplanationReason {
   feature: string;
+  featureLabel?: string;
   group: string;
   direction: string;
   impact: number;

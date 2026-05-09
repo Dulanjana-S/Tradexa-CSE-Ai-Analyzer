@@ -58,6 +58,81 @@ def _feature_label(name: str) -> str:
     return "Model feature"
 
 
+def _feature_plain_name(name: str) -> str:
+    n = name.lower()
+    friendly = {
+        "turnover_proxy": "Trading activity",
+        "turnover_trend_5": "Recent trading activity",
+        "liquidity_ratio_20": "Liquidity versus recent average",
+        "zero_vol_20": "Days with no trading",
+        "close_to_high": "Price near the day's high",
+        "close_to_low": "Price near the day's low",
+        "ret_1d": "1-day price move",
+        "ret_5d": "5-day price move",
+        "ret_20d": "20-day price move",
+        "ret_60d": "60-day price move",
+        "vol_20d": "20-day volatility",
+        "vol_60d": "60-day volatility",
+        "gap_1d": "Overnight price gap",
+        "range_pct": "Daily price range",
+        "breakout_20": "Move versus recent resistance",
+        "drawdown_60": "Pullback from recent high",
+        "atr_14_ratio": "Recent price swing size",
+        "rsi_14": "Momentum balance (RSI)",
+        "macd": "Momentum trend",
+        "macd_signal": "Momentum signal line",
+        "macd_hist": "Momentum gap",
+        "bb_pct": "Position within recent trading band",
+        "bb_width": "Width of the recent trading band",
+    }
+    if n in friendly:
+        return friendly[n]
+    if n.startswith("sent_"):
+        return n.replace("sent_", "Sentiment ").replace("_", " ").title()
+    if n.startswith("macro_"):
+        return n.replace("macro_", "Macro ").replace("_", " ").title()
+    return name.replace("_", " ").strip().title()
+
+
+def _driver_plain_text(name: str, group: str, direction: str) -> str:
+    display_name = _feature_plain_name(name)
+    n = name.lower()
+
+    if "vol" in n or "liquidity" in n or "turnover" in n:
+        if direction == "supports upside":
+            return f"{display_name} is pointing to easier trading and more buying interest."
+        if direction == "supports downside":
+            return f"{display_name} suggests thinner trading, which can make the stock move more unevenly."
+        return f"{display_name} looks balanced, so it is not pushing the price strongly either way."
+
+    if "ret" in n or "trend" in n or "breakout" in n or "drawdown" in n or "close_to_high" in n or "close_to_low" in n:
+        if direction == "supports upside":
+            return f"{display_name} points to the stock holding up well recently, which often attracts buyers."
+        if direction == "supports downside":
+            return f"{display_name} points to recent weakness, which can keep sellers in control."
+        return f"{display_name} is not showing a clear push in either direction right now."
+
+    if "sent_" in n:
+        if direction == "supports upside":
+            return f"Recent announcements and news around {display_name.lower()} are leaning positive."
+        if direction == "supports downside":
+            return f"Recent announcements and news around {display_name.lower()} are leaning negative."
+        return f"Recent announcements and news around {display_name.lower()} look mixed."
+
+    if "macro_" in n or "idx_" in n or "rel_" in n or "beta" in n:
+        if direction == "supports upside":
+            return f"Market conditions are giving this stock a supportive backdrop."
+        if direction == "supports downside":
+            return f"The broader market backdrop is a small headwind for this stock."
+        return f"The broader market backdrop is not clearly helping or hurting this stock."
+
+    if direction == "supports upside":
+        return f"{display_name} is leaning positive in the current snapshot."
+    if direction == "supports downside":
+        return f"{display_name} is leaning negative in the current snapshot."
+    return f"{display_name} is mixed in the current snapshot."
+
+
 def _signal_label(pred_ret: float, up_prob: float, action_probability: float | None = None) -> str:
     if action_probability is not None and action_probability < 0.45:
         return "neutral"
@@ -90,12 +165,14 @@ def _explain_prediction(signal: str, pred_ret: float, up_prob: float, conf: Dict
     for driver in drivers[:6]:
         name = str(driver.get("name") or "feature")
         impact = float(driver.get("impact") or 0.0)
+        direction = "supports upside" if impact > 0 else "supports downside" if impact < 0 else "neutral"
         reasons.append({
             "feature": name,
+            "featureLabel": _feature_plain_name(name),
             "group": _feature_label(name),
-            "direction": "supports upside" if impact > 0 else "supports downside" if impact < 0 else "neutral",
+            "direction": direction,
             "impact": round(impact, 4),
-            "text": f"{_feature_label(name)} signal `{name}` is {'positive' if impact > 0 else 'negative' if impact < 0 else 'mixed'} in the current model snapshot.",
+            "text": _driver_plain_text(name, _feature_label(name), direction),
         })
     plain = f"The model currently expects the stock to move {direction}. The signal strength is {strength}, with an up probability of {up_prob*100:.0f}% and an expected return of {pred_ret*100:.2f}%."
     if conf.get("action_probability") is not None:

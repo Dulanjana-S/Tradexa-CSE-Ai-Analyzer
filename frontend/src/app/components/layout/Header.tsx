@@ -41,34 +41,34 @@ export function Header({ onMenuClick }: HeaderProps) {
       return {
         label: marketStatus,
         dotClass: "bg-amber-500",
-        badgeClass: "border-amber-400/60 bg-amber-500/20 text-amber-200 shadow-[0_0_14px_rgba(245,158,11,0.35)]",
+        badgeClass: "border-amber-400/60 bg-amber-500/20 text-white shadow-[0_0_14px_rgba(245,158,11,0.35)]",
       };
     }
     if (normalized.includes("halt") || normalized.includes("suspend")) {
       return {
         label: marketStatus,
         dotClass: "bg-orange-500",
-        badgeClass: "border-orange-400/60 bg-orange-500/20 text-orange-200 shadow-[0_0_14px_rgba(249,115,22,0.35)]",
+        badgeClass: "border-orange-400/60 bg-orange-500/20 text-white shadow-[0_0_14px_rgba(249,115,22,0.35)]",
       };
     }
     if (normalized.includes("open") || normalized.includes("trading") || normalized.includes("session")) {
       return {
         label: marketStatus,
         dotClass: "bg-emerald-500 animate-pulse",
-        badgeClass: "border-emerald-400/60 bg-emerald-500/20 text-emerald-200 shadow-[0_0_14px_rgba(16,185,129,0.35)]",
+        badgeClass: "border-emerald-400/60 bg-emerald-500/20 text-white shadow-[0_0_14px_rgba(16,185,129,0.35)]",
       };
     }
     if (normalized.includes("close") || normalized.includes("holiday")) {
       return {
         label: marketStatus,
         dotClass: "bg-rose-500",
-        badgeClass: "border-rose-400/60 bg-rose-500/20 text-rose-200 shadow-[0_0_14px_rgba(244,63,94,0.35)]",
+        badgeClass: "border-rose-400/60 bg-rose-500/20 text-white shadow-[0_0_14px_rgba(244,63,94,0.35)]",
       };
     }
     return {
       label: marketStatus,
       dotClass: "bg-slate-400",
-      badgeClass: "border-slate-400/60 bg-slate-500/20 text-slate-100 shadow-[0_0_14px_rgba(148,163,184,0.28)]",
+      badgeClass: "border-slate-400/60 bg-slate-500/20 text-white shadow-[0_0_14px_rgba(148,163,184,0.28)]",
     };
   }, [marketStatus]);
 

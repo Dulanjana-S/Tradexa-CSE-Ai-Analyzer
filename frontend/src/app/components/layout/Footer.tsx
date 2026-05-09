@@ -99,10 +99,10 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Company Links */}
+          {/* About Links */}
           <div>
             <h3 className="text-sm font-semibold text-slate-50 uppercase tracking-wider mb-4">
-              Company
+              About
             </h3>
             <ul className="space-y-2.5">
               {footerLinks.company.map((link) => (
