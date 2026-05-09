@@ -36,8 +36,8 @@ export function DataSync() {
   const [modelHealth, setModelHealth] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const [jobsData, statusData, systemSettings, healthData] = await Promise.all([adminApi.getJobs(), adminApi.getStatus(), adminApi.getSystemSettings(), adminApi.getModelHealth()]);
       setJobs(jobsData);
@@ -45,14 +45,14 @@ export function DataSync() {
       setSchedulerSettings(systemSettings?.settings || null);
       setModelHealth(healthData);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     load().catch(() => setLoading(false));
     const timer = window.setInterval(() => {
-      load().catch(() => undefined);
+      load(true).catch(() => undefined);
     }, 5000);
     return () => window.clearInterval(timer);
   }, []);
@@ -67,7 +67,7 @@ export function DataSync() {
     setBusyAction("sync");
     try {
       await adminApi.triggerSync({ top_n: topN, days, announcements });
-      await load();
+      await load(true);
     } finally {
       setBusyAction(null);
     }
@@ -77,7 +77,7 @@ export function DataSync() {
     setBusyAction("train");
     try {
       await adminApi.triggerTraining({ horizon_days: horizonDays, model_family: modelFamily });
-      await load();
+      await load(true);
     } finally {
       setBusyAction(null);
     }
@@ -87,7 +87,7 @@ export function DataSync() {
     setBusyAction("sync-train");
     try {
       await adminApi.triggerSyncTraining({ top_n: topN, days, announcements, horizon_days: horizonDays, model_family: modelFamily });
-      await load();
+      await load(true);
     } finally {
       setBusyAction(null);
     }
@@ -102,7 +102,7 @@ export function DataSync() {
       setFiles([]);
       setUploadPreview(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
-      await load();
+      await load(true);
     } finally {
       setBusyAction(null);
     }
@@ -113,7 +113,7 @@ export function DataSync() {
     try {
       const response = await adminApi.refreshSentiment(1600);
       setSentimentResult(response?.result || response);
-      await load();
+      await load(true);
     } finally {
       setBusyAction(null);
     }
@@ -124,7 +124,7 @@ export function DataSync() {
     try {
       const response = await adminApi.refreshDocuments({ limit: 120, max_pages: 12 });
       setDocumentResult(response?.result || response);
-      await load();
+      await load(true);
     } finally {
       setBusyAction(null);
     }
@@ -136,7 +136,7 @@ export function DataSync() {
       await adminApi.seedNewsWhitelist();
       const response = await adminApi.refreshSelectedNews({ lookback_days: 30, max_per_source: 40 });
       setSelectedNewsResult(response?.result || response);
-      await load();
+      await load(true);
     } finally {
       setBusyAction(null);
     }
@@ -147,7 +147,7 @@ export function DataSync() {
     try {
       const response = await adminApi.compareNewsModels({ horizon_days: horizonDays, max_symbols: 40 });
       setComparisonResult(response?.result || response);
-      await load();
+      await load(true);
     } finally {
       setBusyAction(null);
     }
@@ -174,7 +174,7 @@ export function DataSync() {
       const response = await adminApi.importMacroData(macroFile);
       setMacroPreview(response?.preview || null);
       setMacroFile(null);
-      await load();
+      await load(true);
     } finally {
       setBusyAction(null);
     }
@@ -216,7 +216,7 @@ export function DataSync() {
     setBusyAction("scheduler");
     try {
       await adminApi.saveSystemSettings(schedulerSettings);
-      await load();
+      await load(true);
     } finally {
       setBusyAction(null);
     }
@@ -469,7 +469,7 @@ export function DataSync() {
             </div>
             <div className="flex gap-3">
               <Button onClick={saveScheduler} disabled={busyAction !== null} className="bg-blue-600 text-white hover:bg-blue-700">{busyAction === "scheduler" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Clock className="mr-2 h-4 w-4" />} Save Scheduler</Button>
-              <Button onClick={async () => { setBusyAction("daily-pipeline"); try { await adminApi.triggerDailyPipeline({ top_n: topN, days, announcements, horizon_days: horizonDays, train_after_sync: true, model_family: modelFamily }); await load(); } finally { setBusyAction(null); } }} disabled={busyAction !== null} variant="outline" className="border-[#30363d] text-[#e6edf3] hover:bg-[#1c2128]">{busyAction === "daily-pipeline" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />} Run Daily Pipeline Now</Button>
+              <Button onClick={async () => { setBusyAction("daily-pipeline"); try { await adminApi.triggerDailyPipeline({ top_n: topN, days, announcements, horizon_days: horizonDays, train_after_sync: true, model_family: modelFamily }); await load(true); } finally { setBusyAction(null); } }} disabled={busyAction !== null} variant="outline" className="border-[#30363d] text-[#e6edf3] hover:bg-[#1c2128]">{busyAction === "daily-pipeline" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />} Run Daily Pipeline Now</Button>
             </div>
           </CardContent>
         </Card>
