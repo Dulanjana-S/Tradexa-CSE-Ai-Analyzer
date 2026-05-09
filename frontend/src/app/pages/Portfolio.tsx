@@ -450,25 +450,52 @@ export function Portfolio() {
   const createPortfolio = async () => {
     const name = newPortfolioName.trim();
     if (!name) return;
-    const result = await portfolioApi.createPortfolio({ name });
-    setPortfolios(result.portfolios);
-    setSelectedPortfolioId(result.portfolio.portfolioId);
-    setNewPortfolioName("");
+    setSubmitting(true);
+    setError(null);
+    try {
+      const result = await portfolioApi.createPortfolio({ name });
+      setPortfolios(result.portfolios);
+      setSelectedPortfolioId(result.portfolio.portfolioId);
+      setNewPortfolioName("");
+    } catch (err: any) {
+      setError(err?.message || "Failed to create portfolio");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const setDefaultPortfolio = async () => {
     if (!selectedPortfolioId) return;
-    const result = await portfolioApi.updatePortfolio(selectedPortfolioId, { isDefault: true });
-    setPortfolios(result.portfolios);
+    setSubmitting(true);
+    setError(null);
+    try {
+      const result = await portfolioApi.updatePortfolio(selectedPortfolioId, { isDefault: true });
+      setPortfolios(result.portfolios);
+    } catch (err: any) {
+      setError(err?.message || "Failed to set default portfolio");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const archivePortfolio = async () => {
     if (!selectedPortfolioId) return;
     const active = portfolios.find((item) => item.portfolioId === selectedPortfolioId);
-    if (active?.isDefault) return;
-    const result = await portfolioApi.updatePortfolio(selectedPortfolioId, { isArchived: true });
-    setPortfolios(result.portfolios);
-    setSelectedPortfolioId(result.portfolios.find((item) => item.isDefault)?.portfolioId || result.portfolios[0]?.portfolioId || "");
+    if (active?.isDefault) {
+      setError("Cannot archive the default portfolio. Set another portfolio as default first.");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const result = await portfolioApi.updatePortfolio(selectedPortfolioId, { isArchived: true });
+      setPortfolios(result.portfolios);
+      setSelectedPortfolioId(result.portfolios.find((item) => item.isDefault)?.portfolioId || result.portfolios[0]?.portfolioId || "");
+    } catch (err: any) {
+      setError(err?.message || "Failed to archive portfolio");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const addCashMovement = async () => {
@@ -513,124 +540,254 @@ export function Portfolio() {
               </SelectContent>
             </Select>
             <Input value={newPortfolioName} onChange={(e) => setNewPortfolioName(e.target.value)} placeholder="New portfolio name" className="w-[210px] border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
-            <Button variant="outline" onClick={createPortfolio} disabled={!newPortfolioName.trim()} className="border-[#30363d] text-[#e6edf3]">Create</Button>
-            <Button variant="outline" onClick={setDefaultPortfolio} disabled={!selectedPortfolioId} className="border-[#30363d] text-[#e6edf3]">Set Default</Button>
-            <Button variant="outline" onClick={archivePortfolio} disabled={!selectedPortfolioId || portfolios.find((item) => item.portfolioId === selectedPortfolioId)?.isDefault} className="border-[#30363d] text-[#e6edf3]">Archive</Button>
+            <Button variant="outline" onClick={createPortfolio} disabled={submitting || !newPortfolioName.trim()} className="border-[#30363d] text-[#e6edf3]">
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create"}
+            </Button>
+            <Button variant="outline" onClick={setDefaultPortfolio} disabled={submitting || !selectedPortfolioId} className="border-[#30363d] text-[#e6edf3]">Set Default</Button>
+            <Button variant="outline" onClick={archivePortfolio} disabled={submitting || !selectedPortfolioId || portfolios.find((item) => item.portfolioId === selectedPortfolioId)?.isDefault} className="border-[#30363d] text-[#e6edf3]">Archive</Button>
           </div>
+          {error && activePanel === "performance" && (
+            <div className="mx-auto max-w-[1680px] px-6 lg:px-8 mt-4">
+              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                {error}
+                <Button variant="ghost" size="sm" onClick={() => setError(null)} className="ml-auto h-auto p-0 text-red-400 hover:text-red-300">Dismiss</Button>
+              </div>
+            </div>
+          )}
           <Dialog open={dialogOpen} onOpenChange={(open) => (open ? setDialogOpen(true) : resetDialog())}>
             <DialogTrigger asChild>
               <Button onClick={() => openAddDialog()} className="bg-emerald-600 text-white hover:bg-emerald-700"><Plus className="mr-2 h-4 w-4" />Add Transaction</Button>
             </DialogTrigger>
-            <DialogContent className="border-[#30363d] bg-[#161b22] text-[#e6edf3] sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>{editingId ? "Edit portfolio transaction" : "Add portfolio transaction"}</DialogTitle>
-                <DialogDescription className="text-[#768390]">Record a buy or sell so holdings, cost basis, and profit/loss stay correct.</DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="symbol">Symbol</Label>
-                  <div className="relative">
-                    <Input
-                      id="symbol"
-                      value={form.symbol}
-                      onChange={(e) => setForm((prev) => ({ ...prev, symbol: e.target.value.toUpperCase() }))}
-                      onFocus={() => form.symbol.trim() && setSymbolSearchOpen(true)}
-                      onBlur={() => window.setTimeout(() => setSymbolSearchOpen(false), 120)}
-                      placeholder="Search symbol or company"
-                      className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]"
-                    />
-                    {symbolSearchOpen && (
-                      <div className="absolute left-0 right-0 top-11 z-20 overflow-hidden rounded-md border border-[#30363d] bg-[#161b22] shadow-2xl">
-                        {symbolSearchLoading ? (
-                          <div className="px-3 py-2 text-[12px] text-[#768390]">Searching symbols…</div>
-                        ) : symbolSuggestions.length ? (
-                          <div className="max-h-56 overflow-y-auto py-1">
-                            {symbolSuggestions.map((item) => (
-                              <button
-                                key={item.symbol}
-                                type="button"
-                                onMouseDown={(event) => event.preventDefault()}
-                                onClick={() => {
-                                  setForm((prev) => ({ ...prev, symbol: item.symbol }));
-                                  setSymbolSearchOpen(false);
-                                }}
-                                className="flex w-full items-start justify-between gap-3 px-3 py-2 text-left hover:bg-[#1c2128]"
-                              >
-                                <div>
-                                  <div className="text-[13px] font-semibold text-[#e6edf3]">{item.symbol}</div>
-                                  <div className="text-[12px] text-[#768390]">{item.company}</div>
+            <DialogContent className="border-[#30363d] bg-[#0d1117] text-[#e6edf3] sm:max-w-[1000px] p-0 overflow-hidden">
+              <div className="flex flex-col md:flex-row h-full max-h-[90vh]">
+                {/* Left Side: Form */}
+                <div className="flex-1 p-6 overflow-y-auto border-r border-[#30363d]">
+                  <DialogHeader className="mb-6">
+                    <DialogTitle className="text-2xl font-bold">{editingId ? "Edit transaction" : "Add transaction"}</DialogTitle>
+                    <DialogDescription className="text-[#768390]">Update your holdings and cost basis with trade details.</DialogDescription>
+                  </DialogHeader>
+                  
+                  <div className="grid gap-5">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="symbol" className="text-[13px] font-medium text-[#768390]">Symbol</Label>
+                        <div className="relative">
+                          <Input
+                            id="symbol"
+                            value={form.symbol}
+                            onChange={(e) => setForm((prev) => ({ ...prev, symbol: e.target.value.toUpperCase() }))}
+                            onFocus={() => form.symbol.trim() && setSymbolSearchOpen(true)}
+                            onBlur={() => window.setTimeout(() => setSymbolSearchOpen(false), 120)}
+                            placeholder="e.g. DIAL.N0000"
+                            className="border-[#30363d] bg-[#161b22] text-[#e6edf3] h-11 focus:ring-blue-500/20"
+                          />
+                          {symbolSearchOpen && (
+                            <div className="absolute left-0 right-0 top-12 z-50 overflow-hidden rounded-xl border border-[#30363d] bg-[#161b22] shadow-2xl backdrop-blur-xl">
+                              {symbolSearchLoading ? (
+                                <div className="px-4 py-3 text-[12px] text-[#768390] flex items-center gap-2">
+                                  <Loader2 className="h-3 w-3 animate-spin" /> Searching symbols…
                                 </div>
-                                <div className="text-[11px] text-[#768390]">{item.sector || "—"}</div>
-                              </button>
+                              ) : symbolSuggestions.length ? (
+                                <div className="max-h-60 overflow-y-auto py-1">
+                                  {symbolSuggestions.map((item) => (
+                                    <button
+                                      key={item.symbol}
+                                      type="button"
+                                      onMouseDown={(event) => event.preventDefault()}
+                                      onClick={() => {
+                                        setForm((prev) => ({ ...prev, symbol: item.symbol }));
+                                        setSymbolSearchOpen(false);
+                                      }}
+                                      className="flex w-full items-start justify-between gap-3 px-4 py-2.5 text-left hover:bg-blue-600/10 transition-colors"
+                                    >
+                                      <div>
+                                        <div className="text-[14px] font-bold text-[#e6edf3]">{item.symbol}</div>
+                                        <div className="text-[12px] text-[#768390]">{item.company}</div>
+                                      </div>
+                                      <div className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-[#30363d] text-[#768390]">{item.sector || "—"}</div>
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="px-4 py-3 text-[12px] text-[#768390]">No matching symbols found.</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-[13px] font-medium text-[#768390]">Trade Type</Label>
+                        <Select value={form.txType} onValueChange={(value: "buy" | "sell") => setForm((prev) => ({ ...prev, txType: value }))}>
+                          <SelectTrigger className="border-[#30363d] bg-[#161b22] text-[#e6edf3] h-11"><SelectValue /></SelectTrigger>
+                          <SelectContent className="border-[#30363d] bg-[#1c2128]">
+                            <SelectItem value="buy" className="text-emerald-400">Buy / Long</SelectItem>
+                            <SelectItem value="sell" className="text-red-400">Sell / Close</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="quantity" className="text-[13px] font-medium text-[#768390]">Quantity</Label>
+                        <Input id="quantity" type="number" min="0" step="0.0001" value={form.quantity} onChange={(e) => setForm((prev) => ({ ...prev, quantity: e.target.value }))} className="border-[#30363d] bg-[#161b22] text-[#e6edf3] h-11" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="price" className="text-[13px] font-medium text-[#768390]">Price per share</Label>
+                        <Input id="price" type="number" min="0" step="0.01" value={form.price} onChange={(e) => setForm((prev) => ({ ...prev, price: e.target.value }))} className="border-[#30363d] bg-[#161b22] text-[#e6edf3] h-11" />
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="fees" className="text-[13px] font-medium text-[#768390]">Broker Fees</Label>
+                        <Input id="fees" type="number" min="0" step="0.01" value={form.fees} onChange={(e) => setForm((prev) => ({ ...prev, fees: e.target.value }))} className="border-[#30363d] bg-[#161b22] text-[#e6edf3] h-11" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="tradedAt" className="text-[13px] font-medium text-[#768390]">Trade Date</Label>
+                        <Input id="tradedAt" type="date" value={form.tradedAt} onChange={(e) => setForm((prev) => ({ ...prev, tradedAt: e.target.value }))} className="border-[#30363d] bg-[#161b22] text-[#e6edf3] h-11" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="notes" className="text-[13px] font-medium text-[#768390]">Notes (Strategy or Rationale)</Label>
+                      <Textarea id="notes" value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} placeholder="Why are you making this trade?" className="border-[#30363d] bg-[#161b22] text-[#e6edf3] min-h-[80px]" />
+                    </div>
+                  </div>
+
+                  {error && (
+                    <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400 flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 shrink-0" />
+                      {error}
+                    </div>
+                  )}
+
+                  <div className="mt-8 flex items-center justify-end gap-3">
+                    <Button variant="outline" onClick={resetDialog} className="border-[#30363d] text-[#768390] hover:bg-[#1c2128] hover:text-[#e6edf3] px-6">Cancel</Button>
+                    <Button 
+                      onClick={submitTransaction} 
+                      disabled={submitting || !form.symbol || !form.quantity || !form.price} 
+                      className={`px-8 h-11 font-bold shadow-lg transition-all active:scale-[0.98] ${form.txType === 'buy' ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-red-600 hover:bg-red-500 text-white'}`}
+                    >
+                      {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : editingId ? <Pencil className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
+                      {editingId ? "Save Changes" : "Save Transaction"}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Right Side: AI Intelligence */}
+                <div className="w-full md:w-[420px] bg-[#161b22] p-6 overflow-y-auto border-l border-[#30363d] relative">
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-600/5 via-transparent to-emerald-600/5 pointer-events-none" />
+                  
+                  <div className="relative z-10 space-y-6">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="p-1.5 rounded-lg bg-blue-500/20">
+                        <BrainCircuit className="h-5 w-5 text-blue-400" />
+                      </div>
+                      <h3 className="text-lg font-bold text-white tracking-tight">Smart Trade Check</h3>
+                    </div>
+
+                    {!form.symbol || !form.quantity || !form.price ? (
+                      <div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
+                        <div className="w-20 h-20 rounded-full bg-[#30363d]/30 flex items-center justify-center mb-2">
+                          <Clock className="h-10 w-10 text-[#30363d]" />
+                        </div>
+                        <p className="text-[#768390] text-sm max-w-[200px]">Fill in the trade details to see AI-powered portfolio impact.</p>
+                      </div>
+                    ) : tradePreviewLoading ? (
+                      <div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
+                        <Loader2 className="h-10 w-10 text-blue-500 animate-spin" />
+                        <p className="text-blue-400 font-medium">Analyzing portfolio fit...</p>
+                        <p className="text-[#768390] text-xs">Simulating allocations and risk profiles</p>
+                      </div>
+                    ) : tradePreview ? (
+                      <div className="animate-in fade-in slide-in-from-right-4 duration-500 space-y-6">
+                        <div className="relative flex flex-col items-center p-6 rounded-2xl bg-[#0d1117] border border-[#30363d] shadow-xl">
+                          <div className="absolute top-4 right-4">
+                            <Badge variant="outline" className={`${statusBadgeClass(tradePreview.status)} border-current bg-transparent px-3 py-1 font-bold uppercase tracking-wider text-[10px]`}>
+                              {tradePreview.statusLabel}
+                            </Badge>
+                          </div>
+                          
+                          <div className="relative flex items-center justify-center w-32 h-32 mb-4">
+                            <svg className="w-full h-full -rotate-90">
+                              <circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-[#1c2128]" />
+                              <circle 
+                                cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="8" fill="transparent" 
+                                strokeDasharray={364.4}
+                                strokeDashoffset={364.4 - (364.4 * tradePreview.fitScore) / 100}
+                                className={`${tradePreview.fitScore >= 75 ? 'text-emerald-500' : tradePreview.fitScore >= 50 ? 'text-blue-500' : 'text-amber-500'} transition-all duration-1000 ease-out`}
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                              <span className="text-3xl font-black text-white">{tradePreview.fitScore}</span>
+                              <span className="text-[10px] text-[#768390] font-bold uppercase">Fit Score</span>
+                            </div>
+                          </div>
+
+                          <div className="w-full grid grid-cols-2 gap-3 mt-2">
+                            <div className="p-3 rounded-xl bg-[#1c2128] border border-[#30363d]">
+                              <p className="text-[11px] text-[#768390] font-medium uppercase mb-1">Stock Weight</p>
+                              <div className="flex items-baseline gap-1">
+                                <span className="text-lg font-bold text-white">{tradePreview.newStockWeightPct.toFixed(1)}%</span>
+                                <span className="text-[10px] text-[#768390]">({tradePreview.currentStockWeightPct.toFixed(1)}% →)</span>
+                              </div>
+                            </div>
+                            <div className="p-3 rounded-xl bg-[#1c2128] border border-[#30363d]">
+                              <p className="text-[11px] text-[#768390] font-medium uppercase mb-1">Cash After</p>
+                              <div className={`text-lg font-bold ${tradePreview.cashAfter < 0 ? "text-red-400" : "text-white"}`}>
+                                {money(tradePreview.cashAfter).replace('Rs. ', '')}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-4">
+                          <h4 className="text-sm font-bold text-[#768390] uppercase tracking-widest flex items-center gap-2">
+                            <ShieldCheck className="h-4 w-4 text-emerald-400" /> Real-World Impact
+                          </h4>
+                          <div className="space-y-3">
+                            {tradePreview.reasons.map((reason, idx) => (
+                              <div key={idx} className="flex gap-3 p-3 rounded-xl bg-blue-500/5 border border-blue-500/10 group hover:border-blue-500/30 transition-colors">
+                                <div className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-blue-500/20">
+                                  <div className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+                                </div>
+                                <p className="text-[13px] leading-relaxed text-[#e6edf3]">{reason}</p>
+                              </div>
                             ))}
                           </div>
-                        ) : (
-                          <div className="px-3 py-2 text-[12px] text-[#768390]">No matching symbols found.</div>
+                        </div>
+
+                        {tradePreview.suggestions.length > 0 && (
+                          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Lightbulb className="h-4 w-4 text-amber-400" />
+                              <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">AI Suggestion</span>
+                            </div>
+                            <p className="text-[13px] text-amber-200/80 italic leading-relaxed">
+                              "{tradePreview.suggestions[0]}"
+                            </p>
+                          </div>
                         )}
+
+                        <div className="pt-2">
+                          <div className="flex items-center gap-3 p-4 rounded-xl border border-[#30363d] bg-gradient-to-r from-violet-600/10 to-blue-600/10">
+                            <div className="shrink-0 p-2 rounded-lg bg-violet-600/20">
+                              <TrendingUp className="h-4 w-4 text-violet-400" />
+                            </div>
+                            <div>
+                              <p className="text-[11px] font-bold text-violet-400 uppercase">Pro Tip</p>
+                              <p className="text-[12px] text-[#768390]">This {tradePreview.txType} will result in a {tradePreview.newStockWeightPct > 15 ? 'concentrated' : 'balanced'} position in your portfolio.</p>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Type</Label>
-                  <Select value={form.txType} onValueChange={(value: "buy" | "sell") => setForm((prev) => ({ ...prev, txType: value }))}>
-                    <SelectTrigger className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]"><SelectValue /></SelectTrigger>
-                    <SelectContent className="border-[#30363d] bg-[#161b22]">
-                      <SelectItem value="buy">Buy</SelectItem>
-                      <SelectItem value="sell">Sell</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="quantity">Quantity</Label>
-                  <Input id="quantity" type="number" min="0" step="0.0001" value={form.quantity} onChange={(e) => setForm((prev) => ({ ...prev, quantity: e.target.value }))} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="price">Price per share</Label>
-                  <Input id="price" type="number" min="0" step="0.01" value={form.price} onChange={(e) => setForm((prev) => ({ ...prev, price: e.target.value }))} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="fees">Fees</Label>
-                  <Input id="fees" type="number" min="0" step="0.01" value={form.fees} onChange={(e) => setForm((prev) => ({ ...prev, fees: e.target.value }))} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="tradedAt">Trade date</Label>
-                  <Input id="tradedAt" type="date" value={form.tradedAt} onChange={(e) => setForm((prev) => ({ ...prev, tradedAt: e.target.value }))} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
-                </div>
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="notes">Notes</Label>
-                  <Textarea id="notes" value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} placeholder="Optional note" className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
-                </div>
-                {tradePreviewLoading && <div className="sm:col-span-2 rounded-lg border border-[#30363d] bg-[#0d1117] p-4 text-[13px] text-[#768390]"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Checking portfolio fit...</div>}
-                {tradePreview && (
-                  <div className="sm:col-span-2 rounded-lg border border-[#30363d] bg-[#0d1117] p-4">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <div>
-                        <div className="text-[13px] font-semibold text-[#e6edf3]">Smart trade check</div>
-                        <div className="text-[12px] text-[#768390]">Projected after this {tradePreview.txType}</div>
-                      </div>
-                      <Badge variant="outline" className={statusBadgeClass(tradePreview.status)}>{tradePreview.statusLabel}</Badge>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <div className="rounded-md border border-[#30363d] p-3"><div className="text-[11px] text-[#768390]">Fit score</div><div className="text-[18px] font-bold text-[#e6edf3]">{tradePreview.fitScore}/100</div></div>
-                      <div className="rounded-md border border-[#30363d] p-3"><div className="text-[11px] text-[#768390]">New stock weight</div><div className="text-[18px] font-bold text-[#e6edf3]">{tradePreview.newStockWeightPct.toFixed(1)}%</div></div>
-                      <div className="rounded-md border border-[#30363d] p-3"><div className="text-[11px] text-[#768390]">Cash after</div><div className={tradePreview.cashAfter < 0 ? "text-[18px] font-bold text-red-400" : "text-[18px] font-bold text-[#e6edf3]"}>{money(tradePreview.cashAfter)}</div></div>
-                    </div>
-                    <div className="mt-3 space-y-1">
-                      {tradePreview.reasons.slice(0, 3).map((item) => <div key={item} className="text-[12px] text-[#9da7b3]">• {item}</div>)}
-                    </div>
-                    {tradePreview.suggestions.length ? <div className="mt-3 rounded-md bg-amber-500/10 p-3 text-[12px] text-amber-200">{tradePreview.suggestions[0]}</div> : null}
-                  </div>
-                )}
-                {error && <p className="sm:col-span-2 text-sm text-red-400">{error}</p>}
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={resetDialog} className="border-[#30363d] text-[#768390] hover:bg-[#1c2128] hover:text-[#e6edf3]">Cancel</Button>
-                <Button onClick={submitTransaction} disabled={submitting || !form.symbol || !form.quantity || !form.price} className="bg-emerald-600 text-white hover:bg-emerald-700">
-                  {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : editingId ? <Pencil className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
-                  {editingId ? "Save Changes" : "Save Transaction"}
-                </Button>
-              </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
@@ -685,9 +842,7 @@ export function Portfolio() {
           </Card>
         </div>
 
-        <div className={activePanel === "performance" ? "grid gap-6" : "hidden"}>
-          <Card className="border-[#30363d] bg-[#161b22]"><CardHeader><CardTitle className="text-[18px] text-[#e6edf3]">Performance by period</CardTitle><CardDescription className="text-[13px] text-[#768390]">Portfolio returns vs ASPI and S&P SL20.</CardDescription></CardHeader><CardContent className="space-y-3">{periodPerformance.length ? periodPerformance.map((row) => <div key={row.label} className="rounded-lg border border-[#30363d] bg-[#0d1117] p-3"><div className="flex items-center justify-between"><span className="font-medium text-[#e6edf3]">{row.label}</span><span className={row.portfolioReturnPct >= 0 ? "text-emerald-400" : "text-red-400"}>{signedPercent(row.portfolioReturnPct)}</span></div><div className="mt-1 flex justify-between text-[12px] text-[#768390]"><span>ASPI {signedPercent(row.aspiReturnPct)}</span><span>Alpha {signedPercent(row.alphaVsAspiPct)}</span></div><div className="mt-1 flex justify-between text-[12px] text-[#768390]"><span>S&P SL20 {signedPercent(row.sp20ReturnPct)}</span><span>Alpha {signedPercent(row.alphaVsSp20Pct)}</span></div></div>) : <p className="text-[13px] text-[#768390]">Add positions to calculate period performance.</p>}</CardContent></Card>
-        </div>
+        {/* The performance tab is now consolidated below */}
 
         <div className={activePanel === "smart" ? "flex flex-col gap-6" : "hidden"}>
           {/* AI Banner */}
@@ -902,8 +1057,34 @@ export function Portfolio() {
           </Card>
         </div>
 
-        <div className={activePanel === "performance" ? "grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]" : "hidden"}>
-          <Card className="border-[#30363d] bg-[#161b22]">
+        <div className={activePanel === "performance" ? "space-y-6" : "hidden"}>
+          {/* Performance by period grid */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+            {periodPerformance.map((row) => (
+              <Card key={row.label} className="border-[#30363d] bg-[#161b22] hover:border-blue-500/30 transition-colors">
+                <CardContent className="p-4">
+                  <div className="text-[12px] font-medium text-[#768390] mb-1">{row.label}</div>
+                  <div className={`text-[18px] font-bold ${row.portfolioReturnPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                    {signedPercent(row.portfolioReturnPct)}
+                  </div>
+                  <div className="mt-3 space-y-1.5 border-t border-[#30363d] pt-2">
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span className="text-[#768390]">Vs ASPI</span>
+                      <span className={row.alphaVsAspiPct >= 0 ? "text-emerald-400" : "text-red-400"}>{signedPercent(row.alphaVsAspiPct)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span className="text-[#768390]">Vs SL20</span>
+                      <span className={row.alphaVsSp20Pct >= 0 ? "text-emerald-400" : "text-red-400"}>{signedPercent(row.alphaVsSp20Pct)}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+            {periodPerformance.length === 0 && <div className="col-span-full py-4 text-center text-[13px] text-[#768390]">Add positions to calculate period performance metrics.</div>}
+          </div>
+
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+            <Card className="border-[#30363d] bg-[#161b22]">
             <CardHeader className="flex flex-col gap-4 border-b border-[#30363d] sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <CardTitle className="text-[18px] text-[#e6edf3]">Portfolio performance</CardTitle>
@@ -992,6 +1173,8 @@ export function Portfolio() {
               )}
             </CardContent>
           </Card>
+        </div>
+      </div>
 
           <Card className="border-[#30363d] bg-[#161b22]">
             <CardHeader>
@@ -1015,7 +1198,6 @@ export function Portfolio() {
               )}
             </CardContent>
           </Card>
-        </div>
 
         <Card className={activePanel === "holdings" ? "border-[#30363d] bg-[#161b22]" : "hidden"}>
           <CardHeader className="flex flex-row items-center justify-between gap-3">
