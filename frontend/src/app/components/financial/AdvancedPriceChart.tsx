@@ -62,7 +62,7 @@ export function AdvancedPriceChart({
     rsi: false,
   });
 
-  const [timeframe, setTimeframe] = useState(interval);
+  const [timeframe, setTimeframe] = useState('ALL' as any);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Calculate SMA
@@ -327,7 +327,36 @@ export function AdvancedPriceChart({
     setIndicators(prev => ({ ...prev, [indicator]: !prev[indicator] }));
   };
 
-  const timeframes = ['1m', '5m', '15m', '1h', '4h', '1D', '1W', '1M'];
+  const timeframes = ['1m', '5m', '15m', '1h', '4h', '1D', '1W', '1M', 'ALL'];
+
+  useEffect(() => {
+    if (!chartRef.current || data.length === 0) return;
+    const timeScale = chartRef.current.timeScale();
+    
+    if (timeframe === 'ALL') {
+      timeScale.fitContent();
+      return;
+    }
+
+    let rangeInBars = 60;
+    switch (timeframe) {
+      case '1m': rangeInBars = 15; break;
+      case '5m': rangeInBars = 30; break;
+      case '15m': rangeInBars = 45; break;
+      case '1h': rangeInBars = 60; break;
+      case '4h': rangeInBars = 90; break;
+      case '1D': rangeInBars = 120; break;
+      case '1W': rangeInBars = 250; break;
+      case '1M': rangeInBars = 500; break;
+      default: rangeInBars = 120;
+    }
+
+    const lastIndex = data.length - 1;
+    timeScale.setVisibleLogicalRange({
+      from: lastIndex - rangeInBars,
+      to: lastIndex + 5,
+    });
+  }, [timeframe, data]);
 
   // Calculate current price and change
   const currentPrice = data[data.length - 1]?.close || 0;
@@ -404,7 +433,7 @@ export function AdvancedPriceChart({
                       ? 'bg-[#161b22] text-[#e6edf3] ring-1 ring-[#30363d]'
                       : 'text-[#768390] hover:bg-[#161b22] hover:text-[#e6edf3]'
                   )}
-                  onClick={() => setTimeframe(tf as typeof interval)}
+                  onClick={() => setTimeframe(tf as any)}
                 >
                   {tf}
                 </Button>

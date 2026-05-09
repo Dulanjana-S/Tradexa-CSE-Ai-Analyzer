@@ -39,7 +39,7 @@ export function ProfessionalChart({
 }: ProfessionalChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const [timeframe, setTimeframe] = useState('1D');
+  const [timeframe, setTimeframe] = useState('ALL');
   const [showIndicators, setShowIndicators] = useState(true);
 
   const candles = useMemo(() => toCandles(data), [data]);
@@ -140,7 +140,36 @@ export function ProfessionalChart({
     };
   }, [candles, data, showIndicators]);
 
-  const timeframes = ['1m', '5m', '15m', '1h', '4h', '1D', '1W', '1M'];
+  const timeframes = ['1m', '5m', '15m', '1h', '4h', '1D', '1W', '1M', 'ALL'];
+
+  useEffect(() => {
+    if (!chartRef.current || candles.length === 0) return;
+    const timeScale = chartRef.current.timeScale();
+    
+    if (timeframe === 'ALL') {
+      timeScale.fitContent();
+      return;
+    }
+
+    let rangeInBars = 60;
+    switch (timeframe) {
+      case '1m': rangeInBars = 15; break;
+      case '5m': rangeInBars = 30; break;
+      case '15m': rangeInBars = 45; break;
+      case '1h': rangeInBars = 60; break;
+      case '4h': rangeInBars = 90; break;
+      case '1D': rangeInBars = 120; break;
+      case '1W': rangeInBars = 250; break;
+      case '1M': rangeInBars = 500; break;
+      default: rangeInBars = 120;
+    }
+
+    const lastIndex = candles.length - 1;
+    timeScale.setVisibleLogicalRange({
+      from: lastIndex - rangeInBars,
+      to: lastIndex + 5, // Slight padding to the right
+    });
+  }, [timeframe, candles]);
 
   return (
     <Card className="border-[#30363d] bg-[#0d1117] shadow-none overflow-hidden">
