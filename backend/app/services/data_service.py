@@ -2099,43 +2099,46 @@ def _score_holding(symbol: str, company: str, sector: str, weight_pct: float, se
     if weight_pct >= 30:
         score -= 32
         risk_score += 34
-        reasons.append(f"Single-stock exposure would be very high at {weight_pct:.1f}%")
-        suggestions.append("Reduce quantity or split capital across more holdings")
+        reasons.append(f"High Concentration Risk: {symbol} would represent {weight_pct:.1f}% of your total capital. A 10% drop in this stock would impact your total portfolio by {weight_pct/10:.1f}%.")
+        suggestions.append("Reduce quantity to stay within a safer 10-15% 'Core' holding range.")
     elif weight_pct >= 22:
         score -= 22
         risk_score += 24
-        reasons.append(f"Single-stock exposure is high at {weight_pct:.1f}%")
-        suggestions.append("Keep this holding below roughly 15–20% unless it is a deliberate high-conviction allocation")
+        reasons.append(f"Meaningful Exposure: At {weight_pct:.1f}%, this stock is becoming a major performance driver. Your portfolio's volatility will be heavily tied to its movements.")
+        suggestions.append("Monitor this holding closely as it exceeds the typical 15% diversification threshold.")
     elif weight_pct >= 15:
         score -= 10
         risk_score += 12
-        reasons.append(f"Stock weight is becoming meaningful at {weight_pct:.1f}%")
-        suggestions.append("Monitor concentration if adding more later")
+        reasons.append(f"Moderate Concentration: Stock weight is {weight_pct:.1f}%. This is a strong 'Conviction' position but remains manageable.")
+        suggestions.append("Maintain current size; avoid adding more until other positions are scaled.")
     else:
-        reasons.append(f"Single-stock exposure is manageable at {weight_pct:.1f}%")
+        reasons.append(f"Healthy Allocation: Single-stock exposure is manageable at {weight_pct:.1f}%, maintaining good diversification.")
+    
     if sector_weight_pct >= 50:
         score -= 25
         risk_score += 28
-        reasons.append(f"Sector exposure would be very concentrated at {sector_weight_pct:.1f}%")
-        suggestions.append("Balance this with holdings from other sectors")
+        reasons.append(f"Extreme Sector Risk: {sector} would make up half your portfolio. You are highly exposed to {sector}-specific regulatory or economic shifts.")
+        suggestions.append("Consider adding stocks from different sectors (e.g., Banking vs. Consumer) to balance risk.")
     elif sector_weight_pct >= 38:
         score -= 16
         risk_score += 18
-        reasons.append(f"Sector exposure is high at {sector_weight_pct:.1f}%")
-        suggestions.append("Avoid adding too much more to the same sector")
+        reasons.append(f"High Sector Exposure: {sector_weight_pct:.1f}% in {sector} is significant. Market shifts in this industry will have a outsized impact on your net worth.")
+        suggestions.append("Diversify into other industries to reduce correlation between your holdings.")
     elif sector_weight_pct >= 28:
         score -= 7
         risk_score += 8
-        reasons.append(f"Sector exposure is moderate at {sector_weight_pct:.1f}%")
+        reasons.append(f"Sector Concentration: Exposure to {sector} is reaching moderate levels ({sector_weight_pct:.1f}%).")
+        
     if unrealized_pct <= -20:
         score -= 12
         risk_score += 12
-        reasons.append(f"Holding has a large unrealized loss ({unrealized_pct:.1f}%)")
-        suggestions.append("Review thesis, stop-loss, and latest disclosures before increasing exposure")
+        reasons.append(f"Position Under Pressure: You are currently down {abs(unrealized_pct):.1f}% on this holding. Adding more is 'averaging down'.")
+        suggestions.append("Confirm the company's fundamentals haven't changed before 'catching a falling knife'.")
     elif unrealized_pct <= -10:
         score -= 6
         risk_score += 6
-        reasons.append(f"Holding is down {unrealized_pct:.1f}% from cost")
+        reasons.append(f"Corrective Phase: Holding is {abs(unrealized_pct):.1f}% below your cost basis.")
+    
     price_risk = _position_price_risk(symbol)
     sentiment_risk = _symbol_sentiment_risk(symbol)
     score -= float(price_risk.get("risk_points") or 0.0)
@@ -2144,15 +2147,17 @@ def _score_holding(symbol: str, company: str, sector: str, weight_pct: float, se
     score -= float(sentiment_risk.get("risk_points") or 0.0)
     risk_score += float(sentiment_risk.get("risk_points") or 0.0)
     reasons.extend(sentiment_risk.get("reasons") or [])
+    
     if cash_after_trade is not None and cash_after_trade < 0:
         score -= 28
         risk_score += 30
-        reasons.append("This trade would make portfolio cash negative")
-        suggestions.append("Record a deposit first or reduce trade size")
+        reasons.append("Liquidity Warning: This trade would exceed your available cash (Buying on Margin).")
+        suggestions.append("Deposit funds or reduce trade size to avoid broker interest/forced liquidation.")
+    
     if not suggestions and score >= 75:
-        suggestions.append("Position looks suitable, but keep monitoring reports, sentiment and allocation")
+        suggestions.append("Trade fits well. Ensure your stop-loss and profit-target strategy is set.")
     elif score < 60 and not any("Reduce" in s or "review" in s.lower() for s in suggestions):
-        suggestions.append("Review this position before adding more capital")
+        suggestions.append("Strategic Review Needed: AI suggests this trade increases portfolio risk beyond optimal levels.")
     label = _status_from_fit_score(max(0.0, min(100.0, score)))
     return {
         "symbol": symbol.upper(),

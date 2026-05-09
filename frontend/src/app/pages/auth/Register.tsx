@@ -67,12 +67,9 @@ export function Register() {
         </Button>
 
         {/* Logo */}
-        <div className="mb-8 flex items-center justify-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600">
-            <TrendingUp className="h-5 w-5 text-white" />
-          </div>
-          <span className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]">TradexaLK</span>
-        </div>
+        <Link to="/" className="mb-8 flex items-center justify-center gap-3">
+          <img src="/logo.png" alt="Tradexa.lk" className="h-16 w-auto object-contain" />
+        </Link>
 
         {/* Register Card */}
         <Card className="border-[var(--color-border)] bg-[var(--color-bg-secondary)]">

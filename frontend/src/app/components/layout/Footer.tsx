@@ -52,12 +52,9 @@ export function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 mb-8">
           {/* Brand Column */}
           <div className="col-span-2 md:col-span-4 lg:col-span-1">
-            <div className="flex items-center gap-2.5 mb-4">
-              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600">
-                <TrendingUp className="h-4.5 w-4.5 text-white" />
-              </div>
-              <span className="font-bold text-lg text-slate-50">TradexaLK</span>
-            </div>
+            <Link to="/" className="flex items-center gap-2.5 mb-4">
+              <img src="/logo.png" alt="Tradexa.lk" className="h-12 w-auto object-contain" />
+            </Link>
             <p className="text-sm text-slate-400 mb-4">
               Professional stock market analytics platform for the Colombo Stock Exchange.
             </p>
@@ -161,10 +158,10 @@ export function Footer() {
         <div className="border-t border-[#1e2938] pt-8 mb-8">
           <div className="bg-amber-600/10 border border-amber-600/30 rounded-lg p-4">
             <p className="text-xs text-amber-200/90 leading-relaxed">
-              <strong className="font-semibold">Disclaimer:</strong> TradexaLK is an independent financial analytics platform. 
-              Stock market investments involve risk, and past performance does not guarantee future results. 
-              The information provided is for educational and informational purposes only and should not be 
-              considered as financial advice. Please consult with a qualified financial advisor before making 
+              <strong className="font-semibold">Disclaimer:</strong> TradexaLK is an independent financial analytics platform.
+              Stock market investments involve risk, and past performance does not guarantee future results.
+              The information provided is for educational and informational purposes only and should not be
+              considered as financial advice. Please consult with a qualified financial advisor before making
               investment decisions. All data is sourced from the Colombo Stock Exchange and third-party providers.
             </p>
           </div>

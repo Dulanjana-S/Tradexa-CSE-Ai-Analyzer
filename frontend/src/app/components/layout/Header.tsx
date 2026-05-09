@@ -172,12 +172,9 @@ export function Header({ onMenuClick }: HeaderProps) {
         <Menu className="h-5 w-5" />
       </Button>
 
-      <div className="flex min-w-[200px] items-center gap-2.5">
-        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-emerald-500 to-emerald-600">
-          <TrendingUp className="h-3.5 w-3.5 text-white" />
-        </div>
-        <span className="text-[15px] font-bold tracking-tight text-[var(--color-text-primary)]">TradexaLK</span>
-      </div>
+      <Link to="/" className="flex min-w-[180px] items-center gap-2.5">
+        <img src="/logo.png" alt="Tradexa.lk" className="h-11 w-auto object-contain" />
+      </Link>
 
       <div className="relative hidden max-w-2xl flex-1 md:block">
         <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-secondary)]" />

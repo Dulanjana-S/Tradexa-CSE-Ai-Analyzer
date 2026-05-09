@@ -66,7 +66,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           onClick={onClose}
         />
       )}
-      
+
       {/* Sidebar */}
       <aside
         className={cn(
