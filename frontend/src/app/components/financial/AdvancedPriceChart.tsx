@@ -421,17 +421,17 @@ export function AdvancedPriceChart({
           {/* Bottom Row - Timeframe and Indicators */}
           <div className="flex items-center justify-between">
             {/* Timeframe Selector */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-0.5 bg-[#0a0e14] rounded-lg p-0.5 border border-[#1e2938]">
               {timeframes.map((tf) => (
                 <Button
                   key={tf}
                   variant="ghost"
                   size="sm"
                   className={cn(
-                    'h-7 px-3 text-[11px] font-semibold',
+                    'h-7 px-3 text-[11px] font-semibold transition-all',
                     timeframe === tf
-                      ? 'bg-[#161b22] text-[#e6edf3] ring-1 ring-[#30363d]'
-                      : 'text-[#768390] hover:bg-[#161b22] hover:text-[#e6edf3]'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-[#768390] hover:text-[#e6edf3] hover:bg-[#161b22]'
                   )}
                   onClick={() => setTimeframe(tf as any)}
                 >

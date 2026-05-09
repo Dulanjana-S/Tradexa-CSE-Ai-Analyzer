@@ -20,6 +20,7 @@ interface ChartCardProps {
   loading?: boolean;
   onTimeframeChange?: (timeframe: string) => void;
   type?: "area" | "line" | "candlestick";
+  color?: string;
 }
 
 export function ChartCard({
@@ -31,15 +32,37 @@ export function ChartCard({
   loading,
   onTimeframeChange,
   type = "area",
+  color = "#10b981",
 }: ChartCardProps) {
-  const [selectedTimeframe, setSelectedTimeframe] = useState(timeframe);
+  const [selectedTimeframe, setSelectedTimeframe] = useState('ALL');
 
-  const timeframes = ["1M", "3M", "6M", "1Y", "ALL"];
+  const timeframes = ['1M', '3M', '6M', '1Y', 'ALL'];
 
   const handleTimeframeChange = (tf: string) => {
     setSelectedTimeframe(tf);
     onTimeframeChange?.(tf);
   };
+
+  const filteredData = (() => {
+    if (selectedTimeframe === "ALL") return data;
+    
+    let count = 30;
+    switch (selectedTimeframe) {
+      case "1M": count = 30; break;
+      case "3M": count = 90; break;
+      case "6M": count = 180; break;
+      case "1Y": count = 365; break;
+      default: count = data.length;
+    }
+    
+    return data.slice(-count);
+  })();
+
+  const isTrendingUp = filteredData.length >= 2 
+    ? filteredData[filteredData.length - 1].value >= filteredData[0].value
+    : true;
+  
+  const trendColor = isTrendingUp ? "#10b981" : "#ef4444";
 
   if (loading) {
     return (
@@ -74,14 +97,14 @@ export function ChartCard({
             {timeframes.map((tf) => (
               <Button
                 key={tf}
-                variant={selectedTimeframe === tf ? "default" : "ghost"}
+                variant="ghost"
                 size="sm"
                 onClick={() => handleTimeframeChange(tf)}
-                className={
+                className={`h-7 px-3 text-[11px] font-semibold transition-all ${
                   selectedTimeframe === tf
-                    ? "bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-3 text-xs font-semibold shadow-sm"
-                    : "text-slate-500 hover:text-slate-300 hover:bg-[#1e2938] h-7 px-3 text-xs"
-                }
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-[#768390] hover:text-[#e6edf3] hover:bg-[#161b22]'
+                }`}
               >
                 {tf}
               </Button>
@@ -92,11 +115,11 @@ export function ChartCard({
       <CardContent className="pt-6 pb-4 bg-[#0a0e14]">
         <ResponsiveContainer width="100%" height={320}>
           {type === "area" ? (
-            <AreaChart data={data} margin={{ top: 0, right: 8, left: -20, bottom: 0 }}>
+            <AreaChart data={filteredData} margin={{ top: 0, right: 8, left: -20, bottom: 0 }}>
               <defs>
-                <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                <linearGradient id={`colorValue-${title}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={trendColor} stopOpacity={0.25} />
+                  <stop offset="95%" stopColor={trendColor} stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid 
@@ -137,14 +160,14 @@ export function ChartCard({
               <Area
                 type="monotone"
                 dataKey="value"
-                stroke="#10b981"
+                stroke={trendColor}
                 strokeWidth={2.5}
                 fillOpacity={1}
-                fill="url(#colorValue)"
+                fill={`url(#colorValue-${title})`}
               />
             </AreaChart>
           ) : (
-            <LineChart data={data} margin={{ top: 0, right: 8, left: -20, bottom: 0 }}>
+            <LineChart data={filteredData} margin={{ top: 0, right: 8, left: -20, bottom: 0 }}>
               <CartesianGrid 
                 strokeDasharray="3 3" 
                 stroke="#1e2938" 
@@ -183,7 +206,7 @@ export function ChartCard({
               <Line
                 type="monotone"
                 dataKey="value"
-                stroke="#10b981"
+                stroke={trendColor}
                 strokeWidth={2.5}
                 dot={false}
               />

@@ -41,7 +41,8 @@ export function IndexChart({
 }: IndexChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const [timeframe, setTimeframe] = useState('1D');
+  const lineSeriesRef = useRef<any>(null);
+  const [timeframe, setTimeframe] = useState('ALL');
   const isPositive = change >= 0;
   const series = useMemo<LineData[]>(() => {
     const rows = (data && data.length > 0 ? data : createFallbackSeries(currentValue, change)).map((item) => ({
@@ -50,6 +51,46 @@ export function IndexChart({
     }));
     return rows;
   }, [change, currentValue, data]);
+
+  useEffect(() => {
+    if (!chartRef.current || series.length === 0) return;
+    const timeScale = chartRef.current.timeScale();
+    
+    if (timeframe === 'ALL') {
+      timeScale.fitContent();
+      return;
+    }
+
+    let rangeInBars = 120;
+    switch (timeframe) {
+      case '1M': rangeInBars = 120; break;
+      case '3M': rangeInBars = 250; break;
+      case '6M': rangeInBars = 400; break;
+      case '1Y': rangeInBars = 600; break;
+      default: rangeInBars = 120;
+    }
+
+    const lastIndex = series.length - 1;
+    timeScale.setVisibleLogicalRange({
+      from: lastIndex - rangeInBars,
+      to: lastIndex + 5,
+    });
+
+    // Dynamic Color Update
+    if (lineSeriesRef.current) {
+      const visibleRange = timeScale.getVisibleLogicalRange();
+      if (visibleRange) {
+        const from = Math.max(0, Math.floor(visibleRange.from));
+        const to = Math.min(series.length - 1, Math.floor(visibleRange.to));
+        if (to > from) {
+          const isUp = series[to].value >= series[from].value;
+          lineSeriesRef.current.applyOptions({
+            color: isUp ? '#10b981' : '#ef4444'
+          });
+        }
+      }
+    }
+  }, [timeframe, series]);
 
   useEffect(() => {
     if (!chartContainerRef.current || series.length === 0) return;
@@ -78,6 +119,7 @@ export function IndexChart({
       lineWidth: 2,
       priceLineVisible: false,
     });
+    lineSeriesRef.current = lineSeries;
     lineSeries.setData(series);
     chart.timeScale().fitContent();
 
@@ -135,16 +177,16 @@ export function IndexChart({
             </div>
           </div>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1">
-              {['1D', '1W', '1M', '3M', '1Y'].map((tf) => (
+            <div className="flex items-center gap-0.5 bg-[#0a0e14] rounded-lg p-0.5 border border-[#1e2938]">
+              {['1M', '3M', '6M', '1Y', 'ALL'].map((tf) => (
                 <Button
                   key={tf}
                   variant="ghost"
                   size="sm"
-                  className={`h-7 px-3 text-[11px] font-semibold ${
+                  className={`h-7 px-3 text-[11px] font-semibold transition-all ${
                     timeframe === tf
-                      ? 'bg-[#161b22] text-[#e6edf3] ring-1 ring-[#30363d]'
-                      : 'text-[#768390] hover:bg-[#161b22] hover:text-[#e6edf3]'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-[#768390] hover:text-[#e6edf3] hover:bg-[#161b22]'
                   }`}
                   onClick={() => setTimeframe(tf)}
                 >

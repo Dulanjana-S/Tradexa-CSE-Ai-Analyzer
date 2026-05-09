@@ -46,7 +46,14 @@ export function Markets() {
 
   const banking = useMemo(() => filteredStocks.filter((s) => s.sector.toLowerCase().includes("bank")), [filteredStocks]);
   const telecom = useMemo(() => filteredStocks.filter((s) => s.sector.toLowerCase().includes("tele")), [filteredStocks]);
-  const diversified = useMemo(() => filteredStocks.filter((s) => s.sector.toLowerCase().includes("divers")), [filteredStocks]);
+  const diversified = useMemo(() => filteredStocks.filter((s) => 
+    s.sector.toLowerCase().includes("divers") || s.sector.toLowerCase().includes("conglom")
+  ), [filteredStocks]);
+  const manufacturing = useMemo(() => filteredStocks.filter((s) => 
+    s.sector.toLowerCase().includes("manufac") || s.sector.toLowerCase().includes("indust")
+  ), [filteredStocks]);
+  const insurance = useMemo(() => filteredStocks.filter((s) => s.sector.toLowerCase().includes("insur")), [filteredStocks]);
+  const energy = useMemo(() => filteredStocks.filter((s) => s.sector.toLowerCase().includes("ener") || s.sector.toLowerCase().includes("utili")), [filteredStocks]);
 
   return (
     <div className="p-6 space-y-6">
@@ -82,22 +89,29 @@ export function Markets() {
           data={(overview?.aspi.series || []).map((d) => ({ date: d.date, value: d.value }))}
           description="All Share Price Index"
           type="area"
+          color="#10b981"
         />
         <ChartCard
           title="S&P SL20 Index"
           data={(overview?.sp20.series || []).map((d) => ({ date: d.date, value: d.value }))}
           description="S&P Sri Lanka 20 Index"
-          type="line"
+          type="area"
+          color="#10b981"
         />
       </div>
 
       <Tabs defaultValue="all" className="w-full">
-        <TabsList className="bg-slate-900 border border-slate-800">
-          <TabsTrigger value="all" className="data-[state=active]:bg-emerald-600">All Stocks</TabsTrigger>
-          <TabsTrigger value="banking" className="data-[state=active]:bg-emerald-600">Banking</TabsTrigger>
-          <TabsTrigger value="telecom" className="data-[state=active]:bg-emerald-600">Telecommunications</TabsTrigger>
-          <TabsTrigger value="diversified" className="data-[state=active]:bg-emerald-600">Diversified</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto pb-2">
+          <TabsList className="bg-slate-900 border border-slate-800 w-fit">
+            <TabsTrigger value="all" className="data-[state=active]:bg-emerald-600">All Stocks</TabsTrigger>
+            <TabsTrigger value="banking" className="data-[state=active]:bg-blue-600">Banking</TabsTrigger>
+            <TabsTrigger value="telecom" className="data-[state=active]:bg-indigo-600">Telecom</TabsTrigger>
+            <TabsTrigger value="diversified" className="data-[state=active]:bg-amber-600">Diversified</TabsTrigger>
+            <TabsTrigger value="manufacturing" className="data-[state=active]:bg-pink-600">Manufacturing</TabsTrigger>
+            <TabsTrigger value="insurance" className="data-[state=active]:bg-orange-600">Insurance</TabsTrigger>
+            <TabsTrigger value="energy" className="data-[state=active]:bg-cyan-600">Energy & Utilities</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="all" className="mt-6">
           <Card className="bg-slate-900 border-slate-800">
@@ -120,7 +134,16 @@ export function Markets() {
           <Card className="bg-slate-900 border-slate-800"><CardHeader><CardTitle>Telecommunications Sector</CardTitle></CardHeader><CardContent><StockTable stocks={telecom} loading={loading} /></CardContent></Card>
         </TabsContent>
         <TabsContent value="diversified" className="mt-6">
-          <Card className="bg-slate-900 border-slate-800"><CardHeader><CardTitle>Diversified Holdings Sector</CardTitle></CardHeader><CardContent><StockTable stocks={diversified} loading={loading} /></CardContent></Card>
+          <Card className="bg-slate-900 border-slate-800"><CardHeader><CardTitle>Diversified & Conglomerates</CardTitle></CardHeader><CardContent><StockTable stocks={diversified} loading={loading} /></CardContent></Card>
+        </TabsContent>
+        <TabsContent value="manufacturing" className="mt-6">
+          <Card className="bg-slate-900 border-slate-800"><CardHeader><CardTitle>Manufacturing & Industrial</CardTitle></CardHeader><CardContent><StockTable stocks={manufacturing} loading={loading} /></CardContent></Card>
+        </TabsContent>
+        <TabsContent value="insurance" className="mt-6">
+          <Card className="bg-slate-900 border-slate-800"><CardHeader><CardTitle>Insurance Sector</CardTitle></CardHeader><CardContent><StockTable stocks={insurance} loading={loading} /></CardContent></Card>
+        </TabsContent>
+        <TabsContent value="energy" className="mt-6">
+          <Card className="bg-slate-900 border-slate-800"><CardHeader><CardTitle>Energy & Utilities Sector</CardTitle></CardHeader><CardContent><StockTable stocks={energy} loading={loading} /></CardContent></Card>
         </TabsContent>
       </Tabs>
     </div>
