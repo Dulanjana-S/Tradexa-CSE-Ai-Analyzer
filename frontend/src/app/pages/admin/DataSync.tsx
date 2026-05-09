@@ -247,11 +247,7 @@ export function DataSync() {
           <Card className="border-[#30363d] bg-[#161b22]"><CardHeader className="pb-2"><CardDescription className="text-[#768390]">Latest Price Date</CardDescription></CardHeader><CardContent><div className="text-[18px] font-bold text-[#e6edf3] break-all">{status?.freshness?.latest_price_date || "—"}</div></CardContent></Card>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          {[["Market Data","Sync"],["Intelligence","Refresh"],["Model Training","Train"],["Live Prediction","Activate in Model Management"]].map(([title, statusLabel]) => (
-            <Badge key={String(title)} className="border-[#30363d] bg-[#161b22] px-3 py-1 text-[#c9d1d9]">{title}: {statusLabel}</Badge>
-          ))}
-        </div>
+
 
         <div className="grid gap-6 xl:grid-cols-2">
           <Card className="border-[#30363d] bg-[#161b22]">
@@ -333,9 +329,9 @@ export function DataSync() {
                     ["LightGBM", Boolean(modelHealth?.capabilities?.lightgbm)],
                     ["XGBoost", Boolean(modelHealth?.capabilities?.xgboost)],
                     ["CatBoost", Boolean(modelHealth?.capabilities?.catboost)],
-                    ["FinBERT runtime", Boolean(modelHealth?.capabilities?.finbertAvailable)],
+                    ["FinBERT", Boolean(modelHealth?.capabilities?.finbertAvailable)],
                   ].map(([name, ok]) => (
-                    <div key={String(name)} className={`rounded-md border px-3 py-2 ${ok ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200" : "border-[#30363d] bg-[#08090c] text-[#768390]"}`}>{name}: {ok ? "Available" : "Unavailable"}</div>
+                    <div key={String(name)} className={`rounded-md border px-3 py-2 ${ok ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200" : "border-[#30363d] bg-[#08090c] text-[#768390]"}`}>{name}</div>
                   ))}
                 </div>
                 <div className="mt-3 text-[#768390]">Auto mode uses only engines available in the running backend environment.</div>
