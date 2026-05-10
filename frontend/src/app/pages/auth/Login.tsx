@@ -153,17 +153,6 @@ export function Login() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Demo Credentials */}
-        <Card className="border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
-          <CardContent className="pt-6">
-            <div className="space-y-2 text-[12px] text-[var(--color-text-tertiary)]">
-              <p className="font-semibold text-[var(--color-text-secondary)]">Demo Credentials:</p>
-              <p>Admin: admin@tradexalk.com / admin123</p>
-              <p>User: user@tradexalk.com / user123</p>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

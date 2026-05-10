@@ -8,7 +8,7 @@ import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import Body, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
+from fastapi import BackgroundTasks, Body, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse, Response
@@ -253,10 +253,13 @@ def api_auth_me(request: Request):
 
 
 @app.post("/api/auth/register")
-def api_auth_register(payload: Dict[str, Any] = Body(...)):
+def api_auth_register(payload: Dict[str, Any] = Body(...), background_tasks: BackgroundTasks = BackgroundTasks()):
     username = _derive_username(payload)
     display_name = payload.get('display_name') or payload.get('name') or username
     user = create_user(username, str(payload.get("password") or ""), role="user", display_name=display_name, email=payload.get("email"))
+    if user.get("email"):
+        from .services.auth_service import send_welcome_email
+        background_tasks.add_task(send_welcome_email, str(user.get("email")), display_name)
     return {"ok": True, "user": user}
 
 

@@ -242,6 +242,32 @@ def _send_reset_email(email: str, reset_link: str) -> bool:
     return True
 
 
+def send_welcome_email(email: str, display_name: str) -> bool:
+    if not settings.smtp_host or not email:
+        return False
+    msg = EmailMessage()
+    msg['Subject'] = 'Welcome to TradexaLK'
+    msg['From'] = settings.smtp_from_email
+    msg['To'] = email
+    msg.set_content(
+        f"Hello {display_name},\n\n"
+        "Welcome to TradexaLK! Your account has been successfully created.\n\n"
+        "You can now log in and start using our professional AI analytics platform.\n\n"
+        "Best regards,\n"
+        "The TradexaLK Team"
+    )
+    try:
+        with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=20) as server:
+            if settings.smtp_use_tls:
+                server.starttls()
+            if settings.smtp_username:
+                server.login(settings.smtp_username, settings.smtp_password)
+            server.send_message(msg)
+        return True
+    except Exception:
+        return False
+
+
 def start_password_reset(user: Dict[str, Any]) -> Dict[str, Any]:
     username = str(user.get('username') or '').lower()
     email = str(user.get('email') or '').strip()
