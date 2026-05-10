@@ -343,6 +343,21 @@ def api_profile_update(request: Request, payload: Dict[str, Any] = Body(...)):
     updated = update_profile(user['username'], display_name=payload.get('display_name'), email=payload.get('email'))
     return {'ok': True, 'user': updated}
 
+@app.post("/api/contact")
+def api_contact_submit(payload: Dict[str, Any] = Body(...), background_tasks: BackgroundTasks = BackgroundTasks()):
+    name = str(payload.get("name", "")).strip()
+    email = str(payload.get("email", "")).strip()
+    subject = str(payload.get("subject", "")).strip()
+    message = str(payload.get("message", "")).strip()
+    
+    if not name or not email or not message:
+        raise HTTPException(status_code=400, detail="Name, email, and message are required")
+    
+    from .services.auth_service import send_contact_email
+    background_tasks.add_task(send_contact_email, name, email, subject, message)
+    
+    return {"ok": True}
+
 
 # ---- API: health ----
 @app.get("/healthz")

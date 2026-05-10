@@ -25,6 +25,7 @@ import { AlertMonitor } from "./pages/admin/AlertMonitor";
 import { SystemSettings } from "./pages/admin/SystemSettings";
 import { AuditLogs } from "./pages/admin/AuditLogs";
 import { NotFound } from "./pages/NotFound";
+import { Contact } from "./pages/Contact";
 
 // Wrapper to provide AuthContext to all routes
 function RootLayout({ children }: { children: React.ReactNode }) {
@@ -60,6 +61,10 @@ export const router = createBrowserRouter([
       {
         path: "announcements",
         element: <Announcements />,
+      },
+      {
+        path: "contact",
+        element: <Contact />,
       },
       {
         path: "watchlist",

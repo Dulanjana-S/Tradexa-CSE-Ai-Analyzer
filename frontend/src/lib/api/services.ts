@@ -1347,3 +1347,8 @@ export const assistantApi = {
     return response;
   },
 };
+
+export const contactApi = {
+  submit: (data: { name: string; email: string; subject: string; message: string }) =>
+    api.post<{ ok: boolean }>("/api/contact", data),
+};

@@ -241,7 +241,6 @@ def _send_reset_email(email: str, reset_link: str) -> bool:
         server.send_message(msg)
     return True
 
-
 def send_welcome_email(email: str, display_name: str) -> bool:
     if not settings.smtp_host or not email:
         return False
@@ -255,6 +254,33 @@ def send_welcome_email(email: str, display_name: str) -> bool:
         "You can now log in and start using our professional AI analytics platform.\n\n"
         "Best regards,\n"
         "The TradexaLK Team"
+    )
+    try:
+        with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=20) as server:
+            if settings.smtp_use_tls:
+                server.starttls()
+            if settings.smtp_username:
+                server.login(settings.smtp_username, settings.smtp_password)
+            server.send_message(msg)
+        return True
+    except Exception:
+        return False
+
+
+def send_contact_email(name: str, email: str, subject: str, message: str) -> bool:
+    if not settings.smtp_host:
+        return False
+    msg = EmailMessage()
+    msg['Subject'] = f'Contact Form: {subject}'
+    msg['From'] = settings.smtp_from_email
+    msg['To'] = settings.smtp_from_email  # Send to the admin/support email
+    msg['Reply-To'] = email
+    msg.set_content(
+        f"You have received a new message from the contact form:\n\n"
+        f"Name: {name}\n"
+        f"Email: {email}\n"
+        f"Subject: {subject}\n\n"
+        f"Message:\n{message}"
     )
     try:
         with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=20) as server:

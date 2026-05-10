@@ -36,7 +36,7 @@ export function Footer() {
     
     ],
     support: [
-      { name: "Contact Support", path: "mailto:support@tradexalk.com" },
+      { name: "Contact Support", path: "/contact" },
     ],
   };
 
