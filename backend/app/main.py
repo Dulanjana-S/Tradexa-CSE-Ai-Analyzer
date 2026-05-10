@@ -8,6 +8,7 @@ import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from contextlib import asynccontextmanager
 from fastapi import BackgroundTasks, Body, Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
@@ -24,10 +25,20 @@ from .rate_limit import rate_limit_auth, generate_captcha, verify_captcha
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup:
+    ensure_bootstrap_admin()
+    start_job_system()
+    yield
+    # Shutdown:
+    # (Add cleanup logic here if needed)
+
 app = FastAPI(
     title="TradexaLK — CSE AI Analytics",
     description="Professional AI analytics platform for the Colombo Stock Exchange. Live market data, ML predictions, portfolio management, and alerts.",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -47,8 +58,6 @@ def _custom_openapi() -> Dict[str, Any]:
 
 
 app.openapi = _custom_openapi
-ensure_bootstrap_admin()
-start_job_system()
 
 
 
