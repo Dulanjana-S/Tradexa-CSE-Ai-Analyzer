@@ -63,5 +63,7 @@ class Settings:
     smtp_from_email: str = os.getenv("SMTP_FROM_EMAIL", "no-reply@tradexalk.local")
     smtp_use_tls: bool = os.getenv("SMTP_USE_TLS", "true").lower() in {"1", "true", "yes"}
 
+    allow_password_reset_preview: bool = os.getenv("ALLOW_PASSWORD_RESET_PREVIEW", "true").lower() in {"1", "true", "yes"}
+
 
 settings = Settings()
