@@ -35,15 +35,6 @@ async def lifespan(app: FastAPI):
     start_job_system()
     yield
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup:
-    ensure_bootstrap_admin()
-    start_job_system()
-    yield
-    # Shutdown:
-    # (Add cleanup logic here if needed)
-
 app = FastAPI(
     title="TradexaLK — CSE AI Analytics",
     description="Professional AI analytics platform for the Colombo Stock Exchange. Live market data, ML predictions, portfolio management, and alerts.",
