@@ -315,19 +315,42 @@ def api_auth_forgot_password(payload: Dict[str, Any] = Body(...)):
     user = _find_user(identifier)
     if not user:
         return {"ok": True, "message": "If an account exists for that email, a reset link has been prepared."}
+    
     result = start_password_reset(user)
-    response = {"ok": True, "message": "If an account exists for that email, a reset link has been prepared."}
-    if result.get("preview_reset_link"):
-        response["preview_reset_link"] = result.get("preview_reset_link")
+    response = {"ok": True, "sent": result.get("sent", False)}
+    
+    if result.get("sent"):
+        response["message"] = "A password reset link has been sent to your email address."
+    else:
+        response["message"] = "A password reset link has been prepared."
+        # Only expose the link in API if explicitly allowed in config (dev mode)
+        if settings.allow_password_reset_preview and result.get("preview_reset_link"):
+            response["preview_reset_link"] = result.get("preview_reset_link")
+            
     if result.get("expires_at"):
         response["expires_at"] = result.get("expires_at")
+        
     return response
 
 
 @app.post("/api/auth/reset-password")
 def api_auth_reset_password(payload: Dict[str, Any] = Body(...)):
-    user = complete_password_reset(str(payload.get("token") or ""), str(payload.get("new_password") or ""))
-    return {"ok": True, "user": user}
+    token = str(payload.get("token") or "").strip()
+    new_password = str(payload.get("new_password") or "")
+    
+    if not token:
+        raise HTTPException(status_code=400, detail="Reset token is missing.")
+    if len(new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
+        
+    success = complete_password_reset(token, new_password)
+    if not success:
+        raise HTTPException(
+            status_code=400, 
+            detail="Failed to reset password. The link may have expired or already been used."
+        )
+        
+    return {"ok": True, "message": "Password has been reset successfully."}
 
 
 @app.post("/api/auth/change-password")
