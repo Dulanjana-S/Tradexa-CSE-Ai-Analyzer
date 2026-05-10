@@ -69,8 +69,8 @@ export function UserManagement() {
     <div className="min-h-screen bg-[var(--color-bg-primary)]">
       <div className="mx-auto max-w-[1680px] px-6 py-8 lg:px-8 space-y-8">
         <div className="space-y-1.5">
-          <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[var(--color-text-primary)]">User Management</h1>
-          <p className="text-[13px] text-[var(--color-text-tertiary)]">Main Admin-controlled staff roles. Admin is the account owner, and only that account can assign Co-Admin access.</p>
+          <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[var(--color-text-primary)]">System Access Control</h1>
+          <p className="text-[13px] text-[var(--color-text-tertiary)]">Manage operational staff roles and administrative privileges. Primary access is restricted to the account owner.</p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">
@@ -84,8 +84,8 @@ export function UserManagement() {
           <CardHeader>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <CardTitle className="text-[18px] text-[var(--color-text-primary)]">Accounts and roles</CardTitle>
-                <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Admin is the account owner. Co-Admins can help operate the system, but only the main Admin account can change staff roles.</CardDescription>
+                <CardTitle className="text-[18px] text-[var(--color-text-primary)]">Staff Accounts & Permissions</CardTitle>
+                <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Primary Administrators oversee account ownership and role delegation. Co-Administrators are authorized for system operations.</CardDescription>
               </div>
               <div className="flex gap-3">
                 <div className="relative">
@@ -104,7 +104,7 @@ export function UserManagement() {
               </div>
             </div>
             <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-3 text-xs text-[var(--color-text-muted)]">
-              {canManageStaff ? "You are signed in as the main Admin account. This Admin account is locked here, and you can assign or remove Co-Admin access for staff users." : "You are signed in as staff. You can view accounts here, but role changes are reserved for the main Admin account."}
+              {canManageStaff ? "Primary Administrator session active. You have full authorization to manage system privileges and delegate staff access levels." : "Operational Staff session active. You have read-only access to system accounts. Role modifications require Primary Administrator authorization."}
             </div>
           </CardHeader>
           <CardContent>
@@ -141,7 +141,7 @@ export function UserManagement() {
                         <TableCell className="text-[var(--color-text-tertiary)]">{user.createdAt || "—"}</TableCell>
                         <TableCell className="text-right">
                           {locked ? (
-                            <span className="text-xs text-[var(--color-text-tertiary)]">{role === "admin" ? "Main Admin locked" : "Main Admin only"}</span>
+                            <span className="text-xs text-[var(--color-text-tertiary)]">{role === "admin" ? "Primary Account (Immutable)" : "Primary Authorization Required"}</span>
                           ) : (
                             <div className="flex justify-end">
                               <Select value={role} onValueChange={(value) => updateRole(user.username, value as "user" | "co_admin") } disabled={busyUser === user.username}>

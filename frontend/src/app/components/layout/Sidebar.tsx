@@ -43,15 +43,15 @@ const userBottomItems = [
 
 // Admin navigation items
 const adminNavItems = [
-  { to: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/admin/models", label: "Models", icon: Brain },
-  { to: "/admin/sync", label: "Sync / Training", icon: Database },
-  { to: "/admin/jobs", label: "Jobs / Logs", icon: FileText },
-  { to: "/admin/users", label: "Users", icon: Users },
-  { to: "/admin/announcements", label: "Announcement Triage", icon: Megaphone },
-  { to: "/admin/alerts", label: "Alert Monitor", icon: BellRing },
-  { to: "/admin/settings", label: "System Settings", icon: Shield },
-  { to: "/admin/audit", label: "Audit Logs", icon: ClipboardList },
+  { to: "/admin", label: "Console", icon: LayoutDashboard },
+  { to: "/admin/models", label: "Predictive Intelligence", icon: Brain },
+  { to: "/admin/sync", label: "Infrastructure Sync", icon: Database },
+  { to: "/admin/jobs", label: "System Logs", icon: FileText },
+  { to: "/admin/users", label: "Access Control", icon: Users },
+  { to: "/admin/announcements", label: "Market Announcements", icon: Megaphone },
+  { to: "/admin/alerts", label: "Alert Infrastructure", icon: BellRing },
+  { to: "/admin/settings", label: "Security & Config", icon: Shield },
+  { to: "/admin/audit", label: "Governance Logs", icon: ClipboardList },
 ];
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
@@ -111,7 +111,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               <Separator className="my-2 bg-[var(--color-border)]" />
               <div className={cn("px-3 py-3 transition-opacity", isOpen ? "opacity-100" : "opacity-0 lg:hidden")}>
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">
-                  Admin Panel
+                  Infrastructure Control
                 </p>
               </div>
               <div className="space-y-0.5">

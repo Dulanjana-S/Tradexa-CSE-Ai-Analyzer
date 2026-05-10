@@ -165,8 +165,8 @@ export function Footer() {
 
         {/* Disclaimer */}
         <div className="border-t border-[var(--color-border)] pt-8 mb-8">
-          <div className="bg-amber-600/5 border border-amber-600/20 rounded-lg p-4">
-            <p className="text-xs text-amber-700 dark:text-amber-200/90 leading-relaxed">
+          <div className="bg-[var(--warning-bg)] border border-[var(--warning-border)] rounded-lg p-4">
+            <p className="text-xs text-[var(--warning-text)] leading-relaxed opacity-90">
               <strong className="font-semibold">Disclaimer:</strong> TradexaLK is an independent financial analytics platform.
               Stock market investments involve risk, and past performance does not guarantee future results.
               The information provided is for educational and informational purposes only and should not be

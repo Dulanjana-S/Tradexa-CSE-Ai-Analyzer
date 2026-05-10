@@ -68,8 +68,8 @@ export function AdminDashboard() {
       <div className="mx-auto max-w-[1680px] px-6 py-8 lg:px-8 space-y-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1.5">
-            <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[var(--color-text-primary)]">Admin Dashboard</h1>
-            <p className="text-[13px] text-[var(--color-text-tertiary)]">Monitor backend health, users, alerts, jobs, and deployed models</p>
+            <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[var(--color-text-primary)]">Administrative Console</h1>
+            <p className="text-[13px] text-[var(--color-text-tertiary)]">Operational overview of system infrastructure, staff privileges, and predictive intelligence.</p>
           </div>
           <Button onClick={() => load()} className="bg-emerald-600 text-white hover:bg-emerald-700">
             <RefreshCw className="mr-2 h-4 w-4" /> Refresh
@@ -148,10 +148,10 @@ export function AdminDashboard() {
             </CardHeader>
             <CardContent className="space-y-3">
               {[
-                ["/admin/sync", "Data Sync", BriefcaseBusiness],
-                ["/admin/models", "Model Management", Cpu],
-                ["/admin/users", "User Management", Users],
-                ["/admin/settings", "System Settings", ShieldCheck],
+                ["/admin/sync", "Infrastructure Sync", BriefcaseBusiness],
+                ["/admin/models", "Predictive Intelligence", Cpu],
+                ["/admin/users", "Access Control", Users],
+                ["/admin/settings", "Security & System", ShieldCheck],
               ].map(([to, label, Icon]: any) => (
                 <Button key={to} asChild variant="outline" className="w-full justify-start border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]">
                   <Link to={to}><Icon className="mr-2 h-4 w-4" /> {label}</Link>

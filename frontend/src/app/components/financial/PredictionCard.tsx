@@ -52,13 +52,13 @@ export function PredictionCard({
 
   if (error) {
     return (
-      <Card className="bg-[var(--color-bg-secondary)] border-amber-700/40 shadow-sm">
+      <Card className="bg-[var(--color-bg-secondary)] border-[var(--warning-border)] shadow-sm">
         <CardHeader className="pb-4">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            <AlertTriangle className="h-5 w-5 text-[var(--warning-text)]" />
             <CardTitle className="text-lg">AI Prediction Unavailable</CardTitle>
           </div>
-          <CardDescription className="text-amber-400 text-sm">{error}</CardDescription>
+          <CardDescription className="text-[var(--warning-text)] text-sm">{error}</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -189,8 +189,8 @@ export function PredictionCard({
         </div>
 
         {/* Disclaimer */}
-        <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
-          <p className="text-xs text-amber-400 leading-relaxed flex items-start gap-1.5">
+        <div className="p-3 rounded-lg bg-[var(--warning-bg)] border border-[var(--warning-border)]">
+          <p className="text-xs text-[var(--warning-text)] leading-relaxed flex items-start gap-1.5">
             <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
             <span>
               Predictions are for informational purposes only. Not financial advice. Past
