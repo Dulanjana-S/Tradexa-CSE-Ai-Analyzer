@@ -8,7 +8,7 @@ import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import BackgroundTasks, Body, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
+from fastapi import BackgroundTasks, Body, Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse, Response
@@ -20,6 +20,7 @@ from .jobs import enqueue_daily_pipeline, enqueue_import, enqueue_sync, enqueue_
 from .services import data_service
 from .services.assistant_service import chat_assistant
 from .services.auth_service import SESSION_COOKIE, change_password, complete_password_reset, create_user, current_user_from_request, ensure_bootstrap_admin, is_staff_role, list_users, login, logout, require_user, set_role, start_password_reset, update_profile
+from .rate_limit import rate_limit_auth, generate_captcha, verify_captcha
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -246,14 +247,24 @@ def _audit_admin_action(request: Request, actor: Dict[str, Any], action: str, *,
 
 
 # ---- API: auth ----
+@app.get("/api/auth/captcha")
+def api_auth_captcha():
+    return generate_captcha()
+
+
 @app.get("/api/auth/me")
 def api_auth_me(request: Request):
     user = current_user_from_request(request)
     return {"authenticated": bool(user), "user": user}
 
 
-@app.post("/api/auth/register")
+@app.post("/api/auth/register", dependencies=[Depends(rate_limit_auth)])
 def api_auth_register(payload: Dict[str, Any] = Body(...), background_tasks: BackgroundTasks = BackgroundTasks()):
+    captcha_id = payload.get("captcha_id")
+    captcha_answer = payload.get("captcha_answer")
+    if not verify_captcha(captcha_id, captcha_answer):
+        raise HTTPException(status_code=400, detail="Invalid CAPTCHA")
+
     username = _derive_username(payload)
     display_name = payload.get('display_name') or payload.get('name') or username
     user = create_user(username, str(payload.get("password") or ""), role="user", display_name=display_name, email=payload.get("email"))
@@ -263,8 +274,12 @@ def api_auth_register(payload: Dict[str, Any] = Body(...), background_tasks: Bac
     return {"ok": True, "user": user}
 
 
-@app.post("/api/auth/login")
+@app.post("/api/auth/login", dependencies=[Depends(rate_limit_auth)])
 def api_auth_login(payload: Dict[str, Any] = Body(...)):
+    captcha_answer = payload.get("captcha_answer")
+    if not verify_captcha(None, captcha_answer):
+        raise HTTPException(status_code=400, detail="Invalid CAPTCHA")
+
     identifier = str(payload.get("username") or payload.get('email') or "").strip()
     resolved = identifier
     if '@' in identifier:
@@ -294,7 +309,7 @@ def api_auth_logout(request: Request):
     return resp
 
 
-@app.post("/api/auth/forgot-password")
+@app.post("/api/auth/forgot-password", dependencies=[Depends(rate_limit_auth)])
 def api_auth_forgot_password(payload: Dict[str, Any] = Body(...)):
     identifier = str(payload.get("email") or payload.get("username") or "").strip()
     user = _find_user(identifier)

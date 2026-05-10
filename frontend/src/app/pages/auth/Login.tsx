@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import ReCAPTCHA from "react-google-recaptcha";
 import { useTheme } from "../../contexts/ThemeContext";
 import { Link, useNavigate } from "react-router";
 import { TrendingUp, Mail, Lock, Loader2, AlertCircle, ArrowLeft } from "lucide-react";
@@ -18,6 +19,8 @@ export function Login() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const recaptchaRef = useRef<ReCAPTCHA>(null);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -29,13 +32,20 @@ export function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (!captchaToken) {
+      setError("Please verify that you are not a robot");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      await login({ email, password });
+      await login({ email, password, captcha_answer: captchaToken });
     } catch (err) {
       const apiError = err as APIError;
       setError(apiError.message || "Login failed. Please try again.");
+      recaptchaRef.current?.reset();
+      setCaptchaToken(null);
     } finally {
       setIsLoading(false);
     }
@@ -124,6 +134,15 @@ export function Login() {
                     required
                   />
                 </div>
+              </div>
+
+              <div className="flex justify-center my-4">
+                <ReCAPTCHA
+                  ref={recaptchaRef}
+                  sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY || "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"}
+                  onChange={(token) => setCaptchaToken(token)}
+                  theme={theme === 'dark' ? 'dark' : 'light'}
+                />
               </div>
 
               <Button

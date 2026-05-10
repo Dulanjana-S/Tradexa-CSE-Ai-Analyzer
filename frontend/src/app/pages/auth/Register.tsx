@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import ReCAPTCHA from "react-google-recaptcha";
 import { useTheme } from "../../contexts/ThemeContext";
 import { Link, useNavigate } from "react-router";
 import { TrendingUp, Mail, Lock, User as UserIcon, Loader2, AlertCircle, ArrowLeft } from "lucide-react";
@@ -9,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../..
 import { Alert, AlertDescription } from "../../components/ui/alert";
 import { useAuth } from "../../../lib/auth/AuthContext";
 import type { APIError } from "../../../lib/api/client";
+import { authApi } from "../../../lib/api/services";
 
 export function Register() {
   const { theme } = useTheme();
@@ -20,6 +22,8 @@ export function Register() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const recaptchaRef = useRef<ReCAPTCHA>(null);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -42,13 +46,20 @@ export function Register() {
       return;
     }
 
+    if (!captchaToken) {
+      setError("Please verify that you are not a robot");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      await register({ name, email, password });
+      await register({ name, email, password, captcha_answer: captchaToken || undefined });
     } catch (err) {
       const apiError = err as APIError;
       setError(apiError.message || "Registration failed. Please try again.");
+      recaptchaRef.current?.reset();
+      setCaptchaToken(null);
     } finally {
       setIsLoading(false);
     }
@@ -170,6 +181,15 @@ export function Register() {
                     required
                   />
                 </div>
+              </div>
+
+              <div className="flex justify-center my-4">
+                <ReCAPTCHA
+                  ref={recaptchaRef}
+                  sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY || "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"}
+                  onChange={(token) => setCaptchaToken(token)}
+                  theme={theme === 'dark' ? 'dark' : 'light'}
+                />
               </div>
 
               <Button

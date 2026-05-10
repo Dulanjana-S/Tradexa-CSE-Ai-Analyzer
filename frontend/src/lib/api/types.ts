@@ -16,6 +16,7 @@ export interface AuthResponse {
 export interface LoginRequest {
   email: string;
   password: string;
+  captcha_answer?: string;
 }
 
 export interface ForgotPasswordRequest {
@@ -26,6 +27,8 @@ export interface RegisterRequest {
   email: string;
   password: string;
   name: string;
+  captcha_id?: string;
+  captcha_answer?: string;
 }
 
 export interface Stock {

@@ -726,6 +726,8 @@ export const authApi = {
       password: data.password,
       name: data.name,
       display_name: data.name,
+      captcha_id: data.captcha_id,
+      captcha_answer: data.captcha_answer,
     });
     await authApi.login({ email: data.email, password: data.password });
     return { user: mapUser(response.user) };
@@ -756,6 +758,8 @@ export const authApi = {
 
   resetPassword: (token: string, newPassword: string) =>
     api.post<any>("/api/auth/reset-password", { token, new_password: newPassword }),
+
+  getCaptcha: () => api.get<{ captcha_id: string; question: string }>("/api/auth/captcha"),
 };
 
 export const marketApi = {
