@@ -12,7 +12,7 @@ interface SkeletonProps {
  */
 export function Skeleton({ className }: SkeletonProps) {
   return (
-    <div className={cn("bg-slate-800 animate-pulse rounded", className)} />
+    <div className={cn("bg-[var(--color-bg-secondary)] animate-pulse rounded", className)} />
   );
 }
 
@@ -76,7 +76,7 @@ export function ParagraphSkeleton({ lines = 3 }: { lines?: number }) {
  */
 export function MetricCardSkeleton() {
   return (
-    <div className="bg-[#111823] border border-[#1e2938] rounded-lg p-6">
+    <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg p-6">
       <Skeleton className="h-3 w-16 mb-3" />
       <Skeleton className="h-8 w-24 mb-2" />
       <Skeleton className="h-3 w-20" />
@@ -96,7 +96,7 @@ export function MetricCardSkeleton() {
  */
 export function CardSkeleton() {
   return (
-    <div className="bg-[#111823] border border-[#1e2938] rounded-lg p-6">
+    <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg p-6">
       <Skeleton className="h-6 w-32 mb-4" />
       <div className="space-y-2">
         <Skeleton className="h-4 w-full" />
@@ -123,7 +123,7 @@ export function CardSkeleton() {
  */
 export function TableRowSkeleton({ columns = 5 }: { columns?: number }) {
   return (
-    <tr className="border-b border-[#1e2938]">
+    <tr className="border-b border-[var(--color-border)]">
       {Array.from({ length: columns }).map((_, i) => (
         <td key={i} className="px-4 py-3">
           <Skeleton className={cn("h-4", i === 0 ? "w-20" : i === columns - 1 ? "w-16" : "w-32")} />
@@ -145,9 +145,9 @@ export function TableRowSkeleton({ columns = 5 }: { columns?: number }) {
  */
 export function StockTableSkeleton({ rows = 5 }: { rows?: number }) {
   return (
-    <div className="rounded-lg border border-[#1e2938] bg-[#0a0e14] overflow-hidden">
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-primary)] overflow-hidden">
       <table className="w-full">
-        <thead className="border-b border-[#1e2938] bg-[#0f1419]">
+        <thead className="border-b border-[var(--color-border)] bg-[var(--color-bg-primary)]">
           <tr>
             <th className="text-left px-4 py-3">
               <Skeleton className="h-3 w-16" />
@@ -188,7 +188,7 @@ export function StockTableSkeleton({ rows = 5 }: { rows?: number }) {
  */
 export function ChartSkeleton({ height = "h-64" }: { height?: string }) {
   return (
-    <div className="bg-[#111823] border border-[#1e2938] rounded-lg p-6">
+    <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg p-6">
       <Skeleton className="h-6 w-32 mb-4" />
       <Skeleton className={cn("w-full", height)} />
     </div>

@@ -5,14 +5,14 @@ import { MetricCard } from '../components/financial/MetricCard';
 
 export function ChartDemo() {
   return (
-    <div className="min-h-screen bg-[#08090c] px-6 py-8">
+    <div className="min-h-screen bg-[var(--color-bg-primary)] px-6 py-8">
       <div className="mx-auto max-w-[1680px]">
         {/* Page Header */}
         <div className="mb-8">
-          <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[#e6edf3]">
+          <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[var(--color-text-primary)]">
             Professional Trading Charts
           </h1>
-          <p className="mt-2 text-[13px] text-[#768390]">
+          <p className="mt-2 text-[13px] text-[var(--color-text-tertiary)]">
             TradingView-style charts with technical indicators
           </p>
         </div>
@@ -53,7 +53,7 @@ export function ChartDemo() {
 
         {/* Professional Candlestick Chart */}
         <div className="mb-8">
-          <h2 className="mb-4 text-[17px] font-semibold text-[#e6edf3]">
+          <h2 className="mb-4 text-[17px] font-semibold text-[var(--color-text-primary)]">
             Candlestick Chart (Stock Price)
           </h2>
           <ProfessionalChart 
@@ -64,7 +64,7 @@ export function ChartDemo() {
 
         {/* Index Charts */}
         <div className="mb-8">
-          <h2 className="mb-4 text-[17px] font-semibold text-[#e6edf3]">
+          <h2 className="mb-4 text-[17px] font-semibold text-[var(--color-text-primary)]">
             Index Charts (Area/Line)
           </h2>
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -88,8 +88,8 @@ export function ChartDemo() {
         </div>
 
         {/* Features List */}
-        <div className="rounded-lg border border-[#30363d] bg-[#0d1117] p-6">
-          <h2 className="mb-4 text-[15px] font-semibold text-[#e6edf3]">
+        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-6">
+          <h2 className="mb-4 text-[15px] font-semibold text-[var(--color-text-primary)]">
             Chart Features
           </h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -141,9 +141,9 @@ function Feature({ title, description }: { title: string; description: string })
     <div className="space-y-1">
       <div className="flex items-center gap-2">
         <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-        <h3 className="text-[13px] font-semibold text-[#e6edf3]">{title}</h3>
+        <h3 className="text-[13px] font-semibold text-[var(--color-text-primary)]">{title}</h3>
       </div>
-      <p className="text-[12px] text-[#768390]">{description}</p>
+      <p className="text-[12px] text-[var(--color-text-tertiary)]">{description}</p>
     </div>
   );
 }

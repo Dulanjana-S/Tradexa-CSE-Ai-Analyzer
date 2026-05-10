@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTheme } from "../../contexts/ThemeContext";
 import { Link, useNavigate } from "react-router";
 import { TrendingUp, Mail, Lock, Loader2, AlertCircle, ArrowLeft } from "lucide-react";
 import { Button } from "../../components/ui/button";
@@ -10,6 +11,7 @@ import { useAuth } from "../../../lib/auth/AuthContext";
 import type { APIError } from "../../../lib/api/client";
 
 export function Login() {
+  const { theme } = useTheme();
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
@@ -55,7 +57,14 @@ export function Login() {
 
         {/* Logo */}
         <Link to="/" className="mb-8 flex items-center justify-center gap-3">
-          <img src="/logo.png" alt="Tradexa.lk" className="h-16 w-auto object-contain" />
+          <img 
+            src="/logo.png" 
+            alt="Tradexa.lk" 
+            className="h-16 w-auto object-contain transition-all" 
+            style={{ 
+              filter: theme === 'light' ? 'invert(1) hue-rotate(180deg) brightness(0.2)' : 'none' 
+            }}
+          />
         </Link>
 
         {/* Login Card */}

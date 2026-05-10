@@ -21,7 +21,7 @@ function statusTone(status?: string) {
     case "active":
       return "bg-red-600/20 text-red-300 border-red-500/30";
     case "archived":
-      return "bg-[#1c2128] text-[#768390] border-[#30363d]";
+      return "bg-[var(--color-bg-elevated)] text-[var(--color-text-tertiary)] border-[var(--color-border)]";
     case "failed":
       return "bg-red-600/20 text-red-300 border-red-500/30";
     default:
@@ -126,20 +126,20 @@ export function ModelManagement() {
   const activeModelObj = useMemo(() => models.find((m) => m.isActive || m.id === activeModel), [models, activeModel]);
 
   return (
-    <div className="min-h-screen bg-[#08090c]">
+    <div className="min-h-screen bg-[var(--color-bg-primary)]">
       <div className="mx-auto max-w-[1680px] px-6 py-8 lg:px-8 space-y-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="space-y-1.5">
-            <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[#e6edf3]">Model Management</h1>
-            <p className="text-[13px] text-[#768390]">Train new alpha versions, compare them, then activate one live model.</p>
+            <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[var(--color-text-primary)]">Model Management</h1>
+            <p className="text-[13px] text-[var(--color-text-tertiary)]">Train new alpha versions, compare them, then activate one live model.</p>
           </div>
-          <div className="rounded-md border border-[#30363d] bg-[#161b22] p-4 xl:min-w-[520px]">
+          <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] p-4 xl:min-w-[520px]">
             <div className="grid gap-3 sm:grid-cols-[1fr_110px_auto]">
               <div className="space-y-1">
-                <Label className="text-[12px] text-[#768390]">Model family</Label>
+                <Label className="text-[12px] text-[var(--color-text-tertiary)]">Model family</Label>
                 <Select value={modelFamily} onValueChange={setModelFamily}>
-                  <SelectTrigger className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]"><SelectValue /></SelectTrigger>
-                  <SelectContent className="border-[#30363d] bg-[#161b22]">
+                  <SelectTrigger className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"><SelectValue /></SelectTrigger>
+                  <SelectContent className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
                     <SelectItem value="auto">Auto compare installed models</SelectItem>
                     <SelectItem value="baseline">Baseline</SelectItem>
                     <SelectItem value="sklearn_gbdt">Sklearn GBDT</SelectItem>
@@ -150,11 +150,11 @@ export function ModelManagement() {
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label className="text-[12px] text-[#768390]">Horizon</Label>
-                <Input type="number" min={1} max={10} value={horizonDays} onChange={(e) => setHorizonDays(Number(e.target.value) || 1)} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
+                <Label className="text-[12px] text-[var(--color-text-tertiary)]">Horizon</Label>
+                <Input type="number" min={1} max={10} value={horizonDays} onChange={(e) => setHorizonDays(Number(e.target.value) || 1)} className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]" />
               </div>
               <div className="flex items-end gap-2">
-                <Button variant="outline" className="border-[#30363d] text-[#e6edf3] hover:bg-[#1c2128]" onClick={() => load()}><RefreshCw className="mr-2 h-4 w-4" /> Refresh</Button>
+                <Button variant="outline" className="border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]" onClick={() => load()}><RefreshCw className="mr-2 h-4 w-4" /> Refresh</Button>
                 <Button onClick={triggerTraining} disabled={busyId === "__train__"} className="bg-emerald-600 text-white hover:bg-emerald-700">
                   {busyId === "__train__" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />} Train Alpha
                 </Button>
@@ -164,16 +164,16 @@ export function ModelManagement() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">
-          <Card className="border-[#30363d] bg-[#161b22]"><CardHeader className="pb-2"><CardDescription className="text-[#768390]">Registry</CardDescription></CardHeader><CardContent><div className="text-[28px] font-bold text-[#e6edf3]">{modelCounts.total}</div></CardContent></Card>
-          <Card className="border-[#30363d] bg-[#161b22]"><CardHeader className="pb-2"><CardDescription className="text-[#768390]">Active</CardDescription></CardHeader><CardContent><div className="text-[16px] font-bold text-[#e6edf3] break-all">{activeModel || "—"}</div></CardContent></Card>
-          <Card className="border-[#30363d] bg-[#161b22]"><CardHeader className="pb-2"><CardDescription className="text-[#768390]">Alpha</CardDescription></CardHeader><CardContent><div className="text-[28px] font-bold text-blue-300">{modelCounts.alpha}</div></CardContent></Card>
-          <Card className="border-[#30363d] bg-[#161b22]"><CardHeader className="pb-2"><CardDescription className="text-[#768390]">Archived</CardDescription></CardHeader><CardContent><div className="text-[28px] font-bold text-[#e6edf3]">{modelCounts.archived}</div></CardContent></Card>
+          <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]"><CardHeader className="pb-2"><CardDescription className="text-[var(--color-text-tertiary)]">Registry</CardDescription></CardHeader><CardContent><div className="text-[28px] font-bold text-[var(--color-text-primary)]">{modelCounts.total}</div></CardContent></Card>
+          <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]"><CardHeader className="pb-2"><CardDescription className="text-[var(--color-text-tertiary)]">Active</CardDescription></CardHeader><CardContent><div className="text-[16px] font-bold text-[var(--color-text-primary)] break-all">{activeModel || "—"}</div></CardContent></Card>
+          <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]"><CardHeader className="pb-2"><CardDescription className="text-[var(--color-text-tertiary)]">Alpha</CardDescription></CardHeader><CardContent><div className="text-[28px] font-bold text-blue-300">{modelCounts.alpha}</div></CardContent></Card>
+          <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]"><CardHeader className="pb-2"><CardDescription className="text-[var(--color-text-tertiary)]">Archived</CardDescription></CardHeader><CardContent><div className="text-[28px] font-bold text-[var(--color-text-primary)]">{modelCounts.archived}</div></CardContent></Card>
         </div>
 
         {activeModelObj ? (
-          <Card className="border-[#30363d] bg-[#161b22]">
+          <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
             <CardContent className="p-5">
-              <div className="text-[13px] font-semibold text-[#e6edf3]">Active model capabilities</div>
+              <div className="text-[13px] font-semibold text-[var(--color-text-primary)]">Active model capabilities</div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {[
                   ["Sentiment", Boolean(activeModelObj.summary?.sentiment)],
@@ -181,7 +181,7 @@ export function ModelManagement() {
                   ["FinBERT", Boolean(activeModelObj.summary?.finbertReady)],
                   [`Direction: ${activeModelObj.summary?.directionModel || activeModelObj.meta?.models?.direction || "—"}`, Boolean(activeModelObj.summary?.directionModel || activeModelObj.meta?.models?.direction)],
                 ].map(([name, ok]) => (
-                  <Badge key={String(name)} className={ok ? "bg-emerald-600/20 text-emerald-300 border-emerald-500/30" : "bg-[#1c2128] text-[#768390] border-[#30363d]"}>
+                  <Badge key={String(name)} className={ok ? "bg-emerald-600/20 text-emerald-300 border-emerald-500/30" : "bg-[var(--color-bg-elevated)] text-[var(--color-text-tertiary)] border-[var(--color-border)]"}>
                     {String(name)}
                   </Badge>
                 ))}
@@ -189,7 +189,7 @@ export function ModelManagement() {
             </CardContent>
           </Card>
         ) : modelHealth?.capabilities ? (
-          <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-5"><div className="text-[13px] font-semibold text-[#e6edf3]">Engine availability</div><div className="mt-3 flex flex-wrap gap-2">{[["Baseline", true],["Sklearn GBDT", Boolean(modelHealth.capabilities.sklearnGbdt)],["LightGBM", Boolean(modelHealth.capabilities.lightgbm)],["XGBoost", Boolean(modelHealth.capabilities.xgboost)],["CatBoost", Boolean(modelHealth.capabilities.catboost)],["FinBERT", Boolean(modelHealth.capabilities.finbertAvailable)]].map(([name, ok]) => <Badge key={String(name)} className={ok ? "bg-emerald-600/20 text-emerald-300 border-emerald-500/30" : "bg-[#1c2128] text-[#768390] border-[#30363d]"}>{String(name)}</Badge>)}</div></CardContent></Card>
+          <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]"><CardContent className="p-5"><div className="text-[13px] font-semibold text-[var(--color-text-primary)]">Engine availability</div><div className="mt-3 flex flex-wrap gap-2">{[["Baseline", true],["Sklearn GBDT", Boolean(modelHealth.capabilities.sklearnGbdt)],["LightGBM", Boolean(modelHealth.capabilities.lightgbm)],["XGBoost", Boolean(modelHealth.capabilities.xgboost)],["CatBoost", Boolean(modelHealth.capabilities.catboost)],["FinBERT", Boolean(modelHealth.capabilities.finbertAvailable)]].map(([name, ok]) => <Badge key={String(name)} className={ok ? "bg-emerald-600/20 text-emerald-300 border-emerald-500/30" : "bg-[var(--color-bg-elevated)] text-[var(--color-text-tertiary)] border-[var(--color-border)]"}>{String(name)}</Badge>)}</div></CardContent></Card>
         ) : null}
 
         <Tabs defaultValue="models" className="space-y-6">
@@ -201,15 +201,15 @@ export function ModelManagement() {
 
           <TabsContent value="models">
             <div className="grid gap-6 xl:grid-cols-2">
-              {loading ? <Card className="border-[#30363d] bg-[#161b22] xl:col-span-2"><CardContent className="py-16 text-center text-[#768390]"><Loader2 className="mr-2 inline h-5 w-5 animate-spin" /> Loading models...</CardContent></Card> : models.map((model) => (
-                <Card key={model.id} className="border-[#30363d] bg-[#161b22]">
+              {loading ? <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)] xl:col-span-2"><CardContent className="py-16 text-center text-[var(--color-text-tertiary)]"><Loader2 className="mr-2 inline h-5 w-5 animate-spin" /> Loading models...</CardContent></Card> : models.map((model) => (
+                <Card key={model.id} className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
                   <CardHeader>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3">
                         <Cpu className="h-5 w-5 text-blue-500 mt-1" />
                         <div>
-                          <CardTitle className="text-[18px] text-[#e6edf3]">{model.name || model.id}</CardTitle>
-                          <CardDescription className="text-[13px] text-[#768390]">{model.id}</CardDescription>
+                          <CardTitle className="text-[18px] text-[var(--color-text-primary)]">{model.name || model.id}</CardTitle>
+                          <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">{model.id}</CardDescription>
                         </div>
                       </div>
                       <Badge className={statusTone(model.lifecycleStatus || model.status)}>{model.lifecycleStatus || model.status}</Badge>
@@ -217,18 +217,18 @@ export function ModelManagement() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="rounded-md border border-[#30363d] bg-[#0d1117] p-4"><div className="text-[12px] text-[#768390]">Validation AUC</div><div className="text-[24px] font-bold text-[#e6edf3]">{metric(model.meta?.metrics_holdout?.auc_up)}</div><div className="mt-1 text-[11px] text-[#768390]">Family: {model.summary?.family || model.meta?.model_family_requested || "baseline"}</div></div>
-                      <div className="rounded-md border border-[#30363d] bg-[#0d1117] p-4"><div className="text-[12px] text-[#768390]">Strong-signal Accuracy</div><div className="text-[24px] font-bold text-[#e6edf3]">{metric(model.meta?.metrics_holdout?.strong_signal_acc_up)}</div><div className="mt-1 text-[11px] text-[#768390]">Created: {model.createdAt || "—"}</div></div>
+                      <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4"><div className="text-[12px] text-[var(--color-text-tertiary)]">Validation AUC</div><div className="text-[24px] font-bold text-[var(--color-text-primary)]">{metric(model.meta?.metrics_holdout?.auc_up)}</div><div className="mt-1 text-[11px] text-[var(--color-text-tertiary)]">Family: {model.summary?.family || model.meta?.model_family_requested || "baseline"}</div></div>
+                      <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4"><div className="text-[12px] text-[var(--color-text-tertiary)]">Strong-signal Accuracy</div><div className="text-[24px] font-bold text-[var(--color-text-primary)]">{metric(model.meta?.metrics_holdout?.strong_signal_acc_up)}</div><div className="mt-1 text-[11px] text-[var(--color-text-tertiary)]">Created: {model.createdAt || "—"}</div></div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <Badge className="border-[#30363d] bg-[#0d1117] text-[#c9d1d9]">Sentiment: {model.summary?.sentiment ? "Yes" : "No"}</Badge>
-                      <Badge className="border-[#30363d] bg-[#0d1117] text-[#c9d1d9]">Macro: {model.summary?.macro ? "Yes" : "No"}</Badge>
-                      <Badge className="border-[#30363d] bg-[#0d1117] text-[#c9d1d9]">FinBERT: {model.summary?.finbertReady ? "Ready" : "No"}</Badge>
-                      <Badge className="border-[#30363d] bg-[#0d1117] text-[#c9d1d9]">Direction: {model.summary?.directionModel || model.meta?.models?.direction || "—"}</Badge>
+                      <Badge className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]">Sentiment: {model.summary?.sentiment ? "Yes" : "No"}</Badge>
+                      <Badge className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]">Macro: {model.summary?.macro ? "Yes" : "No"}</Badge>
+                      <Badge className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]">FinBERT: {model.summary?.finbertReady ? "Ready" : "No"}</Badge>
+                      <Badge className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]">Direction: {model.summary?.directionModel || model.meta?.models?.direction || "—"}</Badge>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Button onClick={() => activate(model.id)} disabled={busyId === model.id || model.isActive} className={model.isActive ? "bg-red-600 text-white hover:bg-red-700" : "bg-blue-600 text-white hover:bg-blue-700"}>{busyId === model.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Rocket className="mr-2 h-4 w-4" />}{model.isActive ? "Currently Active" : "Activate"}</Button>
-                      <Button variant="outline" onClick={() => archiveModel(model.id)} disabled={!!model.isActive || busyId === `archive:${model.id}`} className="border-[#30363d] text-[#e6edf3] hover:bg-[#1c2128]"><Archive className="mr-2 h-4 w-4" /> Archive</Button>
+                      <Button variant="outline" onClick={() => archiveModel(model.id)} disabled={!!model.isActive || busyId === `archive:${model.id}`} className="border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]"><Archive className="mr-2 h-4 w-4" /> Archive</Button>
                       <Button variant="outline" onClick={() => deleteModel(model.id)} disabled={!!model.isActive || busyId === `delete:${model.id}`} className="border-red-500/30 text-red-300 hover:bg-red-500/10"><Trash2 className="mr-2 h-4 w-4" /> Delete</Button>
                     </div>
                   </CardContent>
@@ -238,48 +238,48 @@ export function ModelManagement() {
           </TabsContent>
 
           <TabsContent value="compare">
-            <Card className="border-[#30363d] bg-[#161b22]">
+            <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
               <CardHeader>
-                <CardTitle className="text-[18px] text-[#e6edf3]">Compare model versions</CardTitle>
-                <CardDescription className="text-[13px] text-[#768390]">Compare validation quality and feature blocks before activating an alpha model.</CardDescription>
+                <CardTitle className="text-[18px] text-[var(--color-text-primary)]">Compare model versions</CardTitle>
+                <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Compare validation quality and feature blocks before activating an alpha model.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
-                  <Select value={compareA} onValueChange={setCompareA}><SelectTrigger className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]"><SelectValue placeholder="Left model" /></SelectTrigger><SelectContent className="border-[#30363d] bg-[#161b22]">{models.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}</SelectContent></Select>
-                  <Select value={compareB} onValueChange={setCompareB}><SelectTrigger className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]"><SelectValue placeholder="Right model" /></SelectTrigger><SelectContent className="border-[#30363d] bg-[#161b22]">{models.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}</SelectContent></Select>
+                  <Select value={compareA} onValueChange={setCompareA}><SelectTrigger className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"><SelectValue placeholder="Left model" /></SelectTrigger><SelectContent className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">{models.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}</SelectContent></Select>
+                  <Select value={compareB} onValueChange={setCompareB}><SelectTrigger className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"><SelectValue placeholder="Right model" /></SelectTrigger><SelectContent className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">{models.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}</SelectContent></Select>
                   <Button onClick={runCompare} disabled={!compareA || !compareB || compareA === compareB || busyId === "__compare__"} className="bg-violet-600 text-white hover:bg-violet-700">{busyId === "__compare__" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GitCompareArrows className="mr-2 h-4 w-4" />} Compare</Button>
                 </div>
                 {comparison ? (
                   <div className="grid gap-4 lg:grid-cols-2">
                     {[comparison.left, comparison.right].map((side, idx) => (
-                      <div key={idx} className="rounded-md border border-[#30363d] bg-[#0d1117] p-4 space-y-3">
-                        <div className="flex items-center justify-between gap-3"><div className="font-semibold text-[#e6edf3]">{side.displayName}</div><Badge className={statusTone(side.status)}>{side.status}</Badge></div>
-                        <div className="text-[12px] text-[#768390]">Family: {side.family}</div>
+                      <div key={idx} className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4 space-y-3">
+                        <div className="flex items-center justify-between gap-3"><div className="font-semibold text-[var(--color-text-primary)]">{side.displayName}</div><Badge className={statusTone(side.status)}>{side.status}</Badge></div>
+                        <div className="text-[12px] text-[var(--color-text-tertiary)]">Family: {side.family}</div>
                         <div className="grid gap-2 sm:grid-cols-2 text-[13px]">
-                          <div className="rounded-md border border-[#30363d] p-3"><div className="text-[#768390]">AUC</div><div className="font-semibold text-[#e6edf3]">{metric(side.metrics?.auc_up)}</div></div>
-                          <div className="rounded-md border border-[#30363d] p-3"><div className="text-[#768390]">Accuracy</div><div className="font-semibold text-[#e6edf3]">{metric(side.metrics?.acc_up)}</div></div>
-                          <div className="rounded-md border border-[#30363d] p-3"><div className="text-[#768390]">Strong Accuracy</div><div className="font-semibold text-[#e6edf3]">{metric(side.metrics?.strong_signal_acc_up)}</div></div>
-                          <div className="rounded-md border border-[#30363d] p-3"><div className="text-[#768390]">Coverage</div><div className="font-semibold text-[#e6edf3]">{metric(side.metrics?.strong_signal_coverage)}</div></div>
+                          <div className="rounded-md border border-[var(--color-border)] p-3"><div className="text-[var(--color-text-tertiary)]">AUC</div><div className="font-semibold text-[var(--color-text-primary)]">{metric(side.metrics?.auc_up)}</div></div>
+                          <div className="rounded-md border border-[var(--color-border)] p-3"><div className="text-[var(--color-text-tertiary)]">Accuracy</div><div className="font-semibold text-[var(--color-text-primary)]">{metric(side.metrics?.acc_up)}</div></div>
+                          <div className="rounded-md border border-[var(--color-border)] p-3"><div className="text-[var(--color-text-tertiary)]">Strong Accuracy</div><div className="font-semibold text-[var(--color-text-primary)]">{metric(side.metrics?.strong_signal_acc_up)}</div></div>
+                          <div className="rounded-md border border-[var(--color-border)] p-3"><div className="text-[var(--color-text-tertiary)]">Coverage</div><div className="font-semibold text-[var(--color-text-primary)]">{metric(side.metrics?.strong_signal_coverage)}</div></div>
                         </div>
-                        <div className="flex flex-wrap gap-2">{Object.entries(side.featureBlocks || {}).map(([k, v]) => <Badge key={k} className={v ? "bg-emerald-600/20 text-emerald-300 border-emerald-500/30" : "bg-[#1c2128] text-[#768390] border-[#30363d]"}>{k}: {v ? "Yes" : "No"}</Badge>)}</div>
+                        <div className="flex flex-wrap gap-2">{Object.entries(side.featureBlocks || {}).map(([k, v]) => <Badge key={k} className={v ? "bg-emerald-600/20 text-emerald-300 border-emerald-500/30" : "bg-[var(--color-bg-elevated)] text-[var(--color-text-tertiary)] border-[var(--color-border)]"}>{k}: {v ? "Yes" : "No"}</Badge>)}</div>
                       </div>
                     ))}
                   </div>
-                ) : <p className="text-[13px] text-[#768390]">Choose two models to compare.</p>}
+                ) : <p className="text-[13px] text-[var(--color-text-tertiary)]">Choose two models to compare.</p>}
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="training">
-            <Card className="border-[#30363d] bg-[#161b22]">
+            <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
               <CardHeader>
-                <CardTitle className="text-[18px] text-[#e6edf3]">Training Jobs</CardTitle>
-                <CardDescription className="text-[13px] text-[#768390]">Recent training-related jobs and their status.</CardDescription>
+                <CardTitle className="text-[18px] text-[var(--color-text-primary)]">Training Jobs</CardTitle>
+                <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Recent training-related jobs and their status.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 {jobs.filter((job) => String(job.type).toLowerCase().includes("train") || String(job.name).toLowerCase().includes("train")).slice(0, 12).map((job) => (
-                  <div key={job.id} className="rounded-md border border-[#30363d] bg-[#0d1117] p-4">
-                    <div className="flex items-center justify-between gap-3"><div><div className="text-[13px] font-semibold text-[#e6edf3]">{job.name}</div><div className="text-[12px] text-[#768390]">{job.startedAt || "—"}</div></div><Badge variant="outline" className="border-[#30363d] text-[#768390]">{job.status}</Badge></div>
+                  <div key={job.id} className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4">
+                    <div className="flex items-center justify-between gap-3"><div><div className="text-[13px] font-semibold text-[var(--color-text-primary)]">{job.name}</div><div className="text-[12px] text-[var(--color-text-tertiary)]">{job.startedAt || "—"}</div></div><Badge variant="outline" className="border-[var(--color-border)] text-[var(--color-text-tertiary)]">{job.status}</Badge></div>
                   </div>
                 ))}
               </CardContent>

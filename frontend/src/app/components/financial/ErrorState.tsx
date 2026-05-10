@@ -39,7 +39,7 @@ export function ErrorState({
   }
 
   return (
-    <Card className="bg-[#111823] border-red-700/40 shadow-sm">
+    <Card className="bg-[var(--color-bg-secondary)] border-red-700/40 shadow-sm">
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2.5 text-red-400 text-lg">
           <AlertTriangle className="h-5 w-5" />
@@ -47,7 +47,7 @@ export function ErrorState({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-slate-300 text-sm">{message}</p>
+        <p className="text-[var(--color-text-secondary)] text-sm">{message}</p>
         {onRetry && (
           <Button
             onClick={onRetry}

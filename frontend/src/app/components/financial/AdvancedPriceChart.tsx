@@ -4,6 +4,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
 import { createChart, CandlestickSeries, HistogramSeries, LineSeries, IChartApi, ISeriesApi, CandlestickData, LineData, HistogramData } from 'lightweight-charts';
 import { Card, CardContent, CardHeader } from '../ui/card';
 import { Button } from '../ui/button';
@@ -48,6 +49,7 @@ export function AdvancedPriceChart({
   showIndicators = true,
   className,
 }: AdvancedPriceChartProps) {
+  const { theme } = useTheme();
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -130,15 +132,15 @@ export function AdvancedPriceChart({
     // Create chart
     const chart = createChart(chartContainerRef.current, {
       layout: {
-        background: { color: '#08090c' },
-        textColor: '#768390',
+        background: { type: 0, color: 'transparent' },
+        textColor: theme === 'light' ? '#4b5563' : '#adbac7',
         fontSize: 12,
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         attributionLogo: false,
       },
       grid: {
-        vertLines: { color: '#161b2233' },
-        horzLines: { color: '#161b2233' },
+        vertLines: { color: 'rgba(118, 131, 144, 0.1)' },
+        horzLines: { color: 'rgba(118, 131, 144, 0.1)' },
       },
       crosshair: {
         mode: 1,
@@ -156,14 +158,14 @@ export function AdvancedPriceChart({
         },
       },
       rightPriceScale: {
-        borderColor: '#30363d',
+        borderColor: 'rgba(118, 131, 144, 0.2)',
         scaleMargins: {
           top: 0.1,
           bottom: showVolume ? 0.25 : 0.1,
         },
       },
       timeScale: {
-        borderColor: '#30363d',
+        borderColor: 'rgba(118, 131, 144, 0.2)',
         timeVisible: true,
         secondsVisible: false,
         rightOffset: 12,
@@ -366,16 +368,16 @@ export function AdvancedPriceChart({
   const isPositive = priceChange >= 0;
 
   return (
-    <Card className={cn('border-[#30363d] bg-[#0d1117] shadow-none overflow-hidden', className)}>
+    <Card className={cn('border-[var(--color-border)] bg-[var(--color-bg-primary)] shadow-none overflow-hidden', className)}>
       {/* Chart Header */}
-      <CardHeader className="border-b border-[#21262d] px-5 py-3">
+      <CardHeader className="border-b border-[var(--color-border)] px-5 py-3">
         <div className="flex flex-col gap-4">
           {/* Top Row - Symbol and Price */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <h3 className="text-[15px] font-bold text-[#e6edf3]">{symbol}</h3>
+              <h3 className="text-[15px] font-bold text-[var(--color-text-primary)]">{symbol}</h3>
               <div className="flex items-baseline gap-2">
-                <span className="text-[20px] font-bold tabular-nums text-[#e6edf3]">
+                <span className="text-[20px] font-bold tabular-nums text-[var(--color-text-primary)]">
                   {currentPrice.toFixed(2)}
                 </span>
                 <Badge
@@ -396,7 +398,7 @@ export function AdvancedPriceChart({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-[#768390] hover:bg-[#161b22] hover:text-[#e6edf3]"
+                className="h-8 w-8 text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]"
                 onClick={() => setIsFullscreen(!isFullscreen)}
               >
                 <Maximize2 className="h-4 w-4" />
@@ -404,14 +406,14 @@ export function AdvancedPriceChart({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-[#768390] hover:bg-[#161b22] hover:text-[#e6edf3]"
+                className="h-8 w-8 text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]"
               >
                 <Download className="h-4 w-4" />
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-[#768390] hover:bg-[#161b22] hover:text-[#e6edf3]"
+                className="h-8 w-8 text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]"
               >
                 <Settings className="h-4 w-4" />
               </Button>
@@ -421,7 +423,7 @@ export function AdvancedPriceChart({
           {/* Bottom Row - Timeframe and Indicators */}
           <div className="flex items-center justify-between">
             {/* Timeframe Selector */}
-            <div className="flex items-center gap-0.5 bg-[#0a0e14] rounded-lg p-0.5 border border-[#1e2938]">
+            <div className="flex items-center gap-0.5 bg-[var(--color-bg-primary)] rounded-lg p-0.5 border border-[var(--color-border)]">
               {timeframes.map((tf) => (
                 <Button
                   key={tf}
@@ -431,7 +433,7 @@ export function AdvancedPriceChart({
                     'h-7 px-3 text-[11px] font-semibold transition-all',
                     timeframe === tf
                       ? 'bg-emerald-600 text-white shadow-sm'
-                      : 'text-[#768390] hover:text-[#e6edf3] hover:bg-[#161b22]'
+                      : 'text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)]'
                   )}
                   onClick={() => setTimeframe(tf as any)}
                 >
@@ -442,13 +444,13 @@ export function AdvancedPriceChart({
 
             {/* Indicator Toggles */}
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-semibold uppercase text-[#768390]">Indicators:</span>
+              <span className="text-[11px] font-semibold uppercase text-[var(--color-text-tertiary)]">Indicators:</span>
               <Button
                 variant="ghost"
                 size="sm"
                 className={cn(
                   'h-7 px-2.5 text-[11px] font-semibold',
-                  indicators.sma20 ? 'bg-[#d2992233] text-[#d29922]' : 'text-[#768390]'
+                  indicators.sma20 ? 'bg-[#d2992233] text-[#d29922]' : 'text-[var(--color-text-tertiary)]'
                 )}
                 onClick={() => toggleIndicator('sma20')}
               >
@@ -459,7 +461,7 @@ export function AdvancedPriceChart({
                 size="sm"
                 className={cn(
                   'h-7 px-2.5 text-[11px] font-semibold',
-                  indicators.sma50 ? 'bg-[#a371f733] text-[#a371f7]' : 'text-[#768390]'
+                  indicators.sma50 ? 'bg-[#a371f733] text-[#a371f7]' : 'text-[var(--color-text-tertiary)]'
                 )}
                 onClick={() => toggleIndicator('sma50')}
               >
@@ -470,7 +472,7 @@ export function AdvancedPriceChart({
                 size="sm"
                 className={cn(
                   'h-7 px-2.5 text-[11px] font-semibold',
-                  indicators.bollingerBands ? 'bg-[#58a6ff33] text-[#58a6ff]' : 'text-[#768390]'
+                  indicators.bollingerBands ? 'bg-[#58a6ff33] text-[#58a6ff]' : 'text-[var(--color-text-tertiary)]'
                 )}
                 onClick={() => toggleIndicator('bollingerBands')}
               >
@@ -479,7 +481,7 @@ export function AdvancedPriceChart({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 text-[#768390] hover:bg-[#161b22] hover:text-[#e6edf3]"
+                className="h-7 w-7 text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]"
               >
                 <Plus className="h-3.5 w-3.5" />
               </Button>

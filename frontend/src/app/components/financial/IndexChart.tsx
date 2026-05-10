@@ -4,6 +4,7 @@ import { Card, CardHeader } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { TrendingUp, TrendingDown, RefreshCw, Maximize2, Activity } from 'lucide-react';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface IndexChartProps {
   title: string;
@@ -39,6 +40,7 @@ export function IndexChart({
   height = 320,
   data,
 }: IndexChartProps) {
+  const { theme } = useTheme();
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const lineSeriesRef = useRef<any>(null);
@@ -97,17 +99,17 @@ export function IndexChart({
 
     const chart = createChart(chartContainerRef.current, {
       layout: {
-        background: { color: '#0d1117' },
-        textColor: '#768390',
+        background: { type: 0, color: 'transparent' },
+        textColor: theme === 'light' ? '#4b5563' : '#adbac7',
         attributionLogo: false,
       },
       grid: {
-        vertLines: { color: '#161b2244' },
-        horzLines: { color: '#161b2244' },
+        vertLines: { color: 'rgba(118, 131, 144, 0.1)' },
+        horzLines: { color: 'rgba(118, 131, 144, 0.1)' },
       },
-      rightPriceScale: { borderColor: '#30363d' },
+      rightPriceScale: { borderColor: 'rgba(118, 131, 144, 0.2)' },
       timeScale: {
-        borderColor: '#30363d',
+        borderColor: 'rgba(118, 131, 144, 0.2)',
         timeVisible: true,
         secondsVisible: false,
       },
@@ -137,23 +139,23 @@ export function IndexChart({
   }, [color, series]);
 
   return (
-    <Card className="border-[#30363d] bg-[#0d1117] shadow-none overflow-hidden">
-      <CardHeader className="border-b border-[#21262d] px-5 py-3">
+    <Card className="border-[var(--color-border)] bg-[var(--color-bg-primary)] shadow-none overflow-hidden">
+      <CardHeader className="border-b border-[var(--color-border)] px-5 py-3">
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div>
-                <h3 className="text-base font-bold text-[#e6edf3]">{title}</h3>
-                <p className="text-[11px] text-[#768390]">{symbol}</p>
+                <h3 className="text-base font-bold text-[var(--color-text-primary)]">{title}</h3>
+                <p className="text-[11px] text-[var(--color-text-tertiary)]">{symbol}</p>
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold tabular-nums text-[#e6edf3]">
+                <span className="text-2xl font-bold tabular-nums text-[var(--color-text-primary)]">
                   {currentValue.toFixed(2)}
                 </span>
                 <Badge
                   className={`gap-1 text-[11px] font-bold ${isPositive
-                      ? 'bg-emerald-600/20 text-emerald-500 border-emerald-500/30'
-                      : 'bg-red-600/20 text-red-500 border-red-500/30'
+                    ? 'bg-emerald-600/20 text-emerald-500 border-emerald-500/30'
+                    : 'bg-red-600/20 text-red-500 border-red-500/30'
                     }`}
                 >
                   {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
@@ -165,26 +167,26 @@ export function IndexChart({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-[#768390] hover:bg-[#161b22] hover:text-[#e6edf3]"
+                className="h-8 w-8 text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]"
                 onClick={() => chartRef.current?.timeScale().fitContent()}
               >
                 <RefreshCw className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-[#768390] hover:bg-[#161b22] hover:text-[#e6edf3]">
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]">
                 <Maximize2 className="h-4 w-4" />
               </Button>
             </div>
           </div>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-0.5 bg-[#0a0e14] rounded-lg p-0.5 border border-[#1e2938]">
+            <div className="flex items-center gap-0.5 bg-[var(--color-bg-primary)] rounded-lg p-0.5 border border-[var(--color-border)]">
               {['1M', '3M', '6M', '1Y', 'ALL'].map((tf) => (
                 <Button
                   key={tf}
                   variant="ghost"
                   size="sm"
                   className={`h-7 px-3 text-[11px] font-semibold transition-all ${timeframe === tf
-                      ? 'bg-emerald-600 text-white shadow-sm'
-                      : 'text-[#768390] hover:text-[#e6edf3] hover:bg-[#161b22]'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)]'
                     }`}
                   onClick={() => setTimeframe(tf)}
                 >
@@ -192,7 +194,7 @@ export function IndexChart({
                 </Button>
               ))}
             </div>
-            <div className="flex items-center gap-1 text-[11px] font-semibold text-[#768390]">
+            <div className="flex items-center gap-1 text-[11px] font-semibold text-[var(--color-text-tertiary)]">
               <Activity className="h-3 w-3" /> Live index trend
             </div>
           </div>
@@ -201,7 +203,7 @@ export function IndexChart({
       {series.length > 0 ? (
         <div ref={chartContainerRef} className="w-full" style={{ height: `${height}px` }} />
       ) : (
-        <div className="flex h-[320px] items-center justify-center text-sm text-[#768390]">
+        <div className="flex h-[320px] items-center justify-center text-sm text-[var(--color-text-tertiary)]">
           No index data available.
         </div>
       )}

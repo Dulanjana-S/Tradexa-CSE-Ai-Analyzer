@@ -46,28 +46,28 @@ export function AnnouncementReview() {
   };
 
   return (
-    <div className="min-h-screen bg-[#08090c]">
+    <div className="min-h-screen bg-[var(--color-bg-primary)]">
       <div className="mx-auto max-w-[1680px] px-6 py-8 lg:px-8 space-y-8">
         <div className="space-y-1.5">
-          <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[#e6edf3]">Announcement Triage</h1>
-          <p className="text-[13px] text-[#768390]">CSE announcements are imported automatically. Admin only highlights, tags, or hides items for users when needed.</p>
+          <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[var(--color-text-primary)]">Announcement Triage</h1>
+          <p className="text-[13px] text-[var(--color-text-tertiary)]">CSE announcements are imported automatically. Admin only highlights, tags, or hides items for users when needed.</p>
         </div>
 
-        <Card className="border-[#30363d] bg-[#161b22]">
+        <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
           <CardHeader>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <CardTitle className="text-[18px] text-[#e6edf3]">Imported Announcements</CardTitle>
-                <CardDescription className="text-[13px] text-[#768390]">Mark important announcements for watchlist users or hide duplicates and bad imports.</CardDescription>
+                <CardTitle className="text-[18px] text-[var(--color-text-primary)]">Imported Announcements</CardTitle>
+                <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Mark important announcements for watchlist users or hide duplicates and bad imports.</CardDescription>
               </div>
               <div className="flex flex-col gap-3 sm:flex-row">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#768390]" />
-                  <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search announcements" className="w-full sm:w-72 border-[#30363d] bg-[#0d1117] pl-10 text-[#e6edf3]" />
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-tertiary)]" />
+                  <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search announcements" className="w-full sm:w-72 border-[var(--color-border)] bg-[var(--color-bg-secondary)] pl-10 text-[var(--color-text-primary)]" />
                 </div>
                 <Select value={importanceFilter} onValueChange={setImportanceFilter}>
-                  <SelectTrigger className="h-10 w-full border-[#30363d] bg-[#0d1117] text-[13px] text-[#e6edf3] sm:w-40"><SelectValue /></SelectTrigger>
-                  <SelectContent className="border-[#30363d] bg-[#161b22]">
+                  <SelectTrigger className="h-10 w-full border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[13px] text-[var(--color-text-primary)] sm:w-40"><SelectValue /></SelectTrigger>
+                  <SelectContent className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
                     <SelectItem value="all">All Levels</SelectItem>
                     <SelectItem value="critical">Critical</SelectItem>
                     <SelectItem value="high">High</SelectItem>
@@ -80,25 +80,25 @@ export function AnnouncementReview() {
           </CardHeader>
           <CardContent className="space-y-4">
             {loading ? (
-              <div className="py-16 text-center text-[#768390]"><Loader2 className="mr-2 inline h-5 w-5 animate-spin" /> Loading announcements...</div>
+              <div className="py-16 text-center text-[var(--color-text-tertiary)]"><Loader2 className="mr-2 inline h-5 w-5 animate-spin" /> Loading announcements...</div>
             ) : filtered.length === 0 ? (
-              <div className="py-16 text-center text-[#768390]">No announcements found.</div>
+              <div className="py-16 text-center text-[var(--color-text-tertiary)]">No announcements found.</div>
             ) : filtered.map((announcement) => (
-              <div key={announcement.id} className="rounded-md border border-[#30363d] bg-[#0d1117] p-4">
+              <div key={announcement.id} className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-[15px] font-semibold text-[#e6edf3]">{announcement.title}</h3>
-                      <Badge variant="outline" className="border-[#30363d] text-[#768390]">{announcement.symbol || "Market"}</Badge>
+                      <h3 className="text-[15px] font-semibold text-[var(--color-text-primary)]">{announcement.title}</h3>
+                      <Badge variant="outline" className="border-[var(--color-border)] text-[var(--color-text-tertiary)]">{announcement.symbol || "Market"}</Badge>
                       {announcement.importance && <Badge className="bg-amber-600/20 text-amber-400 border-amber-500/30">{announcement.importance}</Badge>}
-                      {announcement.status && <Badge variant="outline" className="border-[#30363d] text-[#768390]">{announcement.status}</Badge>}
+                      {announcement.status && <Badge variant="outline" className="border-[var(--color-border)] text-[var(--color-text-tertiary)]">{announcement.status}</Badge>}
                     </div>
-                    <p className="text-[13px] text-[#768390]">{announcement.company} • {announcement.category} • {announcement.date}</p>
-                    <p className="text-[13px] text-[#768390]">{announcement.preview}</p>
+                    <p className="text-[13px] text-[var(--color-text-tertiary)]">{announcement.company} • {announcement.category} • {announcement.date}</p>
+                    <p className="text-[13px] text-[var(--color-text-tertiary)]">{announcement.preview}</p>
                     {announcement.tags && announcement.tags.length > 0 && (
                       <div className="flex flex-wrap gap-2">
                         {announcement.tags.map((tag) => (
-                          <Badge key={tag} variant="outline" className="border-[#30363d] text-[#768390]">{tag}</Badge>
+                          <Badge key={tag} variant="outline" className="border-[var(--color-border)] text-[var(--color-text-tertiary)]">{tag}</Badge>
                         ))}
                       </div>
                     )}

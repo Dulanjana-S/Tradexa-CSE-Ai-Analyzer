@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { TrendingUp, Twitter, Facebook, Linkedin, Mail } from "lucide-react";
+import { useTheme } from "../../contexts/ThemeContext";
 
 /**
  * Footer Component
@@ -8,6 +9,7 @@ import { TrendingUp, Twitter, Facebook, Linkedin, Mail } from "lucide-react";
  * Displayed at the bottom of every page.
  */
 export function Footer() {
+  const { theme } = useTheme();
   const currentYear = new Date().getFullYear();
 
   const footerLinks = {
@@ -46,16 +48,23 @@ export function Footer() {
   ];
 
   return (
-    <footer className="bg-[#0f1419] border-t border-[#1e2938] mt-auto">
+    <footer className="bg-[var(--color-bg-primary)] border-t border-[var(--color-border)] mt-auto">
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         {/* Main Footer Content */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 mb-8">
           {/* Brand Column */}
           <div className="col-span-2 md:col-span-4 lg:col-span-1">
             <Link to="/" className="flex items-center gap-2.5 mb-4">
-              <img src="/logo.png" alt="Tradexa.lk" className="h-12 w-auto object-contain" />
+              <img 
+                src="/logo.png" 
+                alt="Tradexa.lk" 
+                className="h-12 w-auto object-contain transition-all" 
+                style={{ 
+                  filter: theme === 'light' ? 'invert(1) hue-rotate(180deg) brightness(0.2)' : 'none' 
+                }}
+              />
             </Link>
-            <p className="text-sm text-slate-400 mb-4">
+            <p className="text-sm text-[var(--color-text-tertiary)] mb-4">
               Professional stock market analytics platform for the Colombo Stock Exchange.
             </p>
             <div className="flex items-center gap-3">
@@ -67,7 +76,7 @@ export function Footer() {
                     href={social.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-9 h-9 rounded-lg bg-[#1e2938] border border-[#1e2938] hover:border-emerald-600/30 hover:bg-[#1e2938] flex items-center justify-center text-slate-400 hover:text-emerald-500 transition-colors"
+                    className="w-9 h-9 rounded-lg bg-[var(--color-border)] border border-[var(--color-border)] hover:border-emerald-600/30 hover:bg-[var(--color-border)] flex items-center justify-center text-[var(--color-text-tertiary)] hover:text-emerald-500 transition-colors"
                     aria-label={social.name}
                   >
                     <Icon className="h-4 w-4" />
@@ -79,7 +88,7 @@ export function Footer() {
 
           {/* Product Links */}
           <div>
-            <h3 className="text-sm font-semibold text-slate-50 uppercase tracking-wider mb-4">
+            <h3 className="text-sm font-semibold text-[var(--color-text-primary)] uppercase tracking-wider mb-4">
               Product
             </h3>
             <ul className="space-y-2.5">
@@ -87,7 +96,7 @@ export function Footer() {
                 <li key={link.path}>
                   <Link
                     to={link.path}
-                    className="text-sm text-slate-400 hover:text-emerald-500 transition-colors"
+                    className="text-sm text-[var(--color-text-tertiary)] hover:text-emerald-500 transition-colors"
                   >
                     {link.name}
                   </Link>
@@ -98,7 +107,7 @@ export function Footer() {
 
           {/* About Links */}
           <div>
-            <h3 className="text-sm font-semibold text-slate-50 uppercase tracking-wider mb-4">
+            <h3 className="text-sm font-semibold text-[var(--color-text-primary)] uppercase tracking-wider mb-4">
               About
             </h3>
             <ul className="space-y-2.5">
@@ -106,7 +115,7 @@ export function Footer() {
                 <li key={link.path}>
                   <Link
                     to={link.path}
-                    className="text-sm text-slate-400 hover:text-emerald-500 transition-colors"
+                    className="text-sm text-[var(--color-text-tertiary)] hover:text-emerald-500 transition-colors"
                   >
                     {link.name}
                   </Link>
@@ -117,7 +126,7 @@ export function Footer() {
 
           {/* Legal Links */}
           <div>
-            <h3 className="text-sm font-semibold text-slate-50 uppercase tracking-wider mb-4">
+            <h3 className="text-sm font-semibold text-[var(--color-text-primary)] uppercase tracking-wider mb-4">
               Legal
             </h3>
             <ul className="space-y-2.5">
@@ -125,7 +134,7 @@ export function Footer() {
                 <li key={link.path}>
                   <Link
                     to={link.path}
-                    className="text-sm text-slate-400 hover:text-emerald-500 transition-colors"
+                    className="text-sm text-[var(--color-text-tertiary)] hover:text-emerald-500 transition-colors"
                   >
                     {link.name}
                   </Link>
@@ -136,7 +145,7 @@ export function Footer() {
 
           {/* Support Links */}
           <div>
-            <h3 className="text-sm font-semibold text-slate-50 uppercase tracking-wider mb-4">
+            <h3 className="text-sm font-semibold text-[var(--color-text-primary)] uppercase tracking-wider mb-4">
               Support
             </h3>
             <ul className="space-y-2.5">
@@ -144,7 +153,7 @@ export function Footer() {
                 <li key={link.path}>
                   <Link
                     to={link.path}
-                    className="text-sm text-slate-400 hover:text-emerald-500 transition-colors"
+                    className="text-sm text-[var(--color-text-tertiary)] hover:text-emerald-500 transition-colors"
                   >
                     {link.name}
                   </Link>
@@ -155,9 +164,9 @@ export function Footer() {
         </div>
 
         {/* Disclaimer */}
-        <div className="border-t border-[#1e2938] pt-8 mb-8">
-          <div className="bg-amber-600/10 border border-amber-600/30 rounded-lg p-4">
-            <p className="text-xs text-amber-200/90 leading-relaxed">
+        <div className="border-t border-[var(--color-border)] pt-8 mb-8">
+          <div className="bg-amber-600/5 border border-amber-600/20 rounded-lg p-4">
+            <p className="text-xs text-amber-700 dark:text-amber-200/90 leading-relaxed">
               <strong className="font-semibold">Disclaimer:</strong> TradexaLK is an independent financial analytics platform.
               Stock market investments involve risk, and past performance does not guarantee future results.
               The information provided is for educational and informational purposes only and should not be
@@ -168,7 +177,7 @@ export function Footer() {
         </div>
 
         {/* Bottom Bar */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--color-text-tertiary)]">
           <div className="flex flex-col sm:flex-row items-center gap-2">
             <p>
               © {currentYear} TradexaLK. All rights reserved.

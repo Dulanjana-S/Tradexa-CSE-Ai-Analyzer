@@ -90,7 +90,7 @@ export function TabsList({ children, className }: TabsListProps) {
   return (
     <div
       role="tablist"
-      className={cn("border-b border-[#1e2938] flex gap-1 overflow-x-auto", className)}
+      className={cn("border-b border-[var(--color-border)] flex gap-1 overflow-x-auto", className)}
     >
       {children}
     </div>
@@ -115,8 +115,8 @@ export function TabsTrigger({ value, children, className }: TabsTriggerProps) {
         "px-4 py-2.5 text-sm font-semibold transition-colors whitespace-nowrap",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0e14]",
         isActive
-          ? "text-emerald-500 border-b-2 border-emerald-500 bg-[#1e2938]/30"
-          : "text-slate-400 hover:text-slate-100 hover:bg-[#1e2938]/50 rounded-t-lg",
+          ? "text-emerald-500 border-b-2 border-emerald-500 bg-[var(--color-border)]/30"
+          : "text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-border)]/50 rounded-t-lg",
         className
       )}
     >

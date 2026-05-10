@@ -103,7 +103,7 @@ export default function ChatWidget() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="mb-4 w-[380px] sm:w-[420px] h-[600px] max-h-[80vh] max-w-[95vw] flex flex-col rounded-2xl shadow-2xl overflow-hidden border border-white/20 bg-white/80 dark:bg-slate-900/90 backdrop-blur-xl"
+            className="mb-4 w-[380px] sm:w-[420px] h-[600px] max-h-[80vh] max-w-[95vw] flex flex-col rounded-2xl shadow-2xl overflow-hidden border border-white/20 bg-white/80 dark:bg-[var(--color-bg-primary)]/90 backdrop-blur-xl"
           >
             {/* Header */}
             <div className="px-5 py-4 bg-gradient-to-r from-teal-600 to-indigo-700 text-white flex items-center justify-between shadow-md">
@@ -144,23 +144,23 @@ export default function ChatWidget() {
             >
               {messages.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-full text-center space-y-4 opacity-80">
-                  <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-full">
+                  <div className="p-4 bg-slate-100 dark:bg-[var(--color-bg-secondary)] rounded-full">
                     <Bot className="w-8 h-8 text-teal-600 dark:text-teal-400" />
                   </div>
                   <div>
-                    <p className="font-medium text-slate-800 dark:text-slate-200">Welcome to Tradexa Assistant</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-[240px] mx-auto mt-1">
+                    <p className="font-medium text-slate-800 dark:text-[var(--color-text-primary)]">Welcome to Tradexa Assistant</p>
+                    <p className="text-xs text-slate-500 dark:text-[var(--color-text-tertiary)] max-w-[240px] mx-auto mt-1">
                       I can explain CSE market trends, stock analysis, or your portfolio performance.
                     </p>
                   </div>
                   <div className="w-full pt-4">
-                    <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-3">Try asking:</p>
+                    <p className="text-[10px] text-[var(--color-text-tertiary)] uppercase tracking-widest font-bold mb-3">Try asking:</p>
                     <div className="flex flex-wrap gap-2 justify-center">
                       {suggestedQuestions.map((q, idx) => (
                         <button
                           key={idx}
                           onClick={() => onSelectSuggestion(q)}
-                          className="px-3 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full hover:border-teal-500 hover:text-teal-600 dark:hover:text-teal-400 transition-all shadow-sm"
+                          className="px-3 py-1.5 text-xs bg-white dark:bg-[var(--color-bg-secondary)] border border-slate-200 dark:border-[var(--color-border)] rounded-full hover:border-teal-500 hover:text-teal-600 dark:hover:text-teal-400 transition-all shadow-sm"
                         >
                           {q}
                         </button>
@@ -192,7 +192,7 @@ export default function ChatWidget() {
                       "max-w-[85%] px-4 py-2.5 rounded-2xl text-sm shadow-sm whitespace-pre-wrap",
                       m.from === "user"
                         ? "bg-indigo-600 text-white rounded-tr-none"
-                        : "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-100 dark:border-slate-700 rounded-tl-none"
+                        : "bg-white dark:bg-[var(--color-bg-secondary)] text-slate-800 dark:text-[var(--color-text-primary)] border border-slate-100 dark:border-[var(--color-border)] rounded-tl-none"
                     )}>
                       {m.text}
                       <div className={cn(
@@ -229,7 +229,7 @@ export default function ChatWidget() {
                   <div className="flex-shrink-0 w-8 h-8 rounded-full bg-teal-50 dark:bg-teal-900/30 border border-teal-100 dark:border-teal-800 flex items-center justify-center text-teal-600">
                     <Bot className="w-4 h-4" />
                   </div>
-                  <div className="bg-white dark:bg-slate-800 px-4 py-3 rounded-2xl rounded-tl-none border border-slate-100 dark:border-slate-700 shadow-sm">
+                  <div className="bg-white dark:bg-[var(--color-bg-secondary)] px-4 py-3 rounded-2xl rounded-tl-none border border-slate-100 dark:border-[var(--color-border)] shadow-sm">
                     <div className="flex gap-1">
                       <span className="w-1.5 h-1.5 bg-teal-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
                       <span className="w-1.5 h-1.5 bg-teal-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
@@ -241,15 +241,15 @@ export default function ChatWidget() {
             </div>
 
             {/* Input Area */}
-            <div className="p-4 bg-white/50 dark:bg-slate-900/50 border-t border-slate-200/50 dark:border-slate-700/50">
-              <div className="relative flex items-center gap-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-1 shadow-inner focus-within:ring-2 focus-within:ring-teal-500/20 transition-all">
+            <div className="p-4 bg-white/50 dark:bg-[var(--color-bg-primary)]/50 border-t border-slate-200/50 dark:border-[var(--color-border)]/50">
+              <div className="relative flex items-center gap-2 bg-white dark:bg-[var(--color-bg-secondary)] rounded-xl border border-slate-200 dark:border-[var(--color-border)] p-1 shadow-inner focus-within:ring-2 focus-within:ring-teal-500/20 transition-all">
                 <input
                   ref={inputRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") send(); }}
                   placeholder="Type a message..."
-                  className="flex-1 bg-transparent border-none px-3 py-2 text-sm focus:outline-none placeholder:text-slate-400"
+                  className="flex-1 bg-transparent border-none px-3 py-2 text-sm focus:outline-none placeholder:text-[var(--color-text-tertiary)]"
                   disabled={loading}
                 />
                 <button
@@ -260,13 +260,13 @@ export default function ChatWidget() {
                     "p-2 rounded-lg transition-all",
                     input.trim() && !loading
                       ? "bg-teal-600 text-white hover:bg-teal-700 shadow-md"
-                      : "bg-slate-100 text-slate-400 dark:bg-slate-700 dark:text-slate-500 cursor-not-allowed"
+                      : "bg-slate-100 text-[var(--color-text-tertiary)] dark:bg-slate-700 dark:text-slate-500 cursor-not-allowed"
                   )}
                 >
                   {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                 </button>
               </div>
-              <p className="text-[10px] text-center mt-2 text-slate-400">
+              <p className="text-[10px] text-center mt-2 text-[var(--color-text-tertiary)]">
                 Market Intelligence - For Informational Purposes Only Not Financial Advice
               </p>
             </div>
@@ -298,7 +298,7 @@ export default function ChatWidget() {
         className={cn(
           "w-16 h-16 rounded-full shadow-[0_10px_25px_-5px_rgba(20,184,166,0.5)] flex items-center justify-center transition-all duration-300 z-[101]",
           open
-            ? "bg-slate-800 text-white shadow-none"
+            ? "bg-[var(--color-bg-secondary)] text-white shadow-none"
             : "bg-gradient-to-tr from-teal-500 via-teal-600 to-indigo-600 text-white"
         )}
       >

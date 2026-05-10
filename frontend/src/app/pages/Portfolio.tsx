@@ -65,7 +65,7 @@ function statusBadgeClass(status?: string) {
     case "watch": return "border-blue-500/30 bg-blue-500/10 text-blue-300";
     case "need_attention": return "border-amber-500/30 bg-amber-500/10 text-amber-300";
     case "high_risk": return "border-red-500/30 bg-red-500/10 text-red-300";
-    default: return "border-[#30363d] bg-[#0d1117] text-[#768390]";
+    default: return "border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-tertiary)]";
   }
 }
 
@@ -525,26 +525,26 @@ export function Portfolio() {
   };
 
   return (
-    <div className="min-h-screen bg-[#08090c]">
+    <div className="min-h-screen bg-[var(--color-bg-primary)]">
       <div className="mx-auto max-w-[1680px] space-y-8 px-6 py-8 lg:px-8">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="space-y-1.5">
-            <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[#e6edf3]">Portfolio</h1>
-            <p className="text-[13px] text-[#768390]">Track multiple portfolios, cash, performance periods, and benchmark alpha.</p>
+            <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[var(--color-text-primary)]">Portfolio</h1>
+            <p className="text-[13px] text-[var(--color-text-tertiary)]">Track multiple portfolios, cash, performance periods, and benchmark alpha.</p>
           </div>
           <div className="flex flex-col gap-3 md:flex-row md:items-center">
             <Select value={selectedPortfolioId} onValueChange={setSelectedPortfolioId}>
-              <SelectTrigger className="w-[220px] border-[#30363d] bg-[#0d1117] text-[#e6edf3]"><SelectValue placeholder="Select portfolio" /></SelectTrigger>
-              <SelectContent className="border-[#30363d] bg-[#161b22]">
+              <SelectTrigger className="w-[220px] border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"><SelectValue placeholder="Select portfolio" /></SelectTrigger>
+              <SelectContent className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
                 {portfolios.map((item) => <SelectItem key={item.portfolioId} value={item.portfolioId}>{item.name}{item.isDefault ? " · Default" : ""}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Input value={newPortfolioName} onChange={(e) => setNewPortfolioName(e.target.value)} placeholder="New portfolio name" className="w-[210px] border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
-            <Button variant="outline" onClick={createPortfolio} disabled={submitting || !newPortfolioName.trim()} className="border-[#30363d] text-[#e6edf3]">
+            <Input value={newPortfolioName} onChange={(e) => setNewPortfolioName(e.target.value)} placeholder="New portfolio name" className="w-[210px] border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]" />
+            <Button variant="outline" onClick={createPortfolio} disabled={submitting || !newPortfolioName.trim()} className="border-[var(--color-border)] text-[var(--color-text-primary)]">
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create"}
             </Button>
-            <Button variant="outline" onClick={setDefaultPortfolio} disabled={submitting || !selectedPortfolioId} className="border-[#30363d] text-[#e6edf3]">Set Default</Button>
-            <Button variant="outline" onClick={archivePortfolio} disabled={submitting || !selectedPortfolioId || portfolios.find((item) => item.portfolioId === selectedPortfolioId)?.isDefault} className="border-[#30363d] text-[#e6edf3]">Archive</Button>
+            <Button variant="outline" onClick={setDefaultPortfolio} disabled={submitting || !selectedPortfolioId} className="border-[var(--color-border)] text-[var(--color-text-primary)]">Set Default</Button>
+            <Button variant="outline" onClick={archivePortfolio} disabled={submitting || !selectedPortfolioId || portfolios.find((item) => item.portfolioId === selectedPortfolioId)?.isDefault} className="border-[var(--color-border)] text-[var(--color-text-primary)]">Archive</Button>
           </div>
           {error && activePanel === "performance" && (
             <div className="mx-auto max-w-[1680px] px-6 lg:px-8 mt-4">
@@ -559,19 +559,19 @@ export function Portfolio() {
             <DialogTrigger asChild>
               <Button onClick={() => openAddDialog()} className="bg-emerald-600 text-white hover:bg-emerald-700"><Plus className="mr-2 h-4 w-4" />Add Transaction</Button>
             </DialogTrigger>
-            <DialogContent className="border-[#30363d] bg-[#0d1117] text-[#e6edf3] sm:max-w-[1000px] p-0 overflow-hidden">
+            <DialogContent className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)] sm:max-w-[1000px] p-0 overflow-hidden">
               <div className="flex flex-col md:flex-row h-full max-h-[90vh]">
                 {/* Left Side: Form */}
-                <div className="flex-1 p-6 overflow-y-auto border-r border-[#30363d]">
+                <div className="flex-1 p-6 overflow-y-auto border-r border-[var(--color-border)]">
                   <DialogHeader className="mb-6">
                     <DialogTitle className="text-2xl font-bold">{editingId ? "Edit transaction" : "Add transaction"}</DialogTitle>
-                    <DialogDescription className="text-[#768390]">Update your holdings and cost basis with trade details.</DialogDescription>
+                    <DialogDescription className="text-[var(--color-text-tertiary)]">Update your holdings and cost basis with trade details.</DialogDescription>
                   </DialogHeader>
                   
                   <div className="grid gap-5">
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
-                        <Label htmlFor="symbol" className="text-[13px] font-medium text-[#768390]">Symbol</Label>
+                        <Label htmlFor="symbol" className="text-[13px] font-medium text-[var(--color-text-tertiary)]">Symbol</Label>
                         <div className="relative">
                           <Input
                             id="symbol"
@@ -580,12 +580,12 @@ export function Portfolio() {
                             onFocus={() => form.symbol.trim() && setSymbolSearchOpen(true)}
                             onBlur={() => window.setTimeout(() => setSymbolSearchOpen(false), 120)}
                             placeholder="e.g. DIAL.N0000"
-                            className="border-[#30363d] bg-[#161b22] text-[#e6edf3] h-11 focus:ring-blue-500/20"
+                            className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)] h-11 focus:ring-blue-500/20"
                           />
                           {symbolSearchOpen && (
-                            <div className="absolute left-0 right-0 top-12 z-50 overflow-hidden rounded-xl border border-[#30363d] bg-[#161b22] shadow-2xl backdrop-blur-xl">
+                            <div className="absolute left-0 right-0 top-12 z-50 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] shadow-2xl backdrop-blur-xl">
                               {symbolSearchLoading ? (
-                                <div className="px-4 py-3 text-[12px] text-[#768390] flex items-center gap-2">
+                                <div className="px-4 py-3 text-[12px] text-[var(--color-text-tertiary)] flex items-center gap-2">
                                   <Loader2 className="h-3 w-3 animate-spin" /> Searching symbols…
                                 </div>
                               ) : symbolSuggestions.length ? (
@@ -602,25 +602,25 @@ export function Portfolio() {
                                       className="flex w-full items-start justify-between gap-3 px-4 py-2.5 text-left hover:bg-blue-600/10 transition-colors"
                                     >
                                       <div>
-                                        <div className="text-[14px] font-bold text-[#e6edf3]">{item.symbol}</div>
-                                        <div className="text-[12px] text-[#768390]">{item.company}</div>
+                                        <div className="text-[14px] font-bold text-[var(--color-text-primary)]">{item.symbol}</div>
+                                        <div className="text-[12px] text-[var(--color-text-tertiary)]">{item.company}</div>
                                       </div>
-                                      <div className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-[#30363d] text-[#768390]">{item.sector || "—"}</div>
+                                      <div className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-[var(--color-border)] text-[var(--color-text-tertiary)]">{item.sector || "—"}</div>
                                     </button>
                                   ))}
                                 </div>
                               ) : (
-                                <div className="px-4 py-3 text-[12px] text-[#768390]">No matching symbols found.</div>
+                                <div className="px-4 py-3 text-[12px] text-[var(--color-text-tertiary)]">No matching symbols found.</div>
                               )}
                             </div>
                           )}
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-[13px] font-medium text-[#768390]">Trade Type</Label>
+                        <Label className="text-[13px] font-medium text-[var(--color-text-tertiary)]">Trade Type</Label>
                         <Select value={form.txType} onValueChange={(value: "buy" | "sell") => setForm((prev) => ({ ...prev, txType: value }))}>
-                          <SelectTrigger className="border-[#30363d] bg-[#161b22] text-[#e6edf3] h-11"><SelectValue /></SelectTrigger>
-                          <SelectContent className="border-[#30363d] bg-[#1c2128]">
+                          <SelectTrigger className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)] h-11"><SelectValue /></SelectTrigger>
+                          <SelectContent className="border-[var(--color-border)] bg-[var(--color-bg-elevated)]">
                             <SelectItem value="buy" className="text-emerald-400">Buy / Long</SelectItem>
                             <SelectItem value="sell" className="text-red-400">Sell / Close</SelectItem>
                           </SelectContent>
@@ -630,29 +630,29 @@ export function Portfolio() {
 
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
-                        <Label htmlFor="quantity" className="text-[13px] font-medium text-[#768390]">Quantity</Label>
-                        <Input id="quantity" type="number" min="0" step="0.0001" value={form.quantity} onChange={(e) => setForm((prev) => ({ ...prev, quantity: e.target.value }))} className="border-[#30363d] bg-[#161b22] text-[#e6edf3] h-11" />
+                        <Label htmlFor="quantity" className="text-[13px] font-medium text-[var(--color-text-tertiary)]">Quantity</Label>
+                        <Input id="quantity" type="number" min="0" step="0.0001" value={form.quantity} onChange={(e) => setForm((prev) => ({ ...prev, quantity: e.target.value }))} className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)] h-11" />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="price" className="text-[13px] font-medium text-[#768390]">Price per share</Label>
-                        <Input id="price" type="number" min="0" step="0.01" value={form.price} onChange={(e) => setForm((prev) => ({ ...prev, price: e.target.value }))} className="border-[#30363d] bg-[#161b22] text-[#e6edf3] h-11" />
+                        <Label htmlFor="price" className="text-[13px] font-medium text-[var(--color-text-tertiary)]">Price per share</Label>
+                        <Input id="price" type="number" min="0" step="0.01" value={form.price} onChange={(e) => setForm((prev) => ({ ...prev, price: e.target.value }))} className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)] h-11" />
                       </div>
                     </div>
 
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
-                        <Label htmlFor="fees" className="text-[13px] font-medium text-[#768390]">Broker Fees</Label>
-                        <Input id="fees" type="number" min="0" step="0.01" value={form.fees} onChange={(e) => setForm((prev) => ({ ...prev, fees: e.target.value }))} className="border-[#30363d] bg-[#161b22] text-[#e6edf3] h-11" />
+                        <Label htmlFor="fees" className="text-[13px] font-medium text-[var(--color-text-tertiary)]">Broker Fees</Label>
+                        <Input id="fees" type="number" min="0" step="0.01" value={form.fees} onChange={(e) => setForm((prev) => ({ ...prev, fees: e.target.value }))} className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)] h-11" />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="tradedAt" className="text-[13px] font-medium text-[#768390]">Trade Date</Label>
-                        <Input id="tradedAt" type="date" value={form.tradedAt} onChange={(e) => setForm((prev) => ({ ...prev, tradedAt: e.target.value }))} className="border-[#30363d] bg-[#161b22] text-[#e6edf3] h-11" />
+                        <Label htmlFor="tradedAt" className="text-[13px] font-medium text-[var(--color-text-tertiary)]">Trade Date</Label>
+                        <Input id="tradedAt" type="date" value={form.tradedAt} onChange={(e) => setForm((prev) => ({ ...prev, tradedAt: e.target.value }))} className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)] h-11" />
                       </div>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="notes" className="text-[13px] font-medium text-[#768390]">Notes (Strategy or Rationale)</Label>
-                      <Textarea id="notes" value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} placeholder="Why are you making this trade?" className="border-[#30363d] bg-[#161b22] text-[#e6edf3] min-h-[80px]" />
+                      <Label htmlFor="notes" className="text-[13px] font-medium text-[var(--color-text-tertiary)]">Notes (Strategy or Rationale)</Label>
+                      <Textarea id="notes" value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} placeholder="Why are you making this trade?" className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)] min-h-[80px]" />
                     </div>
                   </div>
 
@@ -664,7 +664,7 @@ export function Portfolio() {
                   )}
 
                   <div className="mt-8 flex items-center justify-end gap-3">
-                    <Button variant="outline" onClick={resetDialog} className="border-[#30363d] text-[#768390] hover:bg-[#1c2128] hover:text-[#e6edf3] px-6">Cancel</Button>
+                    <Button variant="outline" onClick={resetDialog} className="border-[var(--color-border)] text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-elevated)] hover:text-[var(--color-text-primary)] px-6">Cancel</Button>
                     <Button 
                       onClick={submitTransaction} 
                       disabled={submitting || !form.symbol || !form.quantity || !form.price} 
@@ -677,7 +677,7 @@ export function Portfolio() {
                 </div>
 
                 {/* Right Side: AI Intelligence */}
-                <div className="w-full md:w-[420px] bg-[#161b22] p-6 overflow-y-auto border-l border-[#30363d] relative">
+                <div className="w-full md:w-[420px] bg-[var(--color-bg-tertiary)] p-6 overflow-y-auto border-l border-[var(--color-border)] relative">
                   <div className="absolute inset-0 bg-gradient-to-br from-blue-600/5 via-transparent to-emerald-600/5 pointer-events-none" />
                   
                   <div className="relative z-10 space-y-6">
@@ -690,20 +690,20 @@ export function Portfolio() {
 
                     {!form.symbol || !form.quantity || !form.price ? (
                       <div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
-                        <div className="w-20 h-20 rounded-full bg-[#30363d]/30 flex items-center justify-center mb-2">
-                          <Clock className="h-10 w-10 text-[#30363d]" />
+                        <div className="w-20 h-20 rounded-full bg-[var(--color-border)]/30 flex items-center justify-center mb-2">
+                          <Clock className="h-10 w-10 text-[var(--color-border)]" />
                         </div>
-                        <p className="text-[#768390] text-sm max-w-[200px]">Fill in the trade details to see AI-powered portfolio impact.</p>
+                        <p className="text-[var(--color-text-tertiary)] text-sm max-w-[200px]">Fill in the trade details to see AI-powered portfolio impact.</p>
                       </div>
                     ) : tradePreviewLoading ? (
                       <div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
                         <Loader2 className="h-10 w-10 text-blue-500 animate-spin" />
                         <p className="text-blue-400 font-medium">Analyzing portfolio fit...</p>
-                        <p className="text-[#768390] text-xs">Simulating allocations and risk profiles</p>
+                        <p className="text-[var(--color-text-tertiary)] text-xs">Simulating allocations and risk profiles</p>
                       </div>
                     ) : tradePreview ? (
                       <div className="animate-in fade-in slide-in-from-right-4 duration-500 space-y-6">
-                        <div className="relative flex flex-col items-center p-6 rounded-2xl bg-[#0d1117] border border-[#30363d] shadow-xl">
+                        <div className="relative flex flex-col items-center p-6 rounded-2xl bg-[var(--color-bg-secondary)] border border-[var(--color-border)] shadow-xl">
                           <div className="absolute top-4 right-4">
                             <Badge variant="outline" className={`${statusBadgeClass(tradePreview.status)} border-current bg-transparent px-3 py-1 font-bold uppercase tracking-wider text-[10px]`}>
                               {tradePreview.statusLabel}
@@ -712,7 +712,7 @@ export function Portfolio() {
                           
                           <div className="relative flex items-center justify-center w-32 h-32 mb-4">
                             <svg className="w-full h-full -rotate-90">
-                              <circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-[#1c2128]" />
+                              <circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-[var(--color-bg-elevated)]" />
                               <circle 
                                 cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="8" fill="transparent" 
                                 strokeDasharray={364.4}
@@ -723,20 +723,20 @@ export function Portfolio() {
                             </svg>
                             <div className="absolute inset-0 flex flex-col items-center justify-center">
                               <span className="text-3xl font-black text-white">{tradePreview.fitScore}</span>
-                              <span className="text-[10px] text-[#768390] font-bold uppercase">Fit Score</span>
+                              <span className="text-[10px] text-[var(--color-text-tertiary)] font-bold uppercase">Fit Score</span>
                             </div>
                           </div>
 
                           <div className="w-full grid grid-cols-2 gap-3 mt-2">
-                            <div className="p-3 rounded-xl bg-[#1c2128] border border-[#30363d]">
-                              <p className="text-[11px] text-[#768390] font-medium uppercase mb-1">Stock Weight</p>
+                            <div className="p-3 rounded-xl bg-[var(--color-bg-elevated)] border border-[var(--color-border)]">
+                              <p className="text-[11px] text-[var(--color-text-tertiary)] font-medium uppercase mb-1">Stock Weight</p>
                               <div className="flex items-baseline gap-1">
                                 <span className="text-lg font-bold text-white">{tradePreview.newStockWeightPct.toFixed(1)}%</span>
-                                <span className="text-[10px] text-[#768390]">({tradePreview.currentStockWeightPct.toFixed(1)}% →)</span>
+                                <span className="text-[10px] text-[var(--color-text-tertiary)]">({tradePreview.currentStockWeightPct.toFixed(1)}% →)</span>
                               </div>
                             </div>
-                            <div className="p-3 rounded-xl bg-[#1c2128] border border-[#30363d]">
-                              <p className="text-[11px] text-[#768390] font-medium uppercase mb-1">Cash After</p>
+                            <div className="p-3 rounded-xl bg-[var(--color-bg-elevated)] border border-[var(--color-border)]">
+                              <p className="text-[11px] text-[var(--color-text-tertiary)] font-medium uppercase mb-1">Cash After</p>
                               <div className={`text-lg font-bold ${tradePreview.cashAfter < 0 ? "text-red-400" : "text-white"}`}>
                                 {money(tradePreview.cashAfter).replace('Rs. ', '')}
                               </div>
@@ -745,7 +745,7 @@ export function Portfolio() {
                         </div>
 
                         <div className="space-y-4">
-                          <h4 className="text-sm font-bold text-[#768390] uppercase tracking-widest flex items-center gap-2">
+                          <h4 className="text-sm font-bold text-[var(--color-text-tertiary)] uppercase tracking-widest flex items-center gap-2">
                             <ShieldCheck className="h-4 w-4 text-emerald-400" /> Real-World Impact
                           </h4>
                           <div className="space-y-3">
@@ -754,7 +754,7 @@ export function Portfolio() {
                                 <div className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-blue-500/20">
                                   <div className="h-1.5 w-1.5 rounded-full bg-blue-400" />
                                 </div>
-                                <p className="text-[13px] leading-relaxed text-[#e6edf3]">{reason}</p>
+                                <p className="text-[13px] leading-relaxed text-[var(--color-text-primary)]">{reason}</p>
                               </div>
                             ))}
                           </div>
@@ -773,13 +773,13 @@ export function Portfolio() {
                         )}
 
                         <div className="pt-2">
-                          <div className="flex items-center gap-3 p-4 rounded-xl border border-[#30363d] bg-gradient-to-r from-violet-600/10 to-blue-600/10">
+                          <div className="flex items-center gap-3 p-4 rounded-xl border border-[var(--color-border)] bg-gradient-to-r from-violet-600/10 to-blue-600/10">
                             <div className="shrink-0 p-2 rounded-lg bg-violet-600/20">
                               <TrendingUp className="h-4 w-4 text-violet-400" />
                             </div>
                             <div>
                               <p className="text-[11px] font-bold text-violet-400 uppercase">Pro Tip</p>
-                              <p className="text-[12px] text-[#768390]">This {tradePreview.txType} will result in a {tradePreview.newStockWeightPct > 15 ? 'concentrated' : 'balanced'} position in your portfolio.</p>
+                              <p className="text-[12px] text-[var(--color-text-tertiary)]">This {tradePreview.txType} will result in a {tradePreview.newStockWeightPct > 15 ? 'concentrated' : 'balanced'} position in your portfolio.</p>
                             </div>
                           </div>
                         </div>
@@ -793,13 +793,13 @@ export function Portfolio() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-blue-500/10"><BriefcaseBusiness className="h-5 w-5 text-blue-500" /></div><div><p className="text-[13px] text-[#768390]">Market value</p><p className="text-[24px] font-bold text-[#e6edf3]">{money(portfolio.summary.marketValue)}</p></div></div></CardContent></Card>
-          <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-violet-500/10"><Landmark className="h-5 w-5 text-violet-500" /></div><div><p className="text-[13px] text-[#768390]">Cost basis</p><p className="text-[24px] font-bold text-[#e6edf3]">{money(portfolio.summary.costBasis)}</p></div></div></CardContent></Card>
-          <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className={`flex h-10 w-10 items-center justify-center rounded-md ${portfolio.summary.unrealizedPl >= 0 ? "bg-emerald-500/10" : "bg-red-500/10"}`}>{portfolio.summary.unrealizedPl >= 0 ? <TrendingUp className="h-5 w-5 text-emerald-500" /> : <TrendingDown className="h-5 w-5 text-red-500" />}</div><div><p className="text-[13px] text-[#768390]">Unrealized P/L</p><p className={`text-[24px] font-bold ${portfolio.summary.unrealizedPl >= 0 ? "text-emerald-400" : "text-red-400"}`}>{money(portfolio.summary.unrealizedPl)}</p><p className="text-[12px] text-[#768390]">{signedPercent(portfolio.summary.unrealizedPlPct)}</p></div></div></CardContent></Card>
-          <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className={`flex h-10 w-10 items-center justify-center rounded-md ${portfolio.summary.realizedPl >= 0 ? "bg-amber-500/10" : "bg-red-500/10"}`}>{portfolio.summary.realizedPl >= 0 ? <TrendingUp className="h-5 w-5 text-amber-500" /> : <TrendingDown className="h-5 w-5 text-red-500" />}</div><div><p className="text-[13px] text-[#768390]">Realized P/L</p><p className={`text-[24px] font-bold ${portfolio.summary.realizedPl >= 0 ? "text-amber-400" : "text-red-400"}`}>{money(portfolio.summary.realizedPl)}</p><p className="text-[12px] text-[#768390]">{portfolio.summary.positionsCount} open positions</p></div></div></CardContent></Card>
+          <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-blue-500/10"><BriefcaseBusiness className="h-5 w-5 text-blue-500" /></div><div><p className="text-[13px] text-[var(--color-text-tertiary)]">Market value</p><p className="text-[24px] font-bold text-[var(--color-text-primary)]">{money(portfolio.summary.marketValue)}</p></div></div></CardContent></Card>
+          <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-violet-500/10"><Landmark className="h-5 w-5 text-violet-500" /></div><div><p className="text-[13px] text-[var(--color-text-tertiary)]">Cost basis</p><p className="text-[24px] font-bold text-[var(--color-text-primary)]">{money(portfolio.summary.costBasis)}</p></div></div></CardContent></Card>
+          <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className={`flex h-10 w-10 items-center justify-center rounded-md ${portfolio.summary.unrealizedPl >= 0 ? "bg-emerald-500/10" : "bg-red-500/10"}`}>{portfolio.summary.unrealizedPl >= 0 ? <TrendingUp className="h-5 w-5 text-emerald-500" /> : <TrendingDown className="h-5 w-5 text-red-500" />}</div><div><p className="text-[13px] text-[var(--color-text-tertiary)]">Unrealized P/L</p><p className={`text-[24px] font-bold ${portfolio.summary.unrealizedPl >= 0 ? "text-emerald-400" : "text-red-400"}`}>{money(portfolio.summary.unrealizedPl)}</p><p className="text-[12px] text-[var(--color-text-tertiary)]">{signedPercent(portfolio.summary.unrealizedPlPct)}</p></div></div></CardContent></Card>
+          <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className={`flex h-10 w-10 items-center justify-center rounded-md ${portfolio.summary.realizedPl >= 0 ? "bg-amber-500/10" : "bg-red-500/10"}`}>{portfolio.summary.realizedPl >= 0 ? <TrendingUp className="h-5 w-5 text-amber-500" /> : <TrendingDown className="h-5 w-5 text-red-500" />}</div><div><p className="text-[13px] text-[var(--color-text-tertiary)]">Realized P/L</p><p className={`text-[24px] font-bold ${portfolio.summary.realizedPl >= 0 ? "text-amber-400" : "text-red-400"}`}>{money(portfolio.summary.realizedPl)}</p><p className="text-[12px] text-[var(--color-text-tertiary)]">{portfolio.summary.positionsCount} open positions</p></div></div></CardContent></Card>
         </div>
 
-        <Card className="sticky top-0 z-10 border-[#30363d] bg-[#0d1117]/95 backdrop-blur">
+        <Card className="sticky top-0 z-10 border-[var(--color-border)] bg-[var(--color-bg-secondary)]/95 backdrop-blur">
           <CardContent className="p-3">
             <div className="flex gap-2 overflow-x-auto pb-1">
               {portfolioPanels.map((panel) => (
@@ -808,35 +808,35 @@ export function Portfolio() {
                   type="button"
                   onClick={() => setActivePanel(panel.key)}
                   title={panel.description}
-                  className={activePanel === panel.key ? "whitespace-nowrap rounded-md bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white" : "whitespace-nowrap rounded-md border border-[#30363d] bg-[#161b22] px-4 py-2 text-[13px] text-[#9da7b3] hover:bg-[#1c2128] hover:text-[#e6edf3]"}
+                  className={activePanel === panel.key ? "whitespace-nowrap rounded-md bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white" : "whitespace-nowrap rounded-md border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] px-4 py-2 text-[13px] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-elevated)] hover:text-[var(--color-text-primary)]"}
                 >
                   {panel.label}
                 </button>
               ))}
             </div>
-            <div className="mt-2 px-1 text-[12px] text-[#768390]">{portfolioPanels.find((panel) => panel.key === activePanel)?.description}</div>
+            <div className="mt-2 px-1 text-[12px] text-[var(--color-text-tertiary)]">{portfolioPanels.find((panel) => panel.key === activePanel)?.description}</div>
           </CardContent>
         </Card>
 
         <div className={activePanel === "cash" ? "grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]" : "hidden"}>
-          <Card className="border-[#30363d] bg-[#161b22] xl:col-span-2">
-            <CardHeader><CardTitle className="text-[18px] text-[#e6edf3]">Cash management</CardTitle><CardDescription className="text-[13px] text-[#768390]">Deposits, withdrawals, and available cash for this portfolio.</CardDescription></CardHeader>
+          <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)] xl:col-span-2">
+            <CardHeader><CardTitle className="text-[18px] text-[var(--color-text-primary)]">Cash management</CardTitle><CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Deposits, withdrawals, and available cash for this portfolio.</CardDescription></CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-                <div className="rounded-lg border border-[#30363d] bg-[#0d1117] p-4"><p className="text-[12px] text-[#768390]">Cash balance</p><p className="text-[20px] font-bold text-[#e6edf3]">{money(portfolio.summary.cashBalance || 0)}</p></div>
-                <div className="rounded-lg border border-[#30363d] bg-[#0d1117] p-4"><p className="text-[12px] text-[#768390]">Total equity</p><p className="text-[20px] font-bold text-[#e6edf3]">{money(portfolio.summary.totalEquity || portfolio.summary.marketValue)}</p></div>
-                <div className="rounded-lg border border-[#30363d] bg-[#0d1117] p-4"><p className="text-[12px] text-[#768390]">Deposits</p><p className="text-[20px] font-bold text-emerald-400">{money(portfolio.summary.cashDeposits || 0)}</p></div>
-                <div className="rounded-lg border border-[#30363d] bg-[#0d1117] p-4"><p className="text-[12px] text-[#768390]">Withdrawals</p><p className="text-[20px] font-bold text-red-400">{money(portfolio.summary.cashWithdrawals || 0)}</p></div>
+                <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4"><p className="text-[12px] text-[var(--color-text-tertiary)]">Cash balance</p><p className="text-[20px] font-bold text-[var(--color-text-primary)]">{money(portfolio.summary.cashBalance || 0)}</p></div>
+                <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4"><p className="text-[12px] text-[var(--color-text-tertiary)]">Total equity</p><p className="text-[20px] font-bold text-[var(--color-text-primary)]">{money(portfolio.summary.totalEquity || portfolio.summary.marketValue)}</p></div>
+                <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4"><p className="text-[12px] text-[var(--color-text-tertiary)]">Deposits</p><p className="text-[20px] font-bold text-emerald-400">{money(portfolio.summary.cashDeposits || 0)}</p></div>
+                <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4"><p className="text-[12px] text-[var(--color-text-tertiary)]">Withdrawals</p><p className="text-[20px] font-bold text-red-400">{money(portfolio.summary.cashWithdrawals || 0)}</p></div>
               </div>
               <div className="grid gap-3 md:grid-cols-5">
-                <Select value={cashForm.movementType} onValueChange={(value: "deposit" | "withdrawal") => setCashForm((prev) => ({ ...prev, movementType: value }))}><SelectTrigger className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]"><SelectValue /></SelectTrigger><SelectContent className="border-[#30363d] bg-[#161b22]"><SelectItem value="deposit">Deposit</SelectItem><SelectItem value="withdrawal">Withdrawal</SelectItem></SelectContent></Select>
-                <Input type="number" value={cashForm.amount} onChange={(e) => setCashForm((prev) => ({ ...prev, amount: e.target.value }))} placeholder="Amount" className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
-                <Input type="date" value={cashForm.movementDate} onChange={(e) => setCashForm((prev) => ({ ...prev, movementDate: e.target.value }))} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
-                <Input value={cashForm.notes} onChange={(e) => setCashForm((prev) => ({ ...prev, notes: e.target.value }))} placeholder="Note" className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
+                <Select value={cashForm.movementType} onValueChange={(value: "deposit" | "withdrawal") => setCashForm((prev) => ({ ...prev, movementType: value }))}><SelectTrigger className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"><SelectValue /></SelectTrigger><SelectContent className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]"><SelectItem value="deposit">Deposit</SelectItem><SelectItem value="withdrawal">Withdrawal</SelectItem></SelectContent></Select>
+                <Input type="number" value={cashForm.amount} onChange={(e) => setCashForm((prev) => ({ ...prev, amount: e.target.value }))} placeholder="Amount" className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]" />
+                <Input type="date" value={cashForm.movementDate} onChange={(e) => setCashForm((prev) => ({ ...prev, movementDate: e.target.value }))} className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]" />
+                <Input value={cashForm.notes} onChange={(e) => setCashForm((prev) => ({ ...prev, notes: e.target.value }))} placeholder="Note" className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]" />
                 <Button onClick={addCashMovement} className="bg-blue-600 text-white hover:bg-blue-700">Add Cash</Button>
               </div>
-              <div className="max-h-52 overflow-y-auto rounded-lg border border-[#30363d]">
-                {(portfolio.cashMovements || []).length ? (portfolio.cashMovements || []).map((item) => <div key={item.id} className="flex items-center justify-between border-b border-[#30363d] px-4 py-3 text-[13px] last:border-b-0"><div><div className="font-medium text-[#e6edf3] capitalize">{item.movementType}</div><div className="text-[#768390]">{item.movementDate || item.createdAt || "—"} {item.notes ? `· ${item.notes}` : ""}</div></div><div className={item.movementType === "deposit" ? "font-semibold text-emerald-400" : "font-semibold text-red-400"}>{item.movementType === "deposit" ? "+" : "-"}{money(item.amount)}</div></div>) : <div className="px-4 py-6 text-center text-[13px] text-[#768390]">No cash movements yet.</div>}
+              <div className="max-h-52 overflow-y-auto rounded-lg border border-[var(--color-border)]">
+                {(portfolio.cashMovements || []).length ? (portfolio.cashMovements || []).map((item) => <div key={item.id} className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3 text-[13px] last:border-b-0"><div><div className="font-medium text-[var(--color-text-primary)] capitalize">{item.movementType}</div><div className="text-[var(--color-text-tertiary)]">{item.movementDate || item.createdAt || "—"} {item.notes ? `· ${item.notes}` : ""}</div></div><div className={item.movementType === "deposit" ? "font-semibold text-emerald-400" : "font-semibold text-red-400"}>{item.movementType === "deposit" ? "+" : "-"}{money(item.amount)}</div></div>) : <div className="px-4 py-6 text-center text-[13px] text-[var(--color-text-tertiary)]">No cash movements yet.</div>}
               </div>
             </CardContent>
           </Card>
@@ -851,95 +851,95 @@ export function Portfolio() {
               <BrainCircuit className="h-6 w-6 text-blue-400" />
             </div>
             <div>
-              <h2 className="text-[20px] font-bold text-[#e6edf3]">TradexaLK AI Intelligence</h2>
-              <p className="text-[13px] text-[#768390]">Fully automated monitoring of your broker statements and trades. We analyze risk, cash management, and provide continuous guidance.</p>
+              <h2 className="text-[20px] font-bold text-[var(--color-text-primary)]">TradexaLK AI Intelligence</h2>
+              <p className="text-[13px] text-[var(--color-text-tertiary)]">Fully automated monitoring of your broker statements and trades. We analyze risk, cash management, and provide continuous guidance.</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-emerald-500/10"><ShieldCheck className="h-5 w-5 text-emerald-400" /></div><div><p className="text-[13px] text-[#768390]">Portfolio health</p><p className="text-[24px] font-bold text-[#e6edf3]">{intelligence.health.score}/100</p><p className="text-[12px] text-[#768390]">{intelligence.health.label} · {intelligence.health.attentionCount} need attention</p></div></div></CardContent></Card>
-            <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-amber-500/10"><Wallet className="h-5 w-5 text-amber-400" /></div><div><p className="text-[13px] text-[#768390]">Cash management</p><p className="text-[24px] font-bold text-[#e6edf3]">{intelligence.cashManagement.cashPct.toFixed(1)}%</p><p className="text-[12px] text-[#768390]">Target {intelligence.cashManagement.targetMinPct.toFixed(0)}–{intelligence.cashManagement.targetMaxPct.toFixed(0)}%</p></div></div></CardContent></Card>
-            <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-violet-500/10"><ShieldAlert className="h-5 w-5 text-violet-400" /></div><div><p className="text-[13px] text-[#768390]">Risk exposure</p><p className="text-[24px] font-bold text-[#e6edf3]">{analytics.risk.score}/100</p><p className="text-[12px] text-[#768390]">{analytics.risk.label} risk level</p></div></div></CardContent></Card>
+            <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-emerald-500/10"><ShieldCheck className="h-5 w-5 text-emerald-400" /></div><div><p className="text-[13px] text-[var(--color-text-tertiary)]">Portfolio health</p><p className="text-[24px] font-bold text-[var(--color-text-primary)]">{intelligence.health.score}/100</p><p className="text-[12px] text-[var(--color-text-tertiary)]">{intelligence.health.label} · {intelligence.health.attentionCount} need attention</p></div></div></CardContent></Card>
+            <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-amber-500/10"><Wallet className="h-5 w-5 text-amber-400" /></div><div><p className="text-[13px] text-[var(--color-text-tertiary)]">Cash management</p><p className="text-[24px] font-bold text-[var(--color-text-primary)]">{intelligence.cashManagement.cashPct.toFixed(1)}%</p><p className="text-[12px] text-[var(--color-text-tertiary)]">Target {intelligence.cashManagement.targetMinPct.toFixed(0)}–{intelligence.cashManagement.targetMaxPct.toFixed(0)}%</p></div></div></CardContent></Card>
+            <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-violet-500/10"><ShieldAlert className="h-5 w-5 text-violet-400" /></div><div><p className="text-[13px] text-[var(--color-text-tertiary)]">Risk exposure</p><p className="text-[24px] font-bold text-[var(--color-text-primary)]">{analytics.risk.score}/100</p><p className="text-[12px] text-[var(--color-text-tertiary)]">{analytics.risk.label} risk level</p></div></div></CardContent></Card>
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             {/* What's Good */}
-            <Card className="border-[#30363d] bg-[#161b22]">
-              <CardHeader className="border-b border-[#30363d] pb-4">
+            <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
+              <CardHeader className="border-b border-[var(--color-border)] pb-4">
                 <CardTitle className="flex items-center gap-2 text-[18px] text-emerald-400">
                   <CheckCircle2 className="h-5 w-5" />
                   What's Good
                 </CardTitle>
-                <CardDescription className="text-[13px] text-[#768390]">Strengths and healthy indicators in your current portfolio.</CardDescription>
+                <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Strengths and healthy indicators in your current portfolio.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 pt-4">
-                {intelligence.health.score >= 70 && <div className="flex items-start gap-3"><div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-500" /><div><p className="text-[13px] font-medium text-[#e6edf3]">Strong Overall Health</p><p className="text-[12px] text-[#768390]">Your portfolio score is {intelligence.health.score}, indicating a well-balanced strategy.</p></div></div>}
-                {intelligence.cashManagement.label === "healthy_cash" && <div className="flex items-start gap-3"><div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-500" /><div><p className="text-[13px] font-medium text-[#e6edf3]">Optimal Cash Buffer</p><p className="text-[12px] text-[#768390]">Cash is at {intelligence.cashManagement.cashPct.toFixed(1)}%, providing excellent flexibility for future opportunities.</p></div></div>}
-                {analytics.diversification.score >= 60 && <div className="flex items-start gap-3"><div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-500" /><div><p className="text-[13px] font-medium text-[#e6edf3]">Good Diversification</p><p className="text-[12px] text-[#768390]">Your capital is spread across {analytics.diversification.sectorCount} sectors.</p></div></div>}
-                {analytics.benchmark.alphaVsAspiPct > 0 && <div className="flex items-start gap-3"><div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-500" /><div><p className="text-[13px] font-medium text-[#e6edf3]">Outperforming Market</p><p className="text-[12px] text-[#768390]">Portfolio is generating {signedPercent(analytics.benchmark.alphaVsAspiPct)} alpha compared to ASPI.</p></div></div>}
+                {intelligence.health.score >= 70 && <div className="flex items-start gap-3"><div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-500" /><div><p className="text-[13px] font-medium text-[var(--color-text-primary)]">Strong Overall Health</p><p className="text-[12px] text-[var(--color-text-tertiary)]">Your portfolio score is {intelligence.health.score}, indicating a well-balanced strategy.</p></div></div>}
+                {intelligence.cashManagement.label === "healthy_cash" && <div className="flex items-start gap-3"><div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-500" /><div><p className="text-[13px] font-medium text-[var(--color-text-primary)]">Optimal Cash Buffer</p><p className="text-[12px] text-[var(--color-text-tertiary)]">Cash is at {intelligence.cashManagement.cashPct.toFixed(1)}%, providing excellent flexibility for future opportunities.</p></div></div>}
+                {analytics.diversification.score >= 60 && <div className="flex items-start gap-3"><div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-500" /><div><p className="text-[13px] font-medium text-[var(--color-text-primary)]">Good Diversification</p><p className="text-[12px] text-[var(--color-text-tertiary)]">Your capital is spread across {analytics.diversification.sectorCount} sectors.</p></div></div>}
+                {analytics.benchmark.alphaVsAspiPct > 0 && <div className="flex items-start gap-3"><div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-500" /><div><p className="text-[13px] font-medium text-[var(--color-text-primary)]">Outperforming Market</p><p className="text-[12px] text-[var(--color-text-tertiary)]">Portfolio is generating {signedPercent(analytics.benchmark.alphaVsAspiPct)} alpha compared to ASPI.</p></div></div>}
                 {intelligence.holdings.filter((h) => h.status === "suitable").slice(0, 3).map((h) => (
-                  <div key={`good-${h.symbol}`} className="flex items-start gap-3"><div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-500" /><div><p className="text-[13px] font-medium text-[#e6edf3]">{h.symbol} looks solid</p><p className="text-[12px] text-[#768390]">High AI fit score of {h.fitScore}/100 with manageable risk.</p></div></div>
+                  <div key={`good-${h.symbol}`} className="flex items-start gap-3"><div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-500" /><div><p className="text-[13px] font-medium text-[var(--color-text-primary)]">{h.symbol} looks solid</p><p className="text-[12px] text-[var(--color-text-tertiary)]">High AI fit score of {h.fitScore}/100 with manageable risk.</p></div></div>
                 ))}
                 {(!intelligence.holdings.some((h) => h.status === "suitable") && intelligence.health.score < 50 && analytics.diversification.score < 50) && (
-                  <p className="text-[13px] text-[#768390]">Import more trades or add funds to see strengths.</p>
+                  <p className="text-[13px] text-[var(--color-text-tertiary)]">Import more trades or add funds to see strengths.</p>
                 )}
               </CardContent>
             </Card>
 
             {/* Risk & Attention */}
-            <Card className="border-[#30363d] bg-[#161b22]">
-              <CardHeader className="border-b border-[#30363d] pb-4">
+            <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
+              <CardHeader className="border-b border-[var(--color-border)] pb-4">
                 <CardTitle className="flex items-center gap-2 text-[18px] text-amber-400">
                   <AlertTriangle className="h-5 w-5" />
                   Risks & Attention Required
                 </CardTitle>
-                <CardDescription className="text-[13px] text-[#768390]">Areas where the AI detected elevated risk or suboptimal allocations.</CardDescription>
+                <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Areas where the AI detected elevated risk or suboptimal allocations.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 pt-4">
                 {intelligence.cashManagement.label !== "healthy_cash" && (
                   <div className="flex items-start gap-3 rounded-md bg-amber-500/10 p-3"><div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-amber-500" /><div><p className="text-[13px] font-medium text-amber-400">Cash Management Warning</p><p className="text-[12px] text-amber-200/70">{intelligence.cashManagement.reasons[0]}</p></div></div>
                 )}
                 {intelligence.attentionItems.map((item) => (
-                  <div key={`attn-${item.symbol}`} className="flex items-start gap-3 rounded-md border border-[#30363d] p-3">
+                  <div key={`attn-${item.symbol}`} className="flex items-start gap-3 rounded-md border border-[var(--color-border)] p-3">
                     <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-red-500" />
                     <div className="flex-1 space-y-1">
                       <div className="flex items-center justify-between">
-                        <p className="text-[13px] font-medium text-[#e6edf3]">{item.symbol} Risk</p>
+                        <p className="text-[13px] font-medium text-[var(--color-text-primary)]">{item.symbol} Risk</p>
                         <Badge variant="outline" className={statusBadgeClass(item.status)}>{item.statusLabel}</Badge>
                       </div>
-                      <p className="text-[12px] text-[#768390]">{item.reasons[0]}</p>
+                      <p className="text-[12px] text-[var(--color-text-tertiary)]">{item.reasons[0]}</p>
                     </div>
                   </div>
                 ))}
                 {intelligence.attentionItems.length === 0 && intelligence.cashManagement.label === "healthy_cash" && (
-                  <p className="text-[13px] text-[#768390]">No immediate risks detected. Your portfolio looks clean.</p>
+                  <p className="text-[13px] text-[var(--color-text-tertiary)]">No immediate risks detected. Your portfolio looks clean.</p>
                 )}
               </CardContent>
             </Card>
           </div>
 
           {/* Overall AI Guidance */}
-          <Card className="border border-blue-500/20 bg-[#0d1117]">
+          <Card className="border border-blue-500/20 bg-[var(--color-bg-secondary)]">
             <CardHeader>
-              <CardTitle className="text-[18px] text-[#e6edf3]">AI Trader Guidance</CardTitle>
-              <CardDescription className="text-[13px] text-[#768390]">Actionable suggestions based on your entire imported trade history.</CardDescription>
+              <CardTitle className="text-[18px] text-[var(--color-text-primary)]">AI Trader Guidance</CardTitle>
+              <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Actionable suggestions based on your entire imported trade history.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 {intelligence.suggestions.map((suggestion, i) => (
-                  <div key={i} className="flex items-center gap-3 rounded-lg border border-[#30363d] bg-[#161b22] p-4 transition-colors hover:bg-[#1c2128]">
+                  <div key={i} className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] p-4 transition-colors hover:bg-[var(--color-bg-elevated)]">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500/10">
                       <Lightbulb className="h-4 w-4 text-blue-400" />
                     </div>
-                    <p className="text-[13px] text-[#e6edf3]">{suggestion}</p>
+                    <p className="text-[13px] text-[var(--color-text-primary)]">{suggestion}</p>
                   </div>
                 ))}
                 {intelligence.holdings.filter((h) => h.suggestions && h.suggestions.length > 0).slice(0, 3).map((h) => (
-                  <div key={`sug-${h.symbol}`} className="flex items-center gap-3 rounded-lg border border-[#30363d] bg-[#161b22] p-4 transition-colors hover:bg-[#1c2128]">
+                  <div key={`sug-${h.symbol}`} className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] p-4 transition-colors hover:bg-[var(--color-bg-elevated)]">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500/10">
                       <Lightbulb className="h-4 w-4 text-blue-400" />
                     </div>
-                    <p className="text-[13px] text-[#e6edf3]"><span className="font-semibold">{h.symbol}:</span> {h.suggestions[0]}</p>
+                    <p className="text-[13px] text-[var(--color-text-primary)]"><span className="font-semibold">{h.symbol}:</span> {h.suggestions[0]}</p>
                   </div>
                 ))}
               </div>
@@ -948,80 +948,80 @@ export function Portfolio() {
         </div>
 
         <div className={activePanel === "analytics" ? "grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4" : "hidden"}>
-          <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-cyan-500/10"><PieChart className="h-5 w-5 text-cyan-400" /></div><div><p className="text-[13px] text-[#768390]">Diversification</p><p className="text-[24px] font-bold text-[#e6edf3]">{analytics.diversification.score}/100</p><p className="text-[12px] text-[#768390]">{analytics.diversification.label} · {analytics.diversification.sectorCount} sectors</p></div></div></CardContent></Card>
-          <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-rose-500/10"><ShieldAlert className="h-5 w-5 text-rose-400" /></div><div><p className="text-[13px] text-[#768390]">Portfolio risk</p><p className="text-[24px] font-bold text-[#e6edf3]">{analytics.risk.score}/100</p><p className="text-[12px] text-[#768390]">{analytics.risk.label} · Vol {analytics.risk.annualizedVolatilityPct.toFixed(1)}%</p></div></div></CardContent></Card>
-          <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-amber-500/10"><Wallet className="h-5 w-5 text-amber-400" /></div><div><p className="text-[13px] text-[#768390]">Dividend income</p><p className="text-[24px] font-bold text-[#e6edf3]">{money(analytics.dividendSummary.totalIncome)}</p><p className="text-[12px] text-[#768390]">Yield on cost {signedPercent(analytics.dividendSummary.yieldOnCostPct)}</p></div></div></CardContent></Card>
-          <Card className="border-[#30363d] bg-[#161b22]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-indigo-500/10"><BarChart3 className="h-5 w-5 text-indigo-400" /></div><div><p className="text-[13px] text-[#768390]">Vs ASPI</p><p className={`text-[24px] font-bold ${analytics.benchmark.alphaVsAspiPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>{signedPercent(analytics.benchmark.alphaVsAspiPct)}</p><p className="text-[12px] text-[#768390]">{chartDays >= 365 ? `${chartDays / 365}Y` : `${chartDays}D`} alpha</p></div></div></CardContent></Card>
+          <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-cyan-500/10"><PieChart className="h-5 w-5 text-cyan-400" /></div><div><p className="text-[13px] text-[var(--color-text-tertiary)]">Diversification</p><p className="text-[24px] font-bold text-[var(--color-text-primary)]">{analytics.diversification.score}/100</p><p className="text-[12px] text-[var(--color-text-tertiary)]">{analytics.diversification.label} · {analytics.diversification.sectorCount} sectors</p></div></div></CardContent></Card>
+          <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-rose-500/10"><ShieldAlert className="h-5 w-5 text-rose-400" /></div><div><p className="text-[13px] text-[var(--color-text-tertiary)]">Portfolio risk</p><p className="text-[24px] font-bold text-[var(--color-text-primary)]">{analytics.risk.score}/100</p><p className="text-[12px] text-[var(--color-text-tertiary)]">{analytics.risk.label} · Vol {analytics.risk.annualizedVolatilityPct.toFixed(1)}%</p></div></div></CardContent></Card>
+          <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-amber-500/10"><Wallet className="h-5 w-5 text-amber-400" /></div><div><p className="text-[13px] text-[var(--color-text-tertiary)]">Dividend income</p><p className="text-[24px] font-bold text-[var(--color-text-primary)]">{money(analytics.dividendSummary.totalIncome)}</p><p className="text-[12px] text-[var(--color-text-tertiary)]">Yield on cost {signedPercent(analytics.dividendSummary.yieldOnCostPct)}</p></div></div></CardContent></Card>
+          <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-md bg-indigo-500/10"><BarChart3 className="h-5 w-5 text-indigo-400" /></div><div><p className="text-[13px] text-[var(--color-text-tertiary)]">Vs ASPI</p><p className={`text-[24px] font-bold ${analytics.benchmark.alphaVsAspiPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>{signedPercent(analytics.benchmark.alphaVsAspiPct)}</p><p className="text-[12px] text-[var(--color-text-tertiary)]">{chartDays >= 365 ? `${chartDays / 365}Y` : `${chartDays}D`} alpha</p></div></div></CardContent></Card>
         </div>
 
         <div className={activePanel === "analytics" ? "grid gap-6 xl:grid-cols-3" : "hidden"}>
-          <Card className="border-[#30363d] bg-[#161b22]">
+          <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
             <CardHeader>
-              <CardTitle className="text-[18px] text-[#e6edf3]">Sector allocation</CardTitle>
-              <CardDescription className="text-[13px] text-[#768390]">How your current holdings are distributed across sectors.</CardDescription>
+              <CardTitle className="text-[18px] text-[var(--color-text-primary)]">Sector allocation</CardTitle>
+              <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">How your current holdings are distributed across sectors.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {(analytics.sectorAllocation || []).length ? analytics.sectorAllocation.map((item) => (
                 <div key={item.sector} className="space-y-2">
                   <div className="flex items-center justify-between gap-3 text-[13px]">
                     <div>
-                      <div className="font-medium text-[#e6edf3]">{item.sector}</div>
-                      <div className="text-[#768390]">{item.positionsCount} holding{item.positionsCount === 1 ? "" : "s"}</div>
+                      <div className="font-medium text-[var(--color-text-primary)]">{item.sector}</div>
+                      <div className="text-[var(--color-text-tertiary)]">{item.positionsCount} holding{item.positionsCount === 1 ? "" : "s"}</div>
                     </div>
                     <div className="text-right">
-                      <div className="font-medium text-[#e6edf3]">{item.weightPct.toFixed(1)}%</div>
-                      <div className="text-[#768390]">{money(item.marketValue)}</div>
+                      <div className="font-medium text-[var(--color-text-primary)]">{item.weightPct.toFixed(1)}%</div>
+                      <div className="text-[var(--color-text-tertiary)]">{money(item.marketValue)}</div>
                     </div>
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-[#0d1117]"><div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.min(100, item.weightPct)}%` }} /></div>
+                  <div className="h-2 overflow-hidden rounded-full bg-[var(--color-bg-secondary)]"><div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.min(100, item.weightPct)}%` }} /></div>
                 </div>
-              )) : <p className="text-[13px] text-[#768390]">Add positions to see sector allocation.</p>}
+              )) : <p className="text-[13px] text-[var(--color-text-tertiary)]">Add positions to see sector allocation.</p>}
             </CardContent>
           </Card>
 
-          <Card className="border-[#30363d] bg-[#161b22]">
+          <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
             <CardHeader>
-              <CardTitle className="text-[18px] text-[#e6edf3]">Top gainers and losers</CardTitle>
-              <CardDescription className="text-[13px] text-[#768390]">Best and weakest current holdings by unrealized return.</CardDescription>
+              <CardTitle className="text-[18px] text-[var(--color-text-primary)]">Top gainers and losers</CardTitle>
+              <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Best and weakest current holdings by unrealized return.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="space-y-3">
                 <div className="text-[13px] font-semibold uppercase tracking-wide text-emerald-400">Top gainers</div>
                 {(analytics.topGainers || []).length ? analytics.topGainers.map((item) => (
-                  <div key={`g-${item.symbol}`} className="flex items-center justify-between gap-3 rounded-lg border border-[#30363d] bg-[#0d1117] p-3">
+                  <div key={`g-${item.symbol}`} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-3">
                     <div>
-                      <div className="font-medium text-[#e6edf3]">{item.symbol}</div>
-                      <div className="text-[12px] text-[#768390]">{item.company}</div>
+                      <div className="font-medium text-[var(--color-text-primary)]">{item.symbol}</div>
+                      <div className="text-[12px] text-[var(--color-text-tertiary)]">{item.company}</div>
                     </div>
                     <div className="text-right">
                       <div className="font-medium text-emerald-400">{signedPercent(item.returnPct)}</div>
-                      <div className="text-[12px] text-[#768390]">{money(item.profit)}</div>
+                      <div className="text-[12px] text-[var(--color-text-tertiary)]">{money(item.profit)}</div>
                     </div>
                   </div>
-                )) : <p className="text-[13px] text-[#768390]">No gainers yet.</p>}
+                )) : <p className="text-[13px] text-[var(--color-text-tertiary)]">No gainers yet.</p>}
               </div>
               <div className="space-y-3">
                 <div className="text-[13px] font-semibold uppercase tracking-wide text-red-400">Top losers</div>
                 {(analytics.topLosers || []).length ? analytics.topLosers.map((item) => (
-                  <div key={`l-${item.symbol}`} className="flex items-center justify-between gap-3 rounded-lg border border-[#30363d] bg-[#0d1117] p-3">
+                  <div key={`l-${item.symbol}`} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-3">
                     <div>
-                      <div className="font-medium text-[#e6edf3]">{item.symbol}</div>
-                      <div className="text-[12px] text-[#768390]">{item.company}</div>
+                      <div className="font-medium text-[var(--color-text-primary)]">{item.symbol}</div>
+                      <div className="text-[12px] text-[var(--color-text-tertiary)]">{item.company}</div>
                     </div>
                     <div className="text-right">
                       <div className="font-medium text-red-400">{signedPercent(item.returnPct)}</div>
-                      <div className="text-[12px] text-[#768390]">{money(item.profit)}</div>
+                      <div className="text-[12px] text-[var(--color-text-tertiary)]">{money(item.profit)}</div>
                     </div>
                   </div>
-                )) : <p className="text-[13px] text-[#768390]">No losers yet.</p>}
+                )) : <p className="text-[13px] text-[var(--color-text-tertiary)]">No losers yet.</p>}
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-[#30363d] bg-[#161b22]">
+          <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
             <CardHeader>
-              <CardTitle className="text-[18px] text-[#e6edf3]">Performance and income mix</CardTitle>
-              <CardDescription className="text-[13px] text-[#768390]">Break down realized profits, unrealized gains, and dividend income.</CardDescription>
+              <CardTitle className="text-[18px] text-[var(--color-text-primary)]">Performance and income mix</CardTitle>
+              <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Break down realized profits, unrealized gains, and dividend income.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {[
@@ -1031,24 +1031,24 @@ export function Portfolio() {
               ].map((item) => (
                 <div key={item.label} className="space-y-2">
                   <div className="flex items-center justify-between text-[13px]">
-                    <span className="font-medium text-[#e6edf3]">{item.label}</span>
-                    <span className="text-[#768390]">{money(item.value)} · {item.pct.toFixed(1)}%</span>
+                    <span className="font-medium text-[var(--color-text-primary)]">{item.label}</span>
+                    <span className="text-[var(--color-text-tertiary)]">{money(item.value)} · {item.pct.toFixed(1)}%</span>
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-[#0d1117]"><div className={`h-full rounded-full ${item.tone}`} style={{ width: `${Math.min(100, item.pct)}%` }} /></div>
+                  <div className="h-2 overflow-hidden rounded-full bg-[var(--color-bg-secondary)]"><div className={`h-full rounded-full ${item.tone}`} style={{ width: `${Math.min(100, item.pct)}%` }} /></div>
                 </div>
               ))}
-              <div className="rounded-lg border border-[#30363d] bg-[#0d1117] p-4 text-[13px]">
-                <div className="flex items-center justify-between"><span className="text-[#768390]">Total return</span><span className={analytics.performanceBreakdown.totalReturn >= 0 ? "font-semibold text-emerald-400" : "font-semibold text-red-400"}>{money(analytics.performanceBreakdown.totalReturn)}</span></div>
-                <div className="mt-3 flex items-center justify-between"><span className="text-[#768390]">Dividend-paying positions</span><span className="font-medium text-[#e6edf3]">{analytics.dividendSummary.payingPositionsCount}</span></div>
-                <div className="mt-2 flex items-center justify-between"><span className="text-[#768390]">Yield on cost</span><span className="font-medium text-[#e6edf3]">{signedPercent(analytics.dividendSummary.yieldOnCostPct)}</span></div>
+              <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4 text-[13px]">
+                <div className="flex items-center justify-between"><span className="text-[var(--color-text-tertiary)]">Total return</span><span className={analytics.performanceBreakdown.totalReturn >= 0 ? "font-semibold text-emerald-400" : "font-semibold text-red-400"}>{money(analytics.performanceBreakdown.totalReturn)}</span></div>
+                <div className="mt-3 flex items-center justify-between"><span className="text-[var(--color-text-tertiary)]">Dividend-paying positions</span><span className="font-medium text-[var(--color-text-primary)]">{analytics.dividendSummary.payingPositionsCount}</span></div>
+                <div className="mt-2 flex items-center justify-between"><span className="text-[var(--color-text-tertiary)]">Yield on cost</span><span className="font-medium text-[var(--color-text-primary)]">{signedPercent(analytics.dividendSummary.yieldOnCostPct)}</span></div>
               </div>
               {(analytics.dividendSummary.topPositions || []).length ? (
                 <div className="space-y-2">
-                  <div className="text-[13px] font-semibold text-[#e6edf3]">Top dividend contributors</div>
+                  <div className="text-[13px] font-semibold text-[var(--color-text-primary)]">Top dividend contributors</div>
                   {analytics.dividendSummary.topPositions.map((item) => (
                     <div key={item.symbol} className="flex items-center justify-between text-[13px]">
-                      <span className="text-[#768390]">{item.symbol}</span>
-                      <span className="text-[#e6edf3]">{money(item.dividendIncome)}</span>
+                      <span className="text-[var(--color-text-tertiary)]">{item.symbol}</span>
+                      <span className="text-[var(--color-text-primary)]">{money(item.dividendIncome)}</span>
                     </div>
                   ))}
                 </div>
@@ -1062,19 +1062,19 @@ export function Portfolio() {
             {/* Performance by period grid */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
               {periodPerformance.map((row) => (
-                <Card key={row.label} className="border-[#30363d] bg-[#161b22] hover:border-blue-500/30 transition-colors">
+                <Card key={row.label} className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)] hover:border-blue-500/30 transition-colors">
                   <CardContent className="p-4">
-                    <div className="text-[12px] font-medium text-[#768390] mb-1">{row.label}</div>
+                    <div className="text-[12px] font-medium text-[var(--color-text-tertiary)] mb-1">{row.label}</div>
                     <div className={`text-[18px] font-bold ${row.portfolioReturnPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                       {signedPercent(row.portfolioReturnPct)}
                     </div>
-                    <div className="mt-3 space-y-1.5 border-t border-[#30363d] pt-2">
+                    <div className="mt-3 space-y-1.5 border-t border-[var(--color-border)] pt-2">
                       <div className="flex items-center justify-between text-[10px]">
-                        <span className="text-[#768390]">Vs ASPI</span>
+                        <span className="text-[var(--color-text-tertiary)]">Vs ASPI</span>
                         <span className={row.alphaVsAspiPct >= 0 ? "text-emerald-400" : "text-red-400"}>{signedPercent(row.alphaVsAspiPct)}</span>
                       </div>
                       <div className="flex items-center justify-between text-[10px]">
-                        <span className="text-[#768390]">Vs SL20</span>
+                        <span className="text-[var(--color-text-tertiary)]">Vs SL20</span>
                         <span className={row.alphaVsSp20Pct >= 0 ? "text-emerald-400" : "text-red-400"}>{signedPercent(row.alphaVsSp20Pct)}</span>
                       </div>
                     </div>
@@ -1082,18 +1082,18 @@ export function Portfolio() {
                 </Card>
               ))}
               {periodPerformance.length === 0 && (
-                <div className="col-span-full py-4 text-center text-[13px] text-[#768390]">
+                <div className="col-span-full py-4 text-center text-[13px] text-[var(--color-text-tertiary)]">
                   Add positions to calculate period performance metrics.
                 </div>
               )}
             </div>
 
             <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
-              <Card className="border-[#30363d] bg-[#161b22]">
-                <CardHeader className="flex flex-col gap-4 border-b border-[#30363d] sm:flex-row sm:items-center sm:justify-between">
+              <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
+                <CardHeader className="flex flex-col gap-4 border-b border-[var(--color-border)] sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <CardTitle className="text-[18px] text-[#e6edf3]">Portfolio performance</CardTitle>
-                    <CardDescription className="text-[13px] text-[#768390]">Total equity and cost basis using trades, cash movements, and stored price history.</CardDescription>
+                    <CardTitle className="text-[18px] text-[var(--color-text-primary)]">Portfolio performance</CardTitle>
+                    <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Total equity and cost basis using trades, cash movements, and stored price history.</CardDescription>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {timeframeOptions.map((option) => (
@@ -1101,7 +1101,7 @@ export function Portfolio() {
                         key={option.label} 
                         variant={chartDays === option.days ? "default" : "outline"} 
                         onClick={() => setChartDays(option.days)} 
-                        className={chartDays === option.days ? "bg-blue-600 text-white hover:bg-blue-700" : "border-[#30363d] text-[#768390] hover:bg-[#1c2128] hover:text-[#e6edf3]"}
+                        className={chartDays === option.days ? "bg-blue-600 text-white hover:bg-blue-700" : "border-[var(--color-border)] text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-elevated)] hover:text-[var(--color-text-primary)]"}
                       >
                         {option.label}
                       </Button>
@@ -1110,9 +1110,9 @@ export function Portfolio() {
                 </CardHeader>
                 <CardContent className="p-6">
                   {chartLoading ? (
-                    <div className="flex h-[340px] items-center justify-center text-[#768390]"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading performance chart...</div>
+                    <div className="flex h-[340px] items-center justify-center text-[var(--color-text-tertiary)]"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading performance chart...</div>
                   ) : chartData.length === 0 ? (
-                    <div className="flex h-[340px] items-center justify-center text-center text-[#768390]">Add portfolio trades first to unlock performance history.</div>
+                    <div className="flex h-[340px] items-center justify-center text-center text-[var(--color-text-tertiary)]">Add portfolio trades first to unlock performance history.</div>
                   ) : (
                     <div className="h-[340px]">
                       <ResponsiveContainer width="100%" height="100%">
@@ -1140,30 +1140,30 @@ export function Portfolio() {
                 </CardContent>
               </Card>
 
-              <Card className="border-[#30363d] bg-[#161b22]">
+              <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
                 <CardHeader>
-                  <CardTitle className="text-[18px] text-[#e6edf3]">Benchmark comparison</CardTitle>
-                  <CardDescription className="text-[13px] text-[#768390]">Current holdings basket compared against ASPI and S&P SL20 on a normalized 100-base chart.</CardDescription>
+                  <CardTitle className="text-[18px] text-[var(--color-text-primary)]">Benchmark comparison</CardTitle>
+                  <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Current holdings basket compared against ASPI and S&P SL20 on a normalized 100-base chart.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4 p-6">
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <div className="rounded-lg border border-[#30363d] bg-[#0d1117] p-3">
-                      <div className="text-[12px] text-[#768390]">Portfolio</div>
+                    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-3">
+                      <div className="text-[12px] text-[var(--color-text-tertiary)]">Portfolio</div>
                       <div className={`text-[18px] font-semibold ${analytics.benchmark.portfolioReturnPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>{signedPercent(analytics.benchmark.portfolioReturnPct)}</div>
                     </div>
-                    <div className="rounded-lg border border-[#30363d] bg-[#0d1117] p-3">
-                      <div className="text-[12px] text-[#768390]">ASPI</div>
+                    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-3">
+                      <div className="text-[12px] text-[var(--color-text-tertiary)]">ASPI</div>
                       <div className={`text-[18px] font-semibold ${analytics.benchmark.aspiReturnPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>{signedPercent(analytics.benchmark.aspiReturnPct)}</div>
                     </div>
-                    <div className="rounded-lg border border-[#30363d] bg-[#0d1117] p-3">
-                      <div className="text-[12px] text-[#768390]">S&P SL20</div>
+                    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-3">
+                      <div className="text-[12px] text-[var(--color-text-tertiary)]">S&P SL20</div>
                       <div className={`text-[18px] font-semibold ${analytics.benchmark.sp20ReturnPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>{signedPercent(analytics.benchmark.sp20ReturnPct)}</div>
                     </div>
                   </div>
                   {analyticsLoading ? (
-                    <div className="flex h-[260px] items-center justify-center text-[#768390]"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading benchmark comparison...</div>
+                    <div className="flex h-[260px] items-center justify-center text-[var(--color-text-tertiary)]"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading benchmark comparison...</div>
                   ) : benchmarkChartData.length === 0 ? (
-                    <div className="flex h-[260px] items-center justify-center text-center text-[#768390]">Add positions with price history to compare against the market benchmarks.</div>
+                    <div className="flex h-[260px] items-center justify-center text-center text-[var(--color-text-tertiary)]">Add positions with price history to compare against the market benchmarks.</div>
                   ) : (
                     <div className="h-[260px]">
                       <ResponsiveContainer width="100%" height="100%">
@@ -1189,21 +1189,21 @@ export function Portfolio() {
           </div>
         )}
 
-          <Card className="border-[#30363d] bg-[#161b22]">
+          <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-[18px] text-[#e6edf3]"><ShoppingBag className="h-5 w-5 text-emerald-500" />Quick add from watchlist</CardTitle>
-              <CardDescription className="text-[13px] text-[#768390]">Turn watched symbols into real holdings faster. We prefill the symbol and trade date for you.</CardDescription>
+              <CardTitle className="flex items-center gap-2 text-[18px] text-[var(--color-text-primary)]"><ShoppingBag className="h-5 w-5 text-emerald-500" />Quick add from watchlist</CardTitle>
+              <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Turn watched symbols into real holdings faster. We prefill the symbol and trade date for you.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {watchlistCandidates.length === 0 ? (
-                <p className="text-[13px] text-[#768390]">Your current watchlist items are already in the portfolio, or the watchlist is still empty.</p>
+                <p className="text-[13px] text-[var(--color-text-tertiary)]">Your current watchlist items are already in the portfolio, or the watchlist is still empty.</p>
               ) : (
                 watchlistCandidates.map((item) => (
-                  <div key={item.symbol} className="flex items-center justify-between gap-3 rounded-lg border border-[#30363d] bg-[#0d1117] p-3">
+                  <div key={item.symbol} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-3">
                     <div>
-                      <p className="text-[13px] font-semibold text-[#e6edf3]">{item.symbol}</p>
-                      <p className="text-[12px] text-[#768390]">{item.company}</p>
-                      <p className="text-[12px] text-[#768390]">Last {money(item.lastPrice)}</p>
+                      <p className="text-[13px] font-semibold text-[var(--color-text-primary)]">{item.symbol}</p>
+                      <p className="text-[12px] text-[var(--color-text-tertiary)]">{item.company}</p>
+                      <p className="text-[12px] text-[var(--color-text-tertiary)]">Last {money(item.lastPrice)}</p>
                     </div>
                     <Button onClick={() => openAddDialog(item.symbol)} className="bg-emerald-600 text-white hover:bg-emerald-700"><Plus className="mr-2 h-4 w-4" />Add buy</Button>
                   </div>
@@ -1212,95 +1212,95 @@ export function Portfolio() {
             </CardContent>
           </Card>
 
-        <Card className={activePanel === "holdings" ? "border-[#30363d] bg-[#161b22]" : "hidden"}>
+        <Card className={activePanel === "holdings" ? "border-[var(--color-border)] bg-[var(--color-bg-tertiary)]" : "hidden"}>
           <CardHeader className="flex flex-row items-center justify-between gap-3">
             <div>
-              <CardTitle className="text-[18px] text-[#e6edf3]">Holdings</CardTitle>
-              <CardDescription className="text-[13px] text-[#768390]">Current open positions calculated from your buy and sell history.</CardDescription>
+              <CardTitle className="text-[18px] text-[var(--color-text-primary)]">Holdings</CardTitle>
+              <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Current open positions calculated from your buy and sell history.</CardDescription>
             </div>
-            <Badge variant="outline" className="border-[#30363d] text-[#768390]">{portfolio.positions.length} holdings</Badge>
+            <Badge variant="outline" className="border-[var(--color-border)] text-[var(--color-text-tertiary)]">{portfolio.positions.length} holdings</Badge>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
-                <TableRow className="border-[#30363d] hover:bg-transparent">
-                  <TableHead className="text-[#768390]">Symbol</TableHead>
-                  <TableHead className="text-[#768390]">Quantity</TableHead>
-                  <TableHead className="text-[#768390]">Avg Cost</TableHead>
-                  <TableHead className="text-[#768390]">Current</TableHead>
-                  <TableHead className="text-[#768390]">Market Value</TableHead>
-                  <TableHead className="text-[#768390]">Unrealized P/L</TableHead>
-                  <TableHead className="text-[#768390]">Weight</TableHead>
-                  <TableHead className="text-[#768390]">Smart Status</TableHead>
+                <TableRow className="border-[var(--color-border)] hover:bg-transparent">
+                  <TableHead className="text-[var(--color-text-tertiary)]">Symbol</TableHead>
+                  <TableHead className="text-[var(--color-text-tertiary)]">Quantity</TableHead>
+                  <TableHead className="text-[var(--color-text-tertiary)]">Avg Cost</TableHead>
+                  <TableHead className="text-[var(--color-text-tertiary)]">Current</TableHead>
+                  <TableHead className="text-[var(--color-text-tertiary)]">Market Value</TableHead>
+                  <TableHead className="text-[var(--color-text-tertiary)]">Unrealized P/L</TableHead>
+                  <TableHead className="text-[var(--color-text-tertiary)]">Weight</TableHead>
+                  <TableHead className="text-[var(--color-text-tertiary)]">Smart Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {portfolio.positions.map((position) => (
-                  <TableRow key={position.symbol} className="border-[#30363d] hover:bg-[#1c2128]">
+                  <TableRow key={position.symbol} className="border-[var(--color-border)] hover:bg-[var(--color-bg-elevated)]">
                     <TableCell>
-                      <div className="font-medium text-[#e6edf3]">{position.symbol}</div>
-                      <div className="text-[12px] text-[#768390]">{position.company}</div>
+                      <div className="font-medium text-[var(--color-text-primary)]">{position.symbol}</div>
+                      <div className="text-[12px] text-[var(--color-text-tertiary)]">{position.company}</div>
                     </TableCell>
-                    <TableCell className="text-[#e6edf3]">{position.quantity.toLocaleString("en-LK")}</TableCell>
-                    <TableCell className="text-[#e6edf3]">{money(position.avgCost)}</TableCell>
-                    <TableCell className="text-[#e6edf3]">{money(position.currentPrice)}</TableCell>
-                    <TableCell className="text-[#e6edf3]">{money(position.marketValue)}</TableCell>
+                    <TableCell className="text-[var(--color-text-primary)]">{position.quantity.toLocaleString("en-LK")}</TableCell>
+                    <TableCell className="text-[var(--color-text-primary)]">{money(position.avgCost)}</TableCell>
+                    <TableCell className="text-[var(--color-text-primary)]">{money(position.currentPrice)}</TableCell>
+                    <TableCell className="text-[var(--color-text-primary)]">{money(position.marketValue)}</TableCell>
                     <TableCell className={position.unrealizedPl >= 0 ? "text-emerald-400" : "text-red-400"}>{money(position.unrealizedPl)} <span className="ml-1 text-[12px]">({signedPercent(position.unrealizedPlPct)})</span></TableCell>
-                    <TableCell className="text-[#e6edf3]">{position.weightPct.toFixed(2)}%</TableCell>
-                    <TableCell>{(() => { const item = intelligence.holdings.find((h) => h.symbol === position.symbol); return item ? <div className="space-y-1"><Badge variant="outline" className={statusBadgeClass(item.status)}>{item.statusLabel}</Badge><div className="text-[11px] text-[#768390]">Fit {item.fitScore}/100 · Risk {item.riskScore}/100</div></div> : <span className="text-[#768390]">—</span>; })()}</TableCell>
+                    <TableCell className="text-[var(--color-text-primary)]">{position.weightPct.toFixed(2)}%</TableCell>
+                    <TableCell>{(() => { const item = intelligence.holdings.find((h) => h.symbol === position.symbol); return item ? <div className="space-y-1"><Badge variant="outline" className={statusBadgeClass(item.status)}>{item.statusLabel}</Badge><div className="text-[11px] text-[var(--color-text-tertiary)]">Fit {item.fitScore}/100 · Risk {item.riskScore}/100</div></div> : <span className="text-[var(--color-text-tertiary)]">—</span>; })()}</TableCell>
                   </TableRow>
                 ))}
-                {!loading && portfolio.positions.length === 0 && <TableRow><TableCell colSpan={8} className="py-8 text-center text-[#768390]">No holdings yet. Add your first buy transaction to start tracking your portfolio.</TableCell></TableRow>}
+                {!loading && portfolio.positions.length === 0 && <TableRow><TableCell colSpan={8} className="py-8 text-center text-[var(--color-text-tertiary)]">No holdings yet. Add your first buy transaction to start tracking your portfolio.</TableCell></TableRow>}
               </TableBody>
             </Table>
           </CardContent>
         </Card>
 
-        <Card className={activePanel === "events" ? "border-[#30363d] bg-[#161b22]" : "hidden"}>
+        <Card className={activePanel === "events" ? "border-[var(--color-border)] bg-[var(--color-bg-tertiary)]" : "hidden"}>
           <CardHeader>
-            <CardTitle className="text-[18px] text-[#e6edf3]">Recent corporate actions</CardTitle>
-            <CardDescription className="text-[13px] text-[#768390]">Dividends, splits, and bonus issues stored in the system and used in portfolio calculations.</CardDescription>
+            <CardTitle className="text-[18px] text-[var(--color-text-primary)]">Recent corporate actions</CardTitle>
+            <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Dividends, splits, and bonus issues stored in the system and used in portfolio calculations.</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
-                <TableRow className="border-[#30363d] hover:bg-transparent">
-                  <TableHead className="text-[#768390]">Ex date</TableHead>
-                  <TableHead className="text-[#768390]">Symbol</TableHead>
-                  <TableHead className="text-[#768390]">Type</TableHead>
-                  <TableHead className="text-[#768390]">Details</TableHead>
+                <TableRow className="border-[var(--color-border)] hover:bg-transparent">
+                  <TableHead className="text-[var(--color-text-tertiary)]">Ex date</TableHead>
+                  <TableHead className="text-[var(--color-text-tertiary)]">Symbol</TableHead>
+                  <TableHead className="text-[var(--color-text-tertiary)]">Type</TableHead>
+                  <TableHead className="text-[var(--color-text-tertiary)]">Details</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {(portfolio.recentActions || []).slice(0, 8).map((action) => (
-                  <TableRow key={action.id} className="border-[#30363d] hover:bg-[#1c2128]">
-                    <TableCell className="text-[#e6edf3]">{compactDate(action.exDate)}</TableCell>
-                    <TableCell className="font-medium text-[#e6edf3]">{action.symbol}</TableCell>
-                    <TableCell className="text-[#e6edf3]">{action.actionType}</TableCell>
-                    <TableCell className="text-[#768390]">{action.amount ? money(action.amount) : action.ratioNumerator && action.ratioDenominator ? `${action.ratioNumerator}:${action.ratioDenominator}` : action.description || "—"}</TableCell>
+                  <TableRow key={action.id} className="border-[var(--color-border)] hover:bg-[var(--color-bg-elevated)]">
+                    <TableCell className="text-[var(--color-text-primary)]">{compactDate(action.exDate)}</TableCell>
+                    <TableCell className="font-medium text-[var(--color-text-primary)]">{action.symbol}</TableCell>
+                    <TableCell className="text-[var(--color-text-primary)]">{action.actionType}</TableCell>
+                    <TableCell className="text-[var(--color-text-tertiary)]">{action.amount ? money(action.amount) : action.ratioNumerator && action.ratioDenominator ? `${action.ratioNumerator}:${action.ratioDenominator}` : action.description || "—"}</TableCell>
                   </TableRow>
                 ))}
-                {!(portfolio.recentActions || []).length && <TableRow><TableCell colSpan={4} className="py-8 text-center text-[#768390]">No corporate actions stored yet.</TableCell></TableRow>}
+                {!(portfolio.recentActions || []).length && <TableRow><TableCell colSpan={4} className="py-8 text-center text-[var(--color-text-tertiary)]">No corporate actions stored yet.</TableCell></TableRow>}
               </TableBody>
             </Table>
           </CardContent>
         </Card>
 
-        <Card className={activePanel === "import" ? "border-[#30363d] bg-[#161b22]" : "hidden"}>
+        <Card className={activePanel === "import" ? "border-[var(--color-border)] bg-[var(--color-bg-tertiary)]" : "hidden"}>
           <CardHeader>
-            <CardTitle className="text-[18px] text-[#e6edf3]">Broker statement import</CardTitle>
-            <CardDescription className="text-[13px] text-[#768390]">Import broker contract notes / statement CSVs or your TradexaLK transaction CSV. We auto-detect common broker statement formats.</CardDescription>
+            <CardTitle className="text-[18px] text-[var(--color-text-primary)]">Broker statement import</CardTitle>
+            <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Import broker contract notes / statement CSVs or your TradexaLK transaction CSV. We auto-detect common broker statement formats.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
               <div className="space-y-3">
-                <Input type="file" accept=".csv,text/csv" onChange={(e) => { const file = e.target.files?.[0] || null; setCsvFile(file); if (file) previewCsvImport(file); else setCsvPreview(null); }} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
+                <Input type="file" accept=".csv,text/csv" onChange={(e) => { const file = e.target.files?.[0] || null; setCsvFile(file); if (file) previewCsvImport(file); else setCsvPreview(null); }} className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]" />
                 {importError ? <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-[13px] text-red-300">{importError}</div> : null}
-                <div className="text-[12px] text-[#768390]">Supported columns include generic fields like <span className="text-[#e6edf3]">symbol, type, quantity, price, fees, date</span> and broker statement fields like <span className="text-[#e6edf3]">trade date, side, rate, brokerage, contract no</span>.</div>
+                <div className="text-[12px] text-[var(--color-text-tertiary)]">Supported columns include generic fields like <span className="text-[var(--color-text-primary)]">symbol, type, quantity, price, fees, date</span> and broker statement fields like <span className="text-[var(--color-text-primary)]">trade date, side, rate, brokerage, contract no</span>.</div>
               </div>
-              <div className="rounded-lg border border-[#30363d] bg-[#0d1117] p-4 text-[13px]">
-                <div className="mb-2 font-semibold text-[#e6edf3]">Preview</div>
-                {csvPreview ? <div className="space-y-2 text-[#768390]"><div className="flex justify-between"><span>Detected broker</span><span className="text-[#e6edf3]">{csvPreview.detected_broker || 'Auto'}</span></div><div className="flex justify-between"><span>Detected format</span><span className="text-[#e6edf3]">{csvPreview.detected_format || 'generic_csv'}</span></div><div className="flex justify-between"><span>Rows</span><span className="text-[#e6edf3]">{csvPreview.rows || 0}</span></div><div className="flex justify-between"><span>Valid rows</span><span className="text-emerald-400">{csvPreview.valid_rows || 0}</span></div><div className="flex justify-between"><span>Invalid rows</span><span className={(csvPreview.invalid_rows || 0) > 0 ? 'text-red-400' : 'text-[#e6edf3]'}>{csvPreview.invalid_rows || 0}</span></div>{(csvPreview.symbols || []).length ? <div><div className="mb-1 text-[#768390]">Symbols</div><div className="text-[#e6edf3]">{csvPreview.symbols.slice(0, 8).join(', ')}{csvPreview.symbols.length > 8 ? '…' : ''}</div></div> : null}</div> : <div className="text-[#768390]">Choose a statement CSV to preview the mapped trades.</div>}
+              <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4 text-[13px]">
+                <div className="mb-2 font-semibold text-[var(--color-text-primary)]">Preview</div>
+                {csvPreview ? <div className="space-y-2 text-[var(--color-text-tertiary)]"><div className="flex justify-between"><span>Detected broker</span><span className="text-[var(--color-text-primary)]">{csvPreview.detected_broker || 'Auto'}</span></div><div className="flex justify-between"><span>Detected format</span><span className="text-[var(--color-text-primary)]">{csvPreview.detected_format || 'generic_csv'}</span></div><div className="flex justify-between"><span>Rows</span><span className="text-[var(--color-text-primary)]">{csvPreview.rows || 0}</span></div><div className="flex justify-between"><span>Valid rows</span><span className="text-emerald-400">{csvPreview.valid_rows || 0}</span></div><div className="flex justify-between"><span>Invalid rows</span><span className={(csvPreview.invalid_rows || 0) > 0 ? 'text-red-400' : 'text-[var(--color-text-primary)]'}>{csvPreview.invalid_rows || 0}</span></div>{(csvPreview.symbols || []).length ? <div><div className="mb-1 text-[var(--color-text-tertiary)]">Symbols</div><div className="text-[var(--color-text-primary)]">{csvPreview.symbols.slice(0, 8).join(', ')}{csvPreview.symbols.length > 8 ? '…' : ''}</div></div> : null}</div> : <div className="text-[var(--color-text-tertiary)]">Choose a statement CSV to preview the mapped trades.</div>}
               </div>
             </div>
             <div className="flex gap-3">
@@ -1310,63 +1310,63 @@ export function Portfolio() {
           </CardContent>
         </Card>
 
-        <Card className={activePanel === "events" ? "border-[#30363d] bg-[#161b22]" : "hidden"}>
+        <Card className={activePanel === "events" ? "border-[var(--color-border)] bg-[var(--color-bg-tertiary)]" : "hidden"}>
           <CardHeader>
-            <CardTitle className="text-[18px] text-[#e6edf3]">Earnings / dividend / event calendar</CardTitle>
-            <CardDescription className="text-[13px] text-[#768390]">Upcoming and recent event markers for symbols currently held in this portfolio.</CardDescription>
+            <CardTitle className="text-[18px] text-[var(--color-text-primary)]">Earnings / dividend / event calendar</CardTitle>
+            <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Upcoming and recent event markers for symbols currently held in this portfolio.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-6 lg:grid-cols-2">
               <div className="space-y-3">
                 <div className="text-[13px] font-semibold uppercase tracking-wide text-emerald-400">Upcoming</div>
-                {calendar.upcoming.length ? calendar.upcoming.slice(0, 10).map((item, idx) => <div key={`up-${idx}-${item.date}-${item.symbol}`} className="rounded-lg border border-[#30363d] bg-[#0d1117] p-3"><div className="flex items-center justify-between gap-3"><div><div className="font-medium text-[#e6edf3]">{item.symbol} · {item.title}</div><div className="text-[12px] text-[#768390]">{compactDate(item.date)} · {item.eventType}</div></div><div className="text-[12px] text-emerald-400">{item.daysFromNow === 0 ? 'Today' : `${item.daysFromNow}d`}</div></div></div>) : <div className="text-[13px] text-[#768390]">No upcoming held-stock events stored yet.</div>}
+                {calendar.upcoming.length ? calendar.upcoming.slice(0, 10).map((item, idx) => <div key={`up-${idx}-${item.date}-${item.symbol}`} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-3"><div className="flex items-center justify-between gap-3"><div><div className="font-medium text-[var(--color-text-primary)]">{item.symbol} · {item.title}</div><div className="text-[12px] text-[var(--color-text-tertiary)]">{compactDate(item.date)} · {item.eventType}</div></div><div className="text-[12px] text-emerald-400">{item.daysFromNow === 0 ? 'Today' : `${item.daysFromNow}d`}</div></div></div>) : <div className="text-[13px] text-[var(--color-text-tertiary)]">No upcoming held-stock events stored yet.</div>}
               </div>
               <div className="space-y-3">
                 <div className="text-[13px] font-semibold uppercase tracking-wide text-blue-400">Recent</div>
-                {calendar.recent.length ? calendar.recent.slice(0, 10).map((item, idx) => <div key={`rc-${idx}-${item.date}-${item.symbol}`} className="rounded-lg border border-[#30363d] bg-[#0d1117] p-3"><div className="font-medium text-[#e6edf3]">{item.symbol} · {item.title}</div><div className="text-[12px] text-[#768390]">{compactDate(item.date)} · {item.eventType} · {item.sourceType}</div></div>) : <div className="text-[13px] text-[#768390]">No recent held-stock events stored yet.</div>}
+                {calendar.recent.length ? calendar.recent.slice(0, 10).map((item, idx) => <div key={`rc-${idx}-${item.date}-${item.symbol}`} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-3"><div className="font-medium text-[var(--color-text-primary)]">{item.symbol} · {item.title}</div><div className="text-[12px] text-[var(--color-text-tertiary)]">{compactDate(item.date)} · {item.eventType} · {item.sourceType}</div></div>) : <div className="text-[13px] text-[var(--color-text-tertiary)]">No recent held-stock events stored yet.</div>}
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className={activePanel === "transactions" ? "border-[#30363d] bg-[#161b22]" : "hidden"}>
+        <Card className={activePanel === "transactions" ? "border-[var(--color-border)] bg-[var(--color-bg-tertiary)]" : "hidden"}>
           <CardHeader>
-            <CardTitle className="text-[18px] text-[#e6edf3]">Transaction history</CardTitle>
-            <CardDescription className="text-[13px] text-[#768390]">Every trade used to calculate positions, cost basis, and performance. You can edit mistakes without re-entering everything.</CardDescription>
+            <CardTitle className="text-[18px] text-[var(--color-text-primary)]">Transaction history</CardTitle>
+            <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Every trade used to calculate positions, cost basis, and performance. You can edit mistakes without re-entering everything.</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
-                <TableRow className="border-[#30363d] hover:bg-transparent">
-                  <TableHead className="text-[#768390]">Date</TableHead>
-                  <TableHead className="text-[#768390]">Symbol</TableHead>
-                  <TableHead className="text-[#768390]">Type</TableHead>
-                  <TableHead className="text-[#768390]">Quantity</TableHead>
-                  <TableHead className="text-[#768390]">Price</TableHead>
-                  <TableHead className="text-[#768390]">Fees</TableHead>
-                  <TableHead className="text-[#768390]">Notes</TableHead>
-                  <TableHead className="text-right text-[#768390]">Actions</TableHead>
+                <TableRow className="border-[var(--color-border)] hover:bg-transparent">
+                  <TableHead className="text-[var(--color-text-tertiary)]">Date</TableHead>
+                  <TableHead className="text-[var(--color-text-tertiary)]">Symbol</TableHead>
+                  <TableHead className="text-[var(--color-text-tertiary)]">Type</TableHead>
+                  <TableHead className="text-[var(--color-text-tertiary)]">Quantity</TableHead>
+                  <TableHead className="text-[var(--color-text-tertiary)]">Price</TableHead>
+                  <TableHead className="text-[var(--color-text-tertiary)]">Fees</TableHead>
+                  <TableHead className="text-[var(--color-text-tertiary)]">Notes</TableHead>
+                  <TableHead className="text-right text-[var(--color-text-tertiary)]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {portfolio.transactions.map((tx) => (
-                  <TableRow key={tx.id} className="border-[#30363d] hover:bg-[#1c2128]">
-                    <TableCell className="text-[#e6edf3]">{compactDate(tx.tradedAt || tx.createdAt)}</TableCell>
-                    <TableCell className="font-medium text-[#e6edf3]">{tx.symbol}</TableCell>
+                  <TableRow key={tx.id} className="border-[var(--color-border)] hover:bg-[var(--color-bg-elevated)]">
+                    <TableCell className="text-[var(--color-text-primary)]">{compactDate(tx.tradedAt || tx.createdAt)}</TableCell>
+                    <TableCell className="font-medium text-[var(--color-text-primary)]">{tx.symbol}</TableCell>
                     <TableCell><Badge className={tx.type === "buy" ? "bg-emerald-600/20 text-emerald-400 border-emerald-500/30" : "bg-red-600/20 text-red-400 border-red-500/30"}>{tx.type.toUpperCase()}</Badge></TableCell>
-                    <TableCell className="text-[#e6edf3]">{tx.quantity.toLocaleString("en-LK")}</TableCell>
-                    <TableCell className="text-[#e6edf3]">{money(tx.price)}</TableCell>
-                    <TableCell className="text-[#e6edf3]">{money(tx.fees)}</TableCell>
-                    <TableCell className="max-w-[280px] text-[#768390]">{tx.notes || "—"}</TableCell>
+                    <TableCell className="text-[var(--color-text-primary)]">{tx.quantity.toLocaleString("en-LK")}</TableCell>
+                    <TableCell className="text-[var(--color-text-primary)]">{money(tx.price)}</TableCell>
+                    <TableCell className="text-[var(--color-text-primary)]">{money(tx.fees)}</TableCell>
+                    <TableCell className="max-w-[280px] text-[var(--color-text-tertiary)]">{tx.notes || "—"}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button variant="outline" size="sm" onClick={() => openEditDialog(tx)} className="border-[#30363d] text-[#e6edf3] hover:bg-[#1c2128]"><Pencil className="mr-2 h-4 w-4" />Edit</Button>
+                        <Button variant="outline" size="sm" onClick={() => openEditDialog(tx)} className="border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]"><Pencil className="mr-2 h-4 w-4" />Edit</Button>
                         <Button variant="outline" size="sm" onClick={() => deleteTransaction(tx.id)} className="border-red-500/30 text-red-400 hover:bg-red-500/10"><Trash2 className="mr-2 h-4 w-4" />Delete</Button>
                       </div>
                     </TableCell>
                   </TableRow>
                 ))}
-                {!loading && portfolio.transactions.length === 0 && <TableRow><TableCell colSpan={8} className="py-8 text-center text-[#768390]">No transactions recorded yet.</TableCell></TableRow>}
+                {!loading && portfolio.transactions.length === 0 && <TableRow><TableCell colSpan={8} className="py-8 text-center text-[var(--color-text-tertiary)]">No transactions recorded yet.</TableCell></TableRow>}
               </TableBody>
             </Table>
           </CardContent>
@@ -1374,29 +1374,29 @@ export function Portfolio() {
 
         {/* Journal Panel */}
         <div className={activePanel === "journal" ? "block space-y-4" : "hidden"}>
-          <Card className="border-[#30363d] bg-[#161b22]">
-            <CardHeader className="border-b border-[#30363d] pb-4">
-              <CardTitle className="text-[18px] text-[#e6edf3]">Trading Journal</CardTitle>
-              <CardDescription className="text-[13px] text-[#768390]">Keep track of multiple notes, strategies, and market thoughts over time.</CardDescription>
+          <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
+            <CardHeader className="border-b border-[var(--color-border)] pb-4">
+              <CardTitle className="text-[18px] text-[var(--color-text-primary)]">Trading Journal</CardTitle>
+              <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Keep track of multiple notes, strategies, and market thoughts over time.</CardDescription>
             </CardHeader>
             <CardContent className="pt-4 space-y-6">
 
               {/* Add Note Section */}
-              <div className="space-y-3 rounded-lg border border-[#30363d] bg-[#0d1117] p-4">
+              <div className="space-y-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4">
                 <Textarea
                   value={newNoteText}
                   onChange={(e) => setNewNoteText(e.target.value)}
                   placeholder="What's your strategy? Did you learn anything today?"
-                  className="min-h-[100px] border-none bg-transparent focus-visible:ring-0 p-0 text-[#e6edf3] placeholder:text-[#768390] resize-none"
+                  className="min-h-[100px] border-none bg-transparent focus-visible:ring-0 p-0 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-tertiary)] resize-none"
                 />
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-t border-[#30363d] pt-3">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-t border-[var(--color-border)] pt-3">
                   <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-[#768390]" />
+                    <Clock className="h-4 w-4 text-[var(--color-text-tertiary)]" />
                     <input
                       type="datetime-local"
                       value={reminderTime}
                       onChange={(e) => setReminderTime(e.target.value)}
-                      className="bg-transparent text-[13px] text-[#e6edf3] outline-none"
+                      className="bg-transparent text-[13px] text-[var(--color-text-primary)] outline-none"
                       style={{ colorScheme: 'dark' }}
                     />
                     {reminderTime && <span className="text-[11px] text-amber-400">Reminder will be set</span>}
@@ -1414,20 +1414,20 @@ export function Portfolio() {
               {/* Notes List */}
               <div className="space-y-4">
                 {notes.length === 0 ? (
-                  <div className="py-8 text-center text-[#768390]">No notes yet. Add your first note above.</div>
+                  <div className="py-8 text-center text-[var(--color-text-tertiary)]">No notes yet. Add your first note above.</div>
                 ) : (
                   notes.map(note => (
-                    <div key={note.id} className="relative rounded-lg border border-[#30363d] bg-[#0d1117]/50 p-4 group">
+                    <div key={note.id} className="relative rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)]/50 p-4 group">
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="absolute top-2 right-2 h-6 w-6 text-[#768390] opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-red-500/10 transition-opacity"
+                        className="absolute top-2 right-2 h-6 w-6 text-[var(--color-text-tertiary)] opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-red-500/10 transition-opacity"
                         onClick={() => handleDeleteNote(note.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                       <div className="flex items-center gap-3 mb-2">
-                        <span className="text-[12px] font-medium text-[#768390]">{new Date(note.createdAt).toLocaleString()}</span>
+                        <span className="text-[12px] font-medium text-[var(--color-text-tertiary)]">{new Date(note.createdAt).toLocaleString()}</span>
                         {note.reminderAt && (() => {
                           const isTriggered = new Date(note.reminderAt).getTime() <= Date.now();
                           return (
@@ -1438,7 +1438,7 @@ export function Portfolio() {
                           );
                         })()}
                       </div>
-                      <div className="whitespace-pre-wrap text-[14px] text-[#e6edf3]">
+                      <div className="whitespace-pre-wrap text-[14px] text-[var(--color-text-primary)]">
                         {note.text}
                       </div>
                     </div>

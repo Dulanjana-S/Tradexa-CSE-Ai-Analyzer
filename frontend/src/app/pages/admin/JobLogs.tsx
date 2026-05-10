@@ -46,34 +46,34 @@ export function JobLogs() {
   }), [jobs, searchQuery, statusFilter, typeFilter]);
 
   return (
-    <div className="min-h-screen bg-[#08090c]">
+    <div className="min-h-screen bg-[var(--color-bg-primary)]">
       <div className="mx-auto max-w-[1680px] px-6 py-8 lg:px-8 space-y-8">
         <div className="space-y-1.5">
-          <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[#e6edf3]">Job Logs</h1>
-          <p className="text-[13px] text-[#768390]">Inspect background activity and execution history</p>
+          <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[var(--color-text-primary)]">Job Logs</h1>
+          <p className="text-[13px] text-[var(--color-text-tertiary)]">Inspect background activity and execution history</p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
-          <Card className="border-[#30363d] bg-[#161b22]"><CardHeader className="pb-2"><CardDescription className="text-[#768390]">Total Jobs</CardDescription></CardHeader><CardContent><div className="text-[28px] font-bold text-[#e6edf3]">{jobs.length}</div></CardContent></Card>
-          <Card className="border-[#30363d] bg-[#161b22]"><CardHeader className="pb-2"><CardDescription className="text-[#768390]">Completed</CardDescription></CardHeader><CardContent><div className="text-[28px] font-bold text-[#e6edf3]">{jobs.filter((job) => String(job.status).toLowerCase() === "completed").length}</div></CardContent></Card>
-          <Card className="border-[#30363d] bg-[#161b22]"><CardHeader className="pb-2"><CardDescription className="text-[#768390]">Running</CardDescription></CardHeader><CardContent><div className="text-[28px] font-bold text-[#e6edf3]">{jobs.filter((job) => String(job.status).toLowerCase() === "running").length}</div></CardContent></Card>
+          <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]"><CardHeader className="pb-2"><CardDescription className="text-[var(--color-text-tertiary)]">Total Jobs</CardDescription></CardHeader><CardContent><div className="text-[28px] font-bold text-[var(--color-text-primary)]">{jobs.length}</div></CardContent></Card>
+          <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]"><CardHeader className="pb-2"><CardDescription className="text-[var(--color-text-tertiary)]">Completed</CardDescription></CardHeader><CardContent><div className="text-[28px] font-bold text-[var(--color-text-primary)]">{jobs.filter((job) => String(job.status).toLowerCase() === "completed").length}</div></CardContent></Card>
+          <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]"><CardHeader className="pb-2"><CardDescription className="text-[var(--color-text-tertiary)]">Running</CardDescription></CardHeader><CardContent><div className="text-[28px] font-bold text-[var(--color-text-primary)]">{jobs.filter((job) => String(job.status).toLowerCase() === "running").length}</div></CardContent></Card>
         </div>
 
-        <Card className="border-[#30363d] bg-[#161b22]">
+        <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
           <CardHeader>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <CardTitle className="text-[18px] text-[#e6edf3]">Execution History</CardTitle>
-                <CardDescription className="text-[13px] text-[#768390]">Filter by status and job type</CardDescription>
+                <CardTitle className="text-[18px] text-[var(--color-text-primary)]">Execution History</CardTitle>
+                <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Filter by status and job type</CardDescription>
               </div>
               <div className="flex flex-col gap-3 sm:flex-row">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#768390]" />
-                  <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search logs" className="w-full sm:w-64 border-[#30363d] bg-[#0d1117] pl-10 text-[#e6edf3]" />
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-tertiary)]" />
+                  <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search logs" className="w-full sm:w-64 border-[var(--color-border)] bg-[var(--color-bg-secondary)] pl-10 text-[var(--color-text-primary)]" />
                 </div>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="h-10 w-full border-[#30363d] bg-[#0d1117] text-[13px] text-[#e6edf3] sm:w-40"><SelectValue /></SelectTrigger>
-                  <SelectContent className="border-[#30363d] bg-[#161b22]">
+                  <SelectTrigger className="h-10 w-full border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[13px] text-[var(--color-text-primary)] sm:w-40"><SelectValue /></SelectTrigger>
+                  <SelectContent className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
                     <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="completed">Completed</SelectItem>
                     <SelectItem value="running">Running</SelectItem>
@@ -81,8 +81,8 @@ export function JobLogs() {
                   </SelectContent>
                 </Select>
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger className="h-10 w-full border-[#30363d] bg-[#0d1117] text-[13px] text-[#e6edf3] sm:w-40"><SelectValue /></SelectTrigger>
-                  <SelectContent className="border-[#30363d] bg-[#161b22]">
+                  <SelectTrigger className="h-10 w-full border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[13px] text-[var(--color-text-primary)] sm:w-40"><SelectValue /></SelectTrigger>
+                  <SelectContent className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
                     <SelectItem value="all">All Types</SelectItem>
                     <SelectItem value="sync">Sync</SelectItem>
                     <SelectItem value="train">Training</SelectItem>
@@ -94,28 +94,28 @@ export function JobLogs() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="py-16 text-center text-[#768390]"><Loader2 className="mr-2 inline h-5 w-5 animate-spin" /> Loading jobs...</div>
+              <div className="py-16 text-center text-[var(--color-text-tertiary)]"><Loader2 className="mr-2 inline h-5 w-5 animate-spin" /> Loading jobs...</div>
             ) : (
               <Table>
                 <TableHeader>
-                  <TableRow className="border-[#30363d] hover:bg-transparent">
-                    <TableHead className="text-[#768390]">Job</TableHead>
-                    <TableHead className="text-[#768390]">Type</TableHead>
-                    <TableHead className="text-[#768390]">Status</TableHead>
-                    <TableHead className="text-[#768390]">Started</TableHead>
-                    <TableHead className="text-[#768390]">Finished</TableHead>
-                    <TableHead className="text-[#768390]">Details</TableHead>
+                  <TableRow className="border-[var(--color-border)] hover:bg-transparent">
+                    <TableHead className="text-[var(--color-text-tertiary)]">Job</TableHead>
+                    <TableHead className="text-[var(--color-text-tertiary)]">Type</TableHead>
+                    <TableHead className="text-[var(--color-text-tertiary)]">Status</TableHead>
+                    <TableHead className="text-[var(--color-text-tertiary)]">Started</TableHead>
+                    <TableHead className="text-[var(--color-text-tertiary)]">Finished</TableHead>
+                    <TableHead className="text-[var(--color-text-tertiary)]">Details</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredJobs.map((job) => (
-                    <TableRow key={job.id} className="border-[#30363d]">
-                      <TableCell className="font-medium text-[#e6edf3]">{job.name}</TableCell>
-                      <TableCell className="text-[#768390]">{job.type}</TableCell>
-                      <TableCell className="text-[#768390]">{job.status}</TableCell>
-                      <TableCell className="text-[#768390]">{job.startedAt || "—"}</TableCell>
-                      <TableCell className="text-[#768390]">{job.completedAt || "—"}</TableCell>
-                      <TableCell className="max-w-sm text-[#768390]">{formatJobDetails(job.details)}</TableCell>
+                    <TableRow key={job.id} className="border-[var(--color-border)]">
+                      <TableCell className="font-medium text-[var(--color-text-primary)]">{job.name}</TableCell>
+                      <TableCell className="text-[var(--color-text-tertiary)]">{job.type}</TableCell>
+                      <TableCell className="text-[var(--color-text-tertiary)]">{job.status}</TableCell>
+                      <TableCell className="text-[var(--color-text-tertiary)]">{job.startedAt || "—"}</TableCell>
+                      <TableCell className="text-[var(--color-text-tertiary)]">{job.completedAt || "—"}</TableCell>
+                      <TableCell className="max-w-sm text-[var(--color-text-tertiary)]">{formatJobDetails(job.details)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

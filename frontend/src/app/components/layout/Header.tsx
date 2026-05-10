@@ -41,28 +41,28 @@ export function Header({ onMenuClick }: HeaderProps) {
       return {
         label: marketStatus,
         dotClass: "bg-amber-500",
-        badgeClass: "border-amber-400/60 bg-amber-500/20 text-white shadow-[0_0_14px_rgba(245,158,11,0.35)]",
+        badgeClass: "border-amber-400/60 bg-amber-500/10 text-amber-600 dark:text-amber-400 shadow-[0_0_14px_rgba(245,158,11,0.2)]",
       };
     }
     if (normalized.includes("halt") || normalized.includes("suspend")) {
       return {
         label: marketStatus,
         dotClass: "bg-orange-500",
-        badgeClass: "border-orange-400/60 bg-orange-500/20 text-white shadow-[0_0_14px_rgba(249,115,22,0.35)]",
+        badgeClass: "border-orange-400/60 bg-orange-500/10 text-orange-600 dark:text-orange-400 shadow-[0_0_14px_rgba(249,115,22,0.2)]",
       };
     }
     if (normalized.includes("open") || normalized.includes("trading") || normalized.includes("session")) {
       return {
         label: marketStatus,
         dotClass: "bg-emerald-500 animate-pulse",
-        badgeClass: "border-emerald-400/60 bg-emerald-500/20 text-white shadow-[0_0_14px_rgba(16,185,129,0.35)]",
+        badgeClass: "border-emerald-400/60 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shadow-[0_0_14px_rgba(16,185,129,0.2)]",
       };
     }
     if (normalized.includes("close") || normalized.includes("holiday")) {
       return {
         label: marketStatus,
         dotClass: "bg-rose-500",
-        badgeClass: "border-rose-400/60 bg-rose-500/20 text-white shadow-[0_0_14px_rgba(244,63,94,0.35)]",
+        badgeClass: "border-rose-400/60 bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-[0_0_14px_rgba(244,63,94,0.2)]",
       };
     }
     return {
@@ -173,7 +173,14 @@ export function Header({ onMenuClick }: HeaderProps) {
       </Button>
 
       <Link to="/" className="flex shrink-0 items-center gap-2.5">
-        <img src="/logo.png" alt="Tradexa.lk" className="h-9 w-auto object-contain sm:h-11" />
+        <img 
+          src="/logo.png" 
+          alt="Tradexa.lk" 
+          className="h-9 w-auto object-contain sm:h-11 transition-all" 
+          style={{ 
+            filter: theme === 'light' ? 'invert(1) hue-rotate(180deg) brightness(0.2)' : 'none' 
+          }}
+        />
       </Link>
 
       <div className="relative hidden max-w-2xl flex-1 md:block">
@@ -230,7 +237,7 @@ export function Header({ onMenuClick }: HeaderProps) {
             </div>
             <span className="hidden min-[450px]:inline sm:inline">{statusBadge.label}</span>
           </div>
-          <span className="hidden md:inline text-[14px] font-bold tabular-nums text-white lg:text-[15px]">
+          <span className="hidden md:inline text-[14px] font-bold tabular-nums text-[var(--color-text-primary)] lg:text-[15px]">
             {cseClockLabel}
           </span>
         </div>

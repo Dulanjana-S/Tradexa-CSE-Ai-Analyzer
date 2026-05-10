@@ -30,12 +30,12 @@ export function EmptyState({
   };
 
   return (
-    <Card className="bg-[#111823] border-[#1e2938] shadow-sm">
+    <Card className="bg-[var(--color-bg-secondary)] border-[var(--color-border)] shadow-sm">
       <CardContent className="flex flex-col items-center justify-center py-16">
-        <div className="w-20 h-20 rounded-full bg-[#0a0e14] border border-[#1e2938] flex items-center justify-center mb-4">
+        <div className="w-20 h-20 rounded-full bg-[var(--color-bg-primary)] border border-[var(--color-border)] flex items-center justify-center mb-4">
           {getIcon()}
         </div>
-        <h3 className="text-lg font-semibold text-slate-300">{title}</h3>
+        <h3 className="text-lg font-semibold text-[var(--color-text-secondary)]">{title}</h3>
         <p className="mt-2 text-sm text-slate-500 max-w-md text-center leading-relaxed">
           {description}
         </p>

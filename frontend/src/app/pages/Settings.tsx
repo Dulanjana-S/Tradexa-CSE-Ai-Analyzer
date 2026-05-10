@@ -61,15 +61,15 @@ function ToggleRow({
   onChange: (value: boolean) => void;
 }) {
   return (
-    <div className={`flex items-start justify-between gap-4 rounded-xl border p-4 ${disabled ? "border-[#2a313b] bg-[#0f1319]/70 opacity-70" : "border-[#30363d] bg-[#0d1117]"}`}>
+    <div className={`flex items-start justify-between gap-4 rounded-xl border p-4 ${disabled ? "border-[var(--color-border)] bg-[var(--color-bg-primary)]/70 opacity-70" : "border-[var(--color-border)] bg-[var(--color-bg-secondary)]"}`}>
       <div className="space-y-1">
         <div className="flex items-center gap-2">
-          <Label className="text-[13px] font-semibold text-[#e6edf3]">{title}</Label>
-          <Badge className={checked ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : "border-[#3a4450] bg-[#111927] text-[#9da7b3]"}>
+          <Label className="text-[13px] font-semibold text-[var(--color-text-primary)]">{title}</Label>
+          <Badge className={checked ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : "border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-muted)]"}>
             {checked ? "On" : "Off"}
           </Badge>
         </div>
-        <p className="text-[12px] text-[#768390]">{description}</p>
+        <p className="text-[12px] text-[var(--color-text-tertiary)]">{description}</p>
       </div>
       <Switch checked={checked} onCheckedChange={onChange} disabled={disabled} />
     </div>
@@ -187,18 +187,18 @@ export function Settings() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#08090c] text-[#768390]">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--color-bg-primary)] text-[var(--color-text-tertiary)]">
         <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading settings...
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#08090c]">
+    <div className="min-h-screen bg-[var(--color-bg-primary)]">
       <div className="mx-auto max-w-[1200px] px-6 py-8 lg:px-8">
         <div className="mb-8 space-y-1.5">
-          <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[#e6edf3]">Settings</h1>
-          <p className="text-[13px] text-[#768390]">Manage your account settings, delivery channels, and portfolio experience.</p>
+          <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[var(--color-text-primary)]">Settings</h1>
+          <p className="text-[13px] text-[var(--color-text-tertiary)]">Manage your account settings, delivery channels, and portfolio experience.</p>
           {message && <p className="text-[13px] text-emerald-400">{message}</p>}
         </div>
 
@@ -213,34 +213,34 @@ export function Settings() {
           </TabsList>
 
           <TabsContent value="profile" className="space-y-6">
-            <Card className="border-[#30363d] bg-[#161b22]">
+            <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
               <CardHeader>
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-md bg-emerald-500/10"><User className="h-5 w-5 text-emerald-500" /></div>
                   <div>
-                    <CardTitle className="text-[18px] text-[#e6edf3]">Profile Information</CardTitle>
-                    <CardDescription className="text-[13px] text-[#768390]">Update your account profile information.</CardDescription>
+                    <CardTitle className="text-[18px] text-[var(--color-text-primary)]">Profile Information</CardTitle>
+                    <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Update your account profile information.</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid gap-6 md:grid-cols-2">
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="fullName" className="text-[#e6edf3]">Full Name</Label>
-                    <Input id="fullName" value={profile.name} onChange={(e) => setProfile((prev) => ({ ...prev, name: e.target.value }))} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
+                    <Label htmlFor="fullName" className="text-[var(--color-text-primary)]">Full Name</Label>
+                    <Input id="fullName" value={profile.name} onChange={(e) => setProfile((prev) => ({ ...prev, name: e.target.value }))} className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="email" className="text-[#e6edf3]">Email Address</Label>
-                    <Input id="email" type="email" value={profile.email} onChange={(e) => setProfile((prev) => ({ ...prev, email: e.target.value }))} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
+                    <Label htmlFor="email" className="text-[var(--color-text-primary)]">Email Address</Label>
+                    <Input id="email" type="email" value={profile.email} onChange={(e) => setProfile((prev) => ({ ...prev, email: e.target.value }))} className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phone" className="text-[#e6edf3]">Phone Number</Label>
-                    <Input id="phone" value={profile.phone} onChange={(e) => setProfile((prev) => ({ ...prev, phone: e.target.value }))} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" />
+                    <Label htmlFor="phone" className="text-[var(--color-text-primary)]">Phone Number</Label>
+                    <Input id="phone" value={profile.phone} onChange={(e) => setProfile((prev) => ({ ...prev, phone: e.target.value }))} className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]" />
                   </div>
                 </div>
-                <Separator className="bg-[#30363d]" />
+                <Separator className="bg-[var(--color-border)]" />
                 <div className="flex justify-end gap-3">
-                  <Button variant="outline" className="border-[#30363d] text-[#768390] hover:bg-[#1c2128] hover:text-[#e6edf3]" onClick={() => window.location.reload()}>
+                  <Button variant="outline" className="border-[var(--color-border)] text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-elevated)] hover:text-[var(--color-text-primary)]" onClick={() => window.location.reload()}>
                     Cancel
                   </Button>
                   <Button className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={saveProfile} disabled={saving}>Save Profile</Button>
@@ -250,13 +250,13 @@ export function Settings() {
           </TabsContent>
 
           <TabsContent value="notifications" className="space-y-6">
-            <Card className="border-[#30363d] bg-[#161b22]">
+            <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
               <CardHeader>
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-md bg-blue-500/10"><Bell className="h-5 w-5 text-blue-500" /></div>
                   <div>
-                    <CardTitle className="text-[18px] text-[#e6edf3]">Notification Preferences</CardTitle>
-                    <CardDescription className="text-[13px] text-[#768390]">Control your in-app notifications and optional email delivery. Advanced webhook delivery has been removed from the user settings page to keep this experience simple and clear.</CardDescription>
+                    <CardTitle className="text-[18px] text-[var(--color-text-primary)]">Notification Preferences</CardTitle>
+                    <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Control your in-app notifications and optional email delivery. Advanced webhook delivery has been removed from the user settings page to keep this experience simple and clear.</CardDescription>
                   </div>
                 </div>
               </CardHeader>
@@ -267,34 +267,34 @@ export function Settings() {
                     <div>You can still review existing alerts and notifications, but new personal alert triggers are temporarily unavailable.</div>
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-[#30363d] bg-[#0d1117] p-4 text-[12px] text-[#9da7b3]">Personal alerts are enabled. Use the Alerts page to create price, move, volume, or announcement alerts for your own portfolio and watchlist.</div>
+                  <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4 text-[12px] text-[var(--color-text-muted)]">Personal alerts are enabled. Use the Alerts page to create price, move, volume, or announcement alerts for your own portfolio and watchlist.</div>
                 )}
 
                 <div className="grid gap-4 md:grid-cols-3">
-                  <Card className="border-[#30363d] bg-[#0d1117]"><CardContent className="p-4"><div className="text-[12px] text-[#768390]">In-app categories on</div><div className="mt-2 text-[24px] font-bold text-[#e6edf3]">{deliverySummary.inAppCount}/4</div></CardContent></Card>
-                  <Card className="border-[#30363d] bg-[#0d1117]"><CardContent className="p-4"><div className="text-[12px] text-[#768390]">Email delivery</div><div className="mt-2 text-[24px] font-bold text-[#e6edf3]">{settings.email_notifications ? "On" : "Off"}</div></CardContent></Card>
-                  <Card className="border-[#30363d] bg-[#0d1117]"><CardContent className="p-4"><div className="text-[12px] text-[#768390]">Email categories on</div><div className="mt-2 text-[24px] font-bold text-[#e6edf3]">{deliverySummary.emailCount}/4</div></CardContent></Card>
+                  <Card className="border-[var(--color-border)] bg-[var(--color-bg-secondary)]"><CardContent className="p-4"><div className="text-[12px] text-[var(--color-text-tertiary)]">In-app categories on</div><div className="mt-2 text-[24px] font-bold text-[var(--color-text-primary)]">{deliverySummary.inAppCount}/4</div></CardContent></Card>
+                  <Card className="border-[var(--color-border)] bg-[var(--color-bg-secondary)]"><CardContent className="p-4"><div className="text-[12px] text-[var(--color-text-tertiary)]">Email delivery</div><div className="mt-2 text-[24px] font-bold text-[var(--color-text-primary)]">{settings.email_notifications ? "On" : "Off"}</div></CardContent></Card>
+                  <Card className="border-[var(--color-border)] bg-[var(--color-bg-secondary)]"><CardContent className="p-4"><div className="text-[12px] text-[var(--color-text-tertiary)]">Email categories on</div><div className="mt-2 text-[24px] font-bold text-[var(--color-text-primary)]">{deliverySummary.emailCount}/4</div></CardContent></Card>
                 </div>
 
                 <div className="space-y-4">
-                  <div className="text-[13px] font-semibold text-[#e6edf3]">In-app notifications</div>
+                  <div className="text-[13px] font-semibold text-[var(--color-text-primary)]">In-app notifications</div>
                   <ToggleRow title="Price alerts" description="Get notified when a personal stock alert condition triggers." checked={Boolean(settings.alert_notifications)} disabled={!userAlertsEnabled} onChange={(checked) => setSettings((prev) => ({ ...prev, alert_notifications: checked }))} />
                   <ToggleRow title="Market announcements" description="Receive important CSE announcement and report-related updates." checked={Boolean(settings.announcement_notifications)} onChange={(checked) => setSettings((prev) => ({ ...prev, announcement_notifications: checked }))} />
                   <ToggleRow title="Market status" description="Receive job, sync, and market status messages from the backend." checked={Boolean(settings.market_status_notifications)} onChange={(checked) => setSettings((prev) => ({ ...prev, market_status_notifications: checked }))} />
                   <ToggleRow title="Watchlist updates" description="Receive important changes for symbols you are tracking." checked={Boolean(settings.watchlist_notifications)} onChange={(checked) => setSettings((prev) => ({ ...prev, watchlist_notifications: checked }))} />
                 </div>
 
-                <Separator className="bg-[#30363d]" />
+                <Separator className="bg-[var(--color-border)]" />
 
                 <div className="grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
-                  <div className="space-y-4 rounded-xl border border-[#30363d] bg-[#0d1117] p-5">
+                  <div className="space-y-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-5">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-emerald-400" /><div className="text-[13px] font-semibold text-[#e6edf3]">Email delivery</div></div>
+                      <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-emerald-400" /><div className="text-[13px] font-semibold text-[var(--color-text-primary)]">Email delivery</div></div>
                       <Switch checked={Boolean(settings.email_notifications)} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, email_notifications: checked }))} />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-[#e6edf3]">Notification email</Label>
-                      <Input type="email" value={settings.notification_email || ""} onChange={(e) => setSettings((prev) => ({ ...prev, notification_email: e.target.value }))} placeholder="Leave blank to use your account email" className="border-[#30363d] bg-[#08090c] text-[#e6edf3]" disabled={!settings.email_notifications} />
+                      <Label className="text-[var(--color-text-primary)]">Notification email</Label>
+                      <Input type="email" value={settings.notification_email || ""} onChange={(e) => setSettings((prev) => ({ ...prev, notification_email: e.target.value }))} placeholder="Leave blank to use your account email" className="border-[var(--color-border)] bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]" disabled={!settings.email_notifications} />
                     </div>
                     <div className="grid gap-3 md:grid-cols-2">
                       <ToggleRow title="Email price alerts" description="Send your personal alert triggers to email." checked={Boolean(settings.email_alert_notifications)} disabled={!settings.email_notifications || !userAlertsEnabled} onChange={(checked) => setSettings((prev) => ({ ...prev, email_alert_notifications: checked }))} />
@@ -303,15 +303,15 @@ export function Settings() {
                       <ToggleRow title="Email watchlist updates" description="Send watchlist-related updates to email." checked={Boolean(settings.email_watchlist_notifications)} disabled={!settings.email_notifications} onChange={(checked) => setSettings((prev) => ({ ...prev, email_watchlist_notifications: checked }))} />
                     </div>
                   </div>
-                  <div className="space-y-4 rounded-xl border border-[#30363d] bg-[#0d1117] p-5">
-                    <div className="text-[13px] font-semibold text-[#e6edf3]">How this works</div>
-                    <div className="space-y-3 text-[12px] text-[#9da7b3]">
+                  <div className="space-y-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-5">
+                    <div className="text-[13px] font-semibold text-[var(--color-text-primary)]">How this works</div>
+                    <div className="space-y-3 text-[12px] text-[var(--color-text-muted)]">
                       <p>In-app notifications always appear inside the TradexaLK notification center when the matching category is enabled.</p>
                       <p>Email notifications provide automated daily summaries and instant breakout alerts.</p>
                       <p>Advanced webhook-style delivery was removed from the normal user settings page to keep this screen focused on investor-friendly controls.</p>
                     </div>
-                    <div className="rounded-lg border border-[#30363d] bg-[#08090c] p-4 text-[12px] text-[#9da7b3]">
-                      <div className="mb-2 font-semibold text-[#e6edf3]">Recommendation</div>
+                    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-primary)] p-4 text-[12px] text-[var(--color-text-muted)]">
+                      <div className="mb-2 font-semibold text-[var(--color-text-primary)]">Recommendation</div>
                       Keep <span className="text-emerald-300">in-app notifications</span> enabled for all categories you care about, and turn on email only for alerts you truly want outside the app.
                     </div>
                   </div>
@@ -324,50 +324,50 @@ export function Settings() {
             </Card>
           </TabsContent>
           <TabsContent value="preferences" className="space-y-6">
-            <Card className="border-[#30363d] bg-[#161b22]">
+            <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
               <CardHeader>
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-md bg-violet-500/10"><Palette className="h-5 w-5 text-violet-500" /></div>
                   <div>
-                    <CardTitle className="text-[18px] text-[#e6edf3]">Display Preferences</CardTitle>
-                    <CardDescription className="text-[13px] text-[#768390]">Personalize how charts and tables behave.</CardDescription>
+                    <CardTitle className="text-[18px] text-[var(--color-text-primary)]">Display Preferences</CardTitle>
+                    <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Personalize how charts and tables behave.</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="grid gap-6 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label className="text-[#e6edf3]">Theme</Label>
+                  <Label className="text-[var(--color-text-primary)]">Theme</Label>
                   <Select value={theme} onValueChange={(value) => { setTheme(value as "light" | "dark"); setSettings((prev) => ({ ...prev, theme: value })); }}>
-                    <SelectTrigger className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]"><SelectValue /></SelectTrigger>
-                    <SelectContent className="border-[#30363d] bg-[#161b22]">
+                    <SelectTrigger className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"><SelectValue /></SelectTrigger>
+                    <SelectContent className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
                       <SelectItem value="dark">Dark Mode</SelectItem>
                       <SelectItem value="light">Light Mode</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[#e6edf3]">Default Timeframe</Label>
+                  <Label className="text-[var(--color-text-primary)]">Default Timeframe</Label>
                   <Select value={String(settings.default_timeframe || "6M")} onValueChange={(value) => setSettings((prev) => ({ ...prev, default_timeframe: value }))}>
-                    <SelectTrigger className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]"><SelectValue /></SelectTrigger>
-                    <SelectContent className="border-[#30363d] bg-[#161b22]">
+                    <SelectTrigger className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"><SelectValue /></SelectTrigger>
+                    <SelectContent className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
                       <SelectItem value="1D">1D</SelectItem><SelectItem value="1W">1W</SelectItem><SelectItem value="1M">1M</SelectItem><SelectItem value="3M">3M</SelectItem><SelectItem value="6M">6M</SelectItem><SelectItem value="1Y">1Y</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[#e6edf3]">Date Format</Label>
+                  <Label className="text-[var(--color-text-primary)]">Date Format</Label>
                   <Select value={String(settings.date_format || "dd-mm-yyyy")} onValueChange={(value) => setSettings((prev) => ({ ...prev, date_format: value }))}>
-                    <SelectTrigger className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]"><SelectValue /></SelectTrigger>
-                    <SelectContent className="border-[#30363d] bg-[#161b22]">
+                    <SelectTrigger className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"><SelectValue /></SelectTrigger>
+                    <SelectContent className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
                       <SelectItem value="dd-mm-yyyy">DD/MM/YYYY</SelectItem><SelectItem value="mm-dd-yyyy">MM/DD/YYYY</SelectItem><SelectItem value="yyyy-mm-dd">YYYY-MM-DD</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[#e6edf3]">Chart Type</Label>
+                  <Label className="text-[var(--color-text-primary)]">Chart Type</Label>
                   <Select value={String(settings.chart_type || "candlestick")} onValueChange={(value) => setSettings((prev) => ({ ...prev, chart_type: value }))}>
-                    <SelectTrigger className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]"><SelectValue /></SelectTrigger>
-                    <SelectContent className="border-[#30363d] bg-[#161b22]">
+                    <SelectTrigger className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"><SelectValue /></SelectTrigger>
+                    <SelectContent className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
                       <SelectItem value="candlestick">Candlestick</SelectItem><SelectItem value="line">Line</SelectItem><SelectItem value="area">Area</SelectItem>
                     </SelectContent>
                   </Select>
@@ -383,46 +383,46 @@ export function Settings() {
           </TabsContent>
 
           <TabsContent value="security" className="space-y-6">
-            <Card className="border-[#30363d] bg-[#161b22]">
+            <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
               <CardHeader>
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-md bg-red-500/10"><Shield className="h-5 w-5 text-red-500" /></div>
                   <div>
-                    <CardTitle className="text-[18px] text-[#e6edf3]">Security</CardTitle>
-                    <CardDescription className="text-[13px] text-[#768390]">Change your password and secure your account.</CardDescription>
+                    <CardTitle className="text-[18px] text-[var(--color-text-primary)]">Security</CardTitle>
+                    <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Change your password and secure your account.</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="grid gap-6 md:grid-cols-2">
-                <div className="space-y-2 md:col-span-2"><Label className="text-[#e6edf3]">Current Password</Label><Input type="password" value={passwords.current} onChange={(e) => setPasswords((prev) => ({ ...prev, current: e.target.value }))} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" /></div>
-                <div className="space-y-2"><Label className="text-[#e6edf3]">New Password</Label><Input type="password" value={passwords.next} onChange={(e) => setPasswords((prev) => ({ ...prev, next: e.target.value }))} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" /></div>
-                <div className="space-y-2"><Label className="text-[#e6edf3]">Confirm New Password</Label><Input type="password" value={passwords.confirm} onChange={(e) => setPasswords((prev) => ({ ...prev, confirm: e.target.value }))} className="border-[#30363d] bg-[#0d1117] text-[#e6edf3]" /></div>
+                <div className="space-y-2 md:col-span-2"><Label className="text-[var(--color-text-primary)]">Current Password</Label><Input type="password" value={passwords.current} onChange={(e) => setPasswords((prev) => ({ ...prev, current: e.target.value }))} className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]" /></div>
+                <div className="space-y-2"><Label className="text-[var(--color-text-primary)]">New Password</Label><Input type="password" value={passwords.next} onChange={(e) => setPasswords((prev) => ({ ...prev, next: e.target.value }))} className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]" /></div>
+                <div className="space-y-2"><Label className="text-[var(--color-text-primary)]">Confirm New Password</Label><Input type="password" value={passwords.confirm} onChange={(e) => setPasswords((prev) => ({ ...prev, confirm: e.target.value }))} className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]" /></div>
                 <div className="md:col-span-2 flex justify-end"><Button className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={updatePassword} disabled={saving}>Update Password</Button></div>
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="data" className="space-y-6">
-            <Card className="border-[#30363d] bg-[#161b22]">
+            <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
               <CardHeader>
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-md bg-cyan-500/10"><Database className="h-5 w-5 text-cyan-500" /></div>
                   <div>
-                    <CardTitle className="text-[18px] text-[#e6edf3]">Account Data</CardTitle>
-                    <CardDescription className="text-[13px] text-[#768390]">Review what is stored for your account and export a copy of your own data.</CardDescription>
+                    <CardTitle className="text-[18px] text-[var(--color-text-primary)]">Account Data</CardTitle>
+                    <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Review what is stored for your account and export a copy of your own data.</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid gap-4 md:grid-cols-3">
-                  <Card className="border-[#30363d] bg-[#0d1117]"><CardContent className="p-4"><div className="text-[12px] text-[#768390]">Saved settings</div><div className="mt-2 text-[24px] font-bold text-[#e6edf3]">{Object.keys(settings || {}).length}</div></CardContent></Card>
-                  <Card className="border-[#30363d] bg-[#0d1117]"><CardContent className="p-4"><div className="text-[12px] text-[#768390]">Primary email</div><div className="mt-2 text-[15px] font-semibold text-[#e6edf3] truncate">{profile.email || "Not set"}</div></CardContent></Card>
-                  <Card className="border-[#30363d] bg-[#0d1117]"><CardContent className="p-4"><div className="text-[12px] text-[#768390]">Theme</div><div className="mt-2 text-[24px] font-bold capitalize text-[#e6edf3]">{theme}</div></CardContent></Card>
+                  <Card className="border-[var(--color-border)] bg-[var(--color-bg-secondary)]"><CardContent className="p-4"><div className="text-[12px] text-[var(--color-text-tertiary)]">Saved settings</div><div className="mt-2 text-[24px] font-bold text-[var(--color-text-primary)]">{Object.keys(settings || {}).length}</div></CardContent></Card>
+                  <Card className="border-[var(--color-border)] bg-[var(--color-bg-secondary)]"><CardContent className="p-4"><div className="text-[12px] text-[var(--color-text-tertiary)]">Primary email</div><div className="mt-2 text-[15px] font-semibold text-[var(--color-text-primary)] truncate">{profile.email || "Not set"}</div></CardContent></Card>
+                  <Card className="border-[var(--color-border)] bg-[var(--color-bg-secondary)]"><CardContent className="p-4"><div className="text-[12px] text-[var(--color-text-tertiary)]">Theme</div><div className="mt-2 text-[24px] font-bold capitalize text-[var(--color-text-primary)]">{theme}</div></CardContent></Card>
                 </div>
 
-                <div className="rounded-xl border border-[#30363d] bg-[#0d1117] p-5">
-                  <div className="mb-3 text-[14px] font-semibold text-[#e6edf3]">Export my account data</div>
-                  <div className="space-y-3 text-[12px] text-[#9da7b3]">
+                <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-5">
+                  <div className="mb-3 text-[14px] font-semibold text-[var(--color-text-primary)]">Export my account data</div>
+                  <div className="space-y-3 text-[12px] text-[var(--color-text-muted)]">
                     <p>This export gives you a JSON snapshot of your account data stored in the application.</p>
                     <p>It includes your profile basics, saved settings, watchlist, portfolios, transactions, cash movements, alerts, and a preview of notifications.</p>
                   </div>
@@ -481,7 +481,7 @@ export function Settings() {
                       }
                     }}>{saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />} Export to Excel (CSV)</Button>
 
-                    <Button variant="outline" className="border-[#30363d] text-slate-300 hover:bg-[#1c2128]" disabled={saving} onClick={async () => {
+                    <Button variant="outline" className="border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elevated)]" disabled={saving} onClick={async () => {
                       try {
                         setSaving(true);
                         setMessage(null);
@@ -504,8 +504,8 @@ export function Settings() {
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-[#30363d] bg-[#0d1117] p-5 text-[12px] text-[#9da7b3]">
-                  <div className="mb-2 font-semibold text-[#e6edf3]">Data handling notes</div>
+                <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-5 text-[12px] text-[var(--color-text-muted)]">
+                  <div className="mb-2 font-semibold text-[var(--color-text-primary)]">Data handling notes</div>
                   <ul className="list-disc space-y-2 pl-5">
                     <li>Preferences are saved to your secure profile.</li>
                     <li>Automated email delivery requires a verified email address.</li>
@@ -516,18 +516,18 @@ export function Settings() {
             </Card>
           </TabsContent>
           <TabsContent value="billing" className="space-y-6">
-            <Card className="border-[#30363d] bg-[#161b22]">
+            <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
               <CardHeader>
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-md bg-amber-500/10"><CreditCard className="h-5 w-5 text-amber-500" /></div>
                   <div>
-                    <CardTitle className="text-[18px] text-[#e6edf3]">Billing</CardTitle>
-                    <CardDescription className="text-[13px] text-[#768390]">Billing features are not enabled in this build.</CardDescription>
+                    <CardTitle className="text-[18px] text-[var(--color-text-primary)]">Billing</CardTitle>
+                    <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Billing features are not enabled in this build.</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="rounded-xl border border-[#30363d] bg-[#0d1117] p-4 text-[13px] text-[#9da7b3]">This area is reserved for future subscription and billing controls.</div>
+                <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4 text-[13px] text-[var(--color-text-muted)]">This area is reserved for future subscription and billing controls.</div>
               </CardContent>
             </Card>
           </TabsContent>

@@ -4,6 +4,7 @@ import { Card, CardHeader } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { TrendingUp, TrendingDown, Maximize2, RefreshCw, Activity } from 'lucide-react';
+import { useTheme } from '../../contexts/ThemeContext';
 import type { HistoricalDataPoint } from '../../../lib/api/types';
 
 interface ProfessionalChartProps {
@@ -37,6 +38,7 @@ export function ProfessionalChart({
   companyName = 'John Keells Holdings PLC',
   data = [],
 }: ProfessionalChartProps) {
+  const { theme } = useTheme();
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const [timeframe, setTimeframe] = useState('ALL');
@@ -54,13 +56,13 @@ export function ProfessionalChart({
 
     const chart = createChart(chartContainerRef.current, {
       layout: {
-        background: { color: '#08090c' },
-        textColor: '#768390',
+        background: { type: 0, color: 'transparent' },
+        textColor: theme === 'light' ? '#4b5563' : '#adbac7',
         attributionLogo: false,
       },
       grid: {
-        vertLines: { color: '#161b2244' },
-        horzLines: { color: '#161b2244' },
+        vertLines: { color: 'rgba(118, 131, 144, 0.1)' },
+        horzLines: { color: 'rgba(118, 131, 144, 0.1)' },
       },
       crosshair: {
         mode: 1,
@@ -78,10 +80,10 @@ export function ProfessionalChart({
         },
       },
       rightPriceScale: {
-        borderColor: '#30363d',
+        borderColor: 'rgba(118, 131, 144, 0.2)',
       },
       timeScale: {
-        borderColor: '#30363d',
+        borderColor: 'rgba(118, 131, 144, 0.2)',
         timeVisible: true,
         secondsVisible: false,
       },
@@ -172,23 +174,23 @@ export function ProfessionalChart({
   }, [timeframe, candles]);
 
   return (
-    <Card className="border-[#30363d] bg-[#0d1117] shadow-none overflow-hidden">
-      <CardHeader className="border-b border-[#21262d] px-5 py-3">
+    <Card className="border-[var(--color-border)] bg-[var(--color-bg-primary)] shadow-none overflow-hidden">
+      <CardHeader className="border-b border-[var(--color-border)] px-5 py-3">
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div>
-                <h3 className="text-base font-bold text-[#e6edf3]">{symbol}</h3>
-                <p className="text-[11px] text-[#768390]">{companyName}</p>
+                <h3 className="text-base font-bold text-[var(--color-text-primary)]">{symbol}</h3>
+                <p className="text-[11px] text-[var(--color-text-tertiary)]">{companyName}</p>
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold tabular-nums text-[#e6edf3]">
+                <span className="text-2xl font-bold tabular-nums text-[var(--color-text-primary)]">
                   {currentPrice.toFixed(2)}
                 </span>
                 <Badge
                   className={`gap-1 text-[11px] font-bold ${isPositive
-                      ? 'bg-emerald-600/20 text-emerald-500 border-emerald-500/30'
-                      : 'bg-red-600/20 text-red-500 border-red-500/30'
+                    ? 'bg-emerald-600/20 text-emerald-500 border-emerald-500/30'
+                    : 'bg-red-600/20 text-red-500 border-red-500/30'
                     }`}
                 >
                   {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
@@ -201,7 +203,7 @@ export function ProfessionalChart({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-[#768390] hover:bg-[#161b22] hover:text-[#e6edf3]"
+                className="h-8 w-8 text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]"
                 onClick={() => chartRef.current?.timeScale().fitContent()}
               >
                 <RefreshCw className="h-4 w-4" />
@@ -209,7 +211,7 @@ export function ProfessionalChart({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-[#768390] hover:bg-[#161b22] hover:text-[#e6edf3]"
+                className="h-8 w-8 text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]"
               >
                 <Maximize2 className="h-4 w-4" />
               </Button>
@@ -217,15 +219,15 @@ export function ProfessionalChart({
           </div>
 
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-0.5 bg-[#0a0e14] rounded-lg p-0.5 border border-[#1e2938]">
+            <div className="flex items-center gap-0.5 bg-[var(--color-bg-primary)] rounded-lg p-0.5 border border-[var(--color-border)]">
               {timeframes.map((tf) => (
                 <Button
                   key={tf}
                   variant="ghost"
                   size="sm"
                   className={`h-7 px-3 text-[11px] font-semibold transition-all ${timeframe === tf
-                      ? 'bg-emerald-600 text-white shadow-sm'
-                      : 'text-[#768390] hover:text-[#e6edf3] hover:bg-[#161b22]'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)]'
                     }`}
                   onClick={() => setTimeframe(tf)}
                 >
@@ -239,8 +241,8 @@ export function ProfessionalChart({
                 variant="ghost"
                 size="sm"
                 className={`h-7 px-2.5 text-[11px] font-semibold ${showIndicators
-                    ? 'bg-[#161b22] text-[#e6edf3] ring-1 ring-[#30363d]'
-                    : 'text-[#768390] hover:bg-[#161b22] hover:text-[#e6edf3]'
+                  ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)] ring-1 ring-[#30363d]'
+                  : 'text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]'
                   }`}
                 onClick={() => setShowIndicators((value) => !value)}
               >
@@ -255,7 +257,7 @@ export function ProfessionalChart({
         {candles.length > 0 ? (
           <div ref={chartContainerRef} className="w-full" style={{ height: '500px' }} />
         ) : (
-          <div className="flex h-[500px] items-center justify-center text-sm text-[#768390]">
+          <div className="flex h-[500px] items-center justify-center text-sm text-[var(--color-text-tertiary)]">
             No historical chart data available.
           </div>
         )}

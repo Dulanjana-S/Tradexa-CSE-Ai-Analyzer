@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTheme } from "../../contexts/ThemeContext";
 import { Link, useNavigate } from "react-router";
 import { TrendingUp, Mail, Lock, User as UserIcon, Loader2, AlertCircle, ArrowLeft } from "lucide-react";
 import { Button } from "../../components/ui/button";
@@ -10,6 +11,7 @@ import { useAuth } from "../../../lib/auth/AuthContext";
 import type { APIError } from "../../../lib/api/client";
 
 export function Register() {
+  const { theme } = useTheme();
   const { register, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [name, setName] = useState("");
@@ -68,7 +70,14 @@ export function Register() {
 
         {/* Logo */}
         <Link to="/" className="mb-8 flex items-center justify-center gap-3">
-          <img src="/logo.png" alt="Tradexa.lk" className="h-16 w-auto object-contain" />
+          <img 
+            src="/logo.png" 
+            alt="Tradexa.lk" 
+            className="h-16 w-auto object-contain transition-all" 
+            style={{ 
+              filter: theme === 'light' ? 'invert(1) hue-rotate(180deg) brightness(0.2)' : 'none' 
+            }}
+          />
         </Link>
 
         {/* Register Card */}

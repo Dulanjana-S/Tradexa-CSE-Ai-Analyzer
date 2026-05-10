@@ -33,7 +33,7 @@ export function PredictionCard({
 }: PredictionCardProps) {
   if (loading) {
     return (
-      <Card className="bg-[#111823] border-[#1e2938] shadow-sm">
+      <Card className="bg-[var(--color-bg-secondary)] border-[var(--color-border)] shadow-sm">
         <CardHeader className="pb-4">
           <div className="flex items-center gap-2">
             <Brain className="h-5 w-5 text-emerald-500" />
@@ -42,9 +42,9 @@ export function PredictionCard({
           <CardDescription className="text-sm">Loading prediction model...</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="h-24 bg-[#0a0e14] animate-pulse rounded-lg" />
-          <div className="h-16 bg-[#0a0e14] animate-pulse rounded-lg" />
-          <div className="h-20 bg-[#0a0e14] animate-pulse rounded-lg" />
+          <div className="h-24 bg-[var(--color-bg-primary)] animate-pulse rounded-lg" />
+          <div className="h-16 bg-[var(--color-bg-primary)] animate-pulse rounded-lg" />
+          <div className="h-20 bg-[var(--color-bg-primary)] animate-pulse rounded-lg" />
         </CardContent>
       </Card>
     );
@@ -52,7 +52,7 @@ export function PredictionCard({
 
   if (error) {
     return (
-      <Card className="bg-[#111823] border-amber-700/40 shadow-sm">
+      <Card className="bg-[var(--color-bg-secondary)] border-amber-700/40 shadow-sm">
         <CardHeader className="pb-4">
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-amber-500" />
@@ -71,8 +71,8 @@ export function PredictionCard({
   };
 
   return (
-    <Card className="bg-[#111823] border-[#1e2938] hover:border-[#2d3748] transition-all duration-200 shadow-sm">
-      <CardHeader className="pb-4 border-b border-[#1e2938]">
+    <Card className="bg-[var(--color-bg-secondary)] border-[var(--color-border)] hover:border-[#2d3748] transition-all duration-200 shadow-sm">
+      <CardHeader className="pb-4 border-b border-[var(--color-border)]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-1 h-5 bg-emerald-500 rounded-full" />
@@ -86,7 +86,7 @@ export function PredictionCard({
       </CardHeader>
       <CardContent className="pt-6 space-y-6">
         {/* Main Prediction */}
-        <div className="p-4 rounded-lg bg-[#0a0e14] border border-[#1e2938]">
+        <div className="p-4 rounded-lg bg-[var(--color-bg-primary)] border border-[var(--color-border)]">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Predicted Price</span>
             <div className="flex items-center gap-1">
@@ -120,11 +120,11 @@ export function PredictionCard({
         <div>
           <div className="flex justify-between items-center mb-3">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Expected Range</span>
-            <span className="text-sm text-slate-300 font-semibold tabular-nums">
+            <span className="text-sm text-[var(--color-text-secondary)] font-semibold tabular-nums">
               Rs. {expectedRange.low.toFixed(2)} - Rs. {expectedRange.high.toFixed(2)}
             </span>
           </div>
-          <div className="relative h-2 bg-[#0a0e14] rounded-full overflow-hidden border border-[#1e2938]">
+          <div className="relative h-2 bg-[var(--color-bg-primary)] rounded-full overflow-hidden border border-[var(--color-border)]">
             <div
               className="absolute h-full bg-gradient-to-r from-red-500 via-amber-500 to-emerald-500"
               style={{
@@ -146,7 +146,7 @@ export function PredictionCard({
             </div>
             <Progress
               value={upProbability * 100}
-              className="mt-2 h-2 bg-[#0a0e14] border border-[#1e2938] [&>div]:bg-emerald-600"
+              className="mt-2 h-2 bg-[var(--color-bg-primary)] border border-[var(--color-border)] [&>div]:bg-emerald-600"
             />
           </div>
           <div>
@@ -158,7 +158,7 @@ export function PredictionCard({
             </div>
             <Progress
               value={confidence * 100}
-              className="mt-2 h-2 bg-[#0a0e14] border border-[#1e2938] [&>div]:bg-emerald-600"
+              className="mt-2 h-2 bg-[var(--color-bg-primary)] border border-[var(--color-border)] [&>div]:bg-emerald-600"
             />
           </div>
         </div>
@@ -171,9 +171,9 @@ export function PredictionCard({
           <div className="space-y-3">
             {topFeatures.map((feature, idx) => (
               <div key={idx} className="flex items-center justify-between gap-3">
-                <span className="text-sm text-slate-400">{feature.feature}</span>
+                <span className="text-sm text-[var(--color-text-tertiary)]">{feature.feature}</span>
                 <div className="flex items-center gap-2">
-                  <div className="w-24 h-1.5 bg-[#0a0e14] border border-[#1e2938] rounded-full overflow-hidden">
+                  <div className="w-24 h-1.5 bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-full overflow-hidden">
                     <div
                       className="h-full bg-emerald-600 rounded-full"
                       style={{ width: `${feature.importance * 100}%` }}

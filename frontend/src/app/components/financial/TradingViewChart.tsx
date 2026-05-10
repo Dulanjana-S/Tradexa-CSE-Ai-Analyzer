@@ -4,6 +4,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
 import {
   createChart,
   CandlestickSeries,
@@ -15,7 +16,8 @@ import {
   CandlestickData,
   LineData,
   Time,
-  MouseEventParams
+  MouseEventParams,
+  ColorType
 } from 'lightweight-charts';
 import { Card, CardContent, CardHeader } from '../ui/card';
 import { Button } from '../ui/button';
@@ -72,6 +74,7 @@ export function TradingViewChart({
   data,
   className,
 }: TradingViewChartProps) {
+  const { theme } = useTheme();
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -143,20 +146,20 @@ export function TradingViewChart({
 
     const chart = createChart(chartContainerRef.current, {
       layout: {
-        background: { color: '#08090c' },
-        textColor: '#768390',
+        background: { type: ColorType.Solid, color: 'transparent' },
+        textColor: theme === 'light' ? '#4b5563' : '#adbac7',
         fontSize: 12,
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         attributionLogo: false,
       },
       grid: {
         vertLines: {
-          color: '#161b2244',
+          color: 'rgba(118, 131, 144, 0.1)',
           style: 1,
           visible: true,
         },
         horzLines: {
-          color: '#161b2244',
+          color: 'rgba(118, 131, 144, 0.1)',
           style: 1,
           visible: true,
         },
@@ -177,7 +180,7 @@ export function TradingViewChart({
         },
       },
       rightPriceScale: {
-        borderColor: '#30363d',
+        borderColor: 'rgba(118, 131, 144, 0.2)',
         scaleMargins: {
           top: 0.08,
           bottom: showVolume ? 0.25 : 0.1,
@@ -185,7 +188,7 @@ export function TradingViewChart({
         mode: 0, // Normal
       },
       timeScale: {
-        borderColor: '#30363d',
+        borderColor: 'rgba(118, 131, 144, 0.2)',
         timeVisible: true,
         secondsVisible: false,
         rightOffset: 15,
@@ -374,21 +377,21 @@ export function TradingViewChart({
   const avgVolume = data.reduce((acc, d) => acc + (d.high - d.low), 0) / data.length * 1000000;
 
   return (
-    <Card className={cn('border-[#30363d] bg-[#0d1117] shadow-none overflow-hidden', className)}>
+    <Card className={cn('border-[var(--color-border)] bg-[var(--color-bg-primary)] shadow-none overflow-hidden', className)}>
       {/* Advanced Header */}
-      <CardHeader className="border-b border-[#21262d] px-5 py-3">
+      <CardHeader className="border-b border-[var(--color-border)] px-5 py-3">
         <div className="space-y-3">
           {/* Symbol and Price Row */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div>
-                <h3 className="text-[16px] font-bold text-[#e6edf3]">{symbol}</h3>
+                <h3 className="text-[16px] font-bold text-[var(--color-text-primary)]">{symbol}</h3>
                 {companyName && (
-                  <p className="text-[11px] text-[#768390]">{companyName}</p>
+                  <p className="text-[11px] text-[var(--color-text-tertiary)]">{companyName}</p>
                 )}
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-[24px] font-bold tabular-nums text-[#e6edf3]">
+                <span className="text-[24px] font-bold tabular-nums text-[var(--color-text-primary)]">
                   {currentPrice.toFixed(2)}
                 </span>
                 <Badge
@@ -410,7 +413,7 @@ export function TradingViewChart({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-[#768390] hover:bg-[#161b22] hover:text-[#e6edf3]"
+                className="h-8 w-8 text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]"
                 onClick={() => chartRef.current?.timeScale().fitContent()}
               >
                 <RefreshCw className="h-4 w-4" />
@@ -418,21 +421,21 @@ export function TradingViewChart({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-[#768390] hover:bg-[#161b22] hover:text-[#e6edf3]"
+                className="h-8 w-8 text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]"
               >
                 <Camera className="h-4 w-4" />
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-[#768390] hover:bg-[#161b22] hover:text-[#e6edf3]"
+                className="h-8 w-8 text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]"
               >
                 <Download className="h-4 w-4" />
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-[#768390] hover:bg-[#161b22] hover:text-[#e6edf3]"
+                className="h-8 w-8 text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]"
                 onClick={() => setIsFullscreen(!isFullscreen)}
               >
                 {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
@@ -443,21 +446,21 @@ export function TradingViewChart({
           {/* Stats Row */}
           <div className="flex items-center gap-6 text-[12px]">
             <div>
-              <span className="text-[#768390]">High: </span>
-              <span className="font-semibold tabular-nums text-[#e6edf3]">{highPrice.toFixed(2)}</span>
+              <span className="text-[var(--color-text-tertiary)]">High: </span>
+              <span className="font-semibold tabular-nums text-[var(--color-text-primary)]">{highPrice.toFixed(2)}</span>
             </div>
             <div>
-              <span className="text-[#768390]">Low: </span>
-              <span className="font-semibold tabular-nums text-[#e6edf3]">{lowPrice.toFixed(2)}</span>
+              <span className="text-[var(--color-text-tertiary)]">Low: </span>
+              <span className="font-semibold tabular-nums text-[var(--color-text-primary)]">{lowPrice.toFixed(2)}</span>
             </div>
             <div>
-              <span className="text-[#768390]">Avg Volume: </span>
-              <span className="font-semibold tabular-nums text-[#e6edf3]">{avgVolume.toLocaleString()}</span>
+              <span className="text-[var(--color-text-tertiary)]">Avg Volume: </span>
+              <span className="font-semibold tabular-nums text-[var(--color-text-primary)]">{avgVolume.toLocaleString()}</span>
             </div>
           </div>
 
           {/* Toolbar Row */}
-          <div className="flex items-center justify-between border-t border-[#21262d] pt-3">
+          <div className="flex items-center justify-between border-t border-[var(--color-border)] pt-3">
             {/* Indicators */}
             <div className="flex items-center gap-2">
               <DropdownMenu>
@@ -465,58 +468,58 @@ export function TradingViewChart({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 gap-1 px-2.5 text-[11px] font-semibold text-[#768390] hover:bg-[#161b22] hover:text-[#e6edf3]"
+                    className="h-7 gap-1 px-2.5 text-[11px] font-semibold text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]"
                   >
                     <Activity className="h-3.5 w-3.5" />
                     Indicators
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56 border-[#30363d] bg-[#161b22]">
-                  <DropdownMenuLabel className="text-[#e6edf3]">Technical Indicators</DropdownMenuLabel>
-                  <DropdownMenuSeparator className="bg-[#30363d]" />
+                <DropdownMenuContent align="start" className="w-56 border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
+                  <DropdownMenuLabel className="text-[var(--color-text-primary)]">Technical Indicators</DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-[var(--color-border)]" />
                   <DropdownMenuCheckboxItem
                     checked={indicators.sma20}
                     onCheckedChange={(checked) => setIndicators({ ...indicators, sma20: checked })}
-                    className="text-[#adbac7]"
+                    className="text-[var(--color-text-secondary)]"
                   >
                     SMA 20
                   </DropdownMenuCheckboxItem>
                   <DropdownMenuCheckboxItem
                     checked={indicators.sma50}
                     onCheckedChange={(checked) => setIndicators({ ...indicators, sma50: checked })}
-                    className="text-[#adbac7]"
+                    className="text-[var(--color-text-secondary)]"
                   >
                     SMA 50
                   </DropdownMenuCheckboxItem>
                   <DropdownMenuCheckboxItem
                     checked={indicators.ema9}
                     onCheckedChange={(checked) => setIndicators({ ...indicators, ema9: checked })}
-                    className="text-[#adbac7]"
+                    className="text-[var(--color-text-secondary)]"
                   >
                     EMA 9
                   </DropdownMenuCheckboxItem>
                   <DropdownMenuCheckboxItem
                     checked={indicators.ema21}
                     onCheckedChange={(checked) => setIndicators({ ...indicators, ema21: checked })}
-                    className="text-[#adbac7]"
+                    className="text-[var(--color-text-secondary)]"
                   >
                     EMA 21
                   </DropdownMenuCheckboxItem>
                   <DropdownMenuCheckboxItem
                     checked={indicators.bollingerBands}
                     onCheckedChange={(checked) => setIndicators({ ...indicators, bollingerBands: checked })}
-                    className="text-[#adbac7]"
+                    className="text-[var(--color-text-secondary)]"
                   >
                     Bollinger Bands
                   </DropdownMenuCheckboxItem>
-                  <DropdownMenuSeparator className="bg-[#30363d]" />
+                  <DropdownMenuSeparator className="bg-[var(--color-border)]" />
                   <DropdownMenuCheckboxItem
                     checked={indicators.volume}
                     onCheckedChange={(checked) => {
                       setIndicators({ ...indicators, volume: checked });
                       setShowVolume(checked);
                     }}
-                    className="text-[#adbac7]"
+                    className="text-[var(--color-text-secondary)]"
                   >
                     Volume
                   </DropdownMenuCheckboxItem>
@@ -549,8 +552,8 @@ export function TradingViewChart({
                 className={cn(
                   'h-7 w-7',
                   drawingMode === 'trendline'
-                    ? 'bg-[#161b22] text-emerald-500'
-                    : 'text-[#768390] hover:bg-[#161b22] hover:text-[#e6edf3]'
+                    ? 'bg-[var(--color-bg-tertiary)] text-emerald-500'
+                    : 'text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]'
                 )}
                 onClick={() => setDrawingMode(drawingMode === 'trendline' ? null : 'trendline')}
               >
@@ -562,8 +565,8 @@ export function TradingViewChart({
                 className={cn(
                   'h-7 w-7',
                   drawingMode === 'horizontal'
-                    ? 'bg-[#161b22] text-emerald-500'
-                    : 'text-[#768390] hover:bg-[#161b22] hover:text-[#e6edf3]'
+                    ? 'bg-[var(--color-bg-tertiary)] text-emerald-500'
+                    : 'text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]'
                 )}
                 onClick={() => setDrawingMode(drawingMode === 'horizontal' ? null : 'horizontal')}
               >
@@ -575,8 +578,8 @@ export function TradingViewChart({
                 className={cn(
                   'h-7 w-7',
                   drawingMode === 'rectangle'
-                    ? 'bg-[#161b22] text-emerald-500'
-                    : 'text-[#768390] hover:bg-[#161b22] hover:text-[#e6edf3]'
+                    ? 'bg-[var(--color-bg-tertiary)] text-emerald-500'
+                    : 'text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]'
                 )}
                 onClick={() => setDrawingMode(drawingMode === 'rectangle' ? null : 'rectangle')}
               >
@@ -585,7 +588,7 @@ export function TradingViewChart({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 text-[#768390] hover:bg-[#161b22] hover:text-[#e6edf3]"
+                className="h-7 w-7 text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]"
               >
                 <Type className="h-3.5 w-3.5" />
               </Button>

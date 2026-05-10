@@ -20,7 +20,7 @@ export function NotFound() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0a0e14] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[var(--color-bg-primary)] flex items-center justify-center p-4">
       <div className="max-w-2xl w-full text-center space-y-8">
         {/* 404 Visual */}
         <div className="space-y-4">
@@ -39,7 +39,7 @@ export function NotFound() {
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-50">
             Page Not Found
           </h1>
-          <p className="text-sm sm:text-base text-slate-400 max-w-md mx-auto">
+          <p className="text-sm sm:text-base text-[var(--color-text-tertiary)] max-w-md mx-auto">
             The page you're looking for doesn't exist or has been moved. Let's get you back on track.
           </p>
         </div>
@@ -51,7 +51,7 @@ export function NotFound() {
             <Input
               type="text"
               placeholder="Search for stocks, sectors, companies..."
-              className="pl-10 bg-[#111823] border-[#1e2938] h-11"
+              className="pl-10 bg-[var(--color-bg-secondary)] border-[var(--color-border)] h-11"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   navigate("/screener");
@@ -81,8 +81,8 @@ export function NotFound() {
         </div>
 
         {/* Popular Pages */}
-        <div className="pt-8 border-t border-[#1e2938]">
-          <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
+        <div className="pt-8 border-t border-[var(--color-border)]">
+          <h3 className="text-sm font-semibold text-[var(--color-text-tertiary)] uppercase tracking-wider mb-4">
             Popular Pages
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -92,10 +92,10 @@ export function NotFound() {
                 <button
                   key={page.path}
                   onClick={() => navigate(page.path)}
-                  className="flex flex-col items-center gap-2 p-4 rounded-lg bg-[#111823] border border-[#1e2938] hover:bg-[#1e2938] hover:border-emerald-600/30 transition-colors group"
+                  className="flex flex-col items-center gap-2 p-4 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] hover:bg-[var(--color-border)] hover:border-emerald-600/30 transition-colors group"
                 >
-                  <Icon className="h-5 w-5 text-slate-400 group-hover:text-emerald-500 transition-colors" />
-                  <span className="text-xs font-semibold text-slate-300 group-hover:text-slate-100">
+                  <Icon className="h-5 w-5 text-[var(--color-text-tertiary)] group-hover:text-emerald-500 transition-colors" />
+                  <span className="text-xs font-semibold text-[var(--color-text-secondary)] group-hover:text-[var(--color-text-primary)]">
                     {page.name}
                   </span>
                 </button>

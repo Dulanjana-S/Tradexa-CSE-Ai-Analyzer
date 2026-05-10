@@ -67,12 +67,12 @@ export function EmptyState({
     <div className={`flex flex-col items-center justify-center ${classes.container}`}>
       {Icon && (
         <div
-          className={`${classes.iconContainer} rounded-full bg-[#1e2938] flex items-center justify-center mb-4`}
+          className={`${classes.iconContainer} rounded-full bg-[var(--color-border)] flex items-center justify-center mb-4`}
         >
           <Icon className={`${classes.icon} text-slate-500`} />
         </div>
       )}
-      <h3 className={`${classes.title} font-semibold text-slate-300 mb-2`}>
+      <h3 className={`${classes.title} font-semibold text-[var(--color-text-secondary)] mb-2`}>
         {title}
       </h3>
       <p className={`${classes.description} text-slate-500 text-center max-w-sm mb-6`}>

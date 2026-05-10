@@ -76,15 +76,15 @@ export function MultiPanelChart({ symbol, data }: MultiPanelChartProps) {
   return (
     <div className="space-y-4">
       {/* Layout Controls */}
-      <Card className="border-[#30363d] bg-[#0d1117] shadow-none">
-        <CardHeader className="border-b border-[#21262d] px-5 py-3">
+      <Card className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] shadow-none">
+        <CardHeader className="border-b border-[var(--color-border)] px-5 py-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-[13px] font-semibold text-[#e6edf3]">
+            <CardTitle className="text-[13px] font-semibold text-[var(--color-text-primary)]">
               Multi-Timeframe Analysis
             </CardTitle>
             
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-semibold uppercase text-[#768390]">Layout:</span>
+              <span className="text-[11px] font-semibold uppercase text-[var(--color-text-tertiary)]">Layout:</span>
               {layouts.map((l) => (
                 <Button
                   key={l.type}
@@ -93,8 +93,8 @@ export function MultiPanelChart({ symbol, data }: MultiPanelChartProps) {
                   className={cn(
                     'h-7 gap-2 px-2.5 text-[11px] font-semibold',
                     layout === l.type
-                      ? 'bg-[#161b22] text-[#e6edf3] ring-1 ring-[#30363d]'
-                      : 'text-[#768390] hover:bg-[#161b22] hover:text-[#e6edf3]'
+                      ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)] ring-1 ring-[#30363d]'
+                      : 'text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]'
                   )}
                   onClick={() => setLayout(l.type)}
                 >

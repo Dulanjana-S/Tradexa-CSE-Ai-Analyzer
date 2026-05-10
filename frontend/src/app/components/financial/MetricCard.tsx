@@ -55,7 +55,7 @@ export function MetricCard({
 
   return (
     <Card className={cn(
-      "group relative overflow-hidden bg-[#0d1117] border-[#30363d] transition-all duration-300 shadow-none rounded-xl hover:border-[#bf953f]/55 hover:shadow-[0_0_25px_-5px_rgba(191,149,63,0.15)]",
+      "group relative overflow-hidden bg-[var(--color-bg-secondary)] border-[var(--color-border)] transition-all duration-300 shadow-none rounded-xl hover:border-[#bf953f]/55 hover:shadow-[0_0_25px_-5px_rgba(191,149,63,0.15)]",
       className
     )}>
       {/* Dynamic background glow based on trend */}
@@ -63,20 +63,20 @@ export function MetricCard({
         "absolute -right-8 -top-8 h-24 w-24 rounded-full blur-[40px] opacity-[0.03] transition-opacity group-hover:opacity-[0.07]",
         trend === "up" ? "bg-emerald-500" : trend === "down" ? "bg-red-500" : "bg-slate-500"
       )} />
-      <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-[#30363d] transition-colors group-hover:bg-[#bf953f]/55" />
+      <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-[var(--color-border)] transition-colors group-hover:bg-[#bf953f]/55" />
       <CardHeader className={cn(
         "flex flex-row items-start justify-between space-y-0 pb-1.5 px-3 pt-3 sm:px-4 sm:pt-4",
         center && "flex-col items-center justify-center text-center gap-2"
       )}>
         <CardTitle className={cn(
-          "text-[14px] sm:text-[15px] font-extrabold uppercase tracking-[0.22em] text-[#e6edf3] transition-colors group-hover:text-[#f5efe2]",
+          "text-[14px] sm:text-[15px] font-extrabold uppercase tracking-[0.22em] text-[var(--color-text-primary)] transition-colors group-hover:text-[var(--color-text-primary)]",
           center && "text-center"
         )}>
           {title}
         </CardTitle>
         {icon && (
           <div className={cn(
-            "text-[#484f58] opacity-60 transition-all group-hover:opacity-100 group-hover:text-[#bf953f]",
+            "text-[var(--color-text-muted)] opacity-60 transition-all group-hover:opacity-100 group-hover:text-emerald-600",
             center && "absolute right-4 top-4"
           )}>
             {icon}
@@ -92,7 +92,7 @@ export function MetricCard({
           center && "items-center"
         )}>
           <div className={cn(
-            "text-[24px] sm:text-[32px] font-bold text-[#e6edf3] tracking-tight leading-none tabular-nums transition-colors group-hover:text-[#f5efe2]",
+            "text-[24px] sm:text-[32px] font-bold text-[var(--color-text-primary)] tracking-tight leading-none tabular-nums transition-colors group-hover:text-[var(--color-text-primary)]",
             center && "text-center"
           )}>
             {value}
@@ -107,7 +107,7 @@ export function MetricCard({
                   className={cn(
                     "inline-flex items-center gap-1.5 text-[14px] sm:text-[16px] font-mono font-bold tabular-nums transition-all",
                     center && "justify-center",
-                    trend === "up" ? "text-emerald-400" : trend === "down" ? "text-red-400" : "text-slate-400"
+                    trend === "up" ? "text-emerald-400" : trend === "down" ? "text-red-400" : "text-[var(--color-text-tertiary)]"
                   )}
                 >
                   {getTrendIcon()}
@@ -126,7 +126,7 @@ export function MetricCard({
                 </span>
               )}
               {subtitle && (
-                <span className="text-[13px] sm:text-[14px] font-bold uppercase tracking-wider text-[#8f98a3] transition-colors group-hover:text-[#f0d9a8]">
+                <span className="text-[13px] sm:text-[14px] font-bold uppercase tracking-wider text-[var(--color-text-tertiary)] transition-colors group-hover:text-[var(--color-text-secondary)]">
                   {subtitle}
                 </span>
               )}

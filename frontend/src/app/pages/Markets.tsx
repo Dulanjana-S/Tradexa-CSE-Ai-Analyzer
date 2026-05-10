@@ -83,13 +83,13 @@ export function Markets() {
     <div className="p-6 space-y-6">
       <div className="space-y-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-100">Markets Overview</h1>
-          <p className="text-slate-400 mt-1">Comprehensive view of Colombo Stock Exchange market activity</p>
+          <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">Markets Overview</h1>
+          <p className="text-[var(--color-text-tertiary)] mt-1">Comprehensive view of Colombo Stock Exchange market activity</p>
         </div>
-        <Card className="bg-slate-900 border-slate-800">
+        <Card className="bg-[var(--color-bg-secondary)] border-[var(--color-border)] shadow-sm">
           <CardContent className="pt-6">
             <div className="relative max-w-xl">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-tertiary)]" />
               <Input
                 value={searchQuery}
                 onChange={(e) => {
@@ -99,10 +99,10 @@ export function Markets() {
                   setSearchParams(params, { replace: true });
                 }}
                 placeholder="Search by symbol, company, or sector..."
-                className="pl-9 bg-[#0a0e14] border-[#1e2938] text-slate-100"
+                className="pl-9 bg-[var(--color-bg-primary)] border-[var(--color-border)] text-[var(--color-text-primary)]"
               />
             </div>
-            {searchQuery && <p className="mt-3 text-sm text-slate-400">Showing <span className="text-slate-200 font-medium">{filteredStocks.length}</span> matches for “{searchQuery}”.</p>}
+            {searchQuery && <p className="mt-3 text-sm text-[var(--color-text-tertiary)]">Showing <span className="text-[var(--color-text-primary)] font-medium">{filteredStocks.length}</span> matches for “{searchQuery}”.</p>}
           </CardContent>
         </Card>
       </div>
@@ -126,7 +126,7 @@ export function Markets() {
 
       <Tabs defaultValue="all" className="w-full">
         <div className="overflow-x-auto pb-2">
-          <TabsList className="bg-slate-900 border border-slate-800 w-fit">
+          <TabsList className="bg-[var(--color-bg-primary)] border border-[var(--color-border)] w-fit">
             <TabsTrigger value="all" className="data-[state=active]:bg-emerald-600">All Stocks</TabsTrigger>
             <TabsTrigger value="banking" className="data-[state=active]:bg-blue-600">Banking</TabsTrigger>
             <TabsTrigger value="telecom" className="data-[state=active]:bg-indigo-600">Telecom</TabsTrigger>
@@ -138,11 +138,11 @@ export function Markets() {
         </div>
 
         <TabsContent value="all" className="mt-6">
-          <Card className="bg-slate-900 border-slate-800">
+          <Card className="bg-[var(--color-bg-secondary)] border-[var(--color-border)] shadow-sm">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>{searchQuery ? "Search Results" : "All Listed Stocks"}</CardTitle>
-                <Badge variant="secondary" className="bg-slate-800 text-slate-300">{filteredStocks.length} stocks</Badge>
+                <Badge variant="secondary" className="bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)]">{filteredStocks.length} stocks</Badge>
               </div>
             </CardHeader>
             <CardContent>
@@ -152,22 +152,22 @@ export function Markets() {
         </TabsContent>
 
         <TabsContent value="banking" className="mt-6">
-          <Card className="bg-slate-900 border-slate-800"><CardHeader><CardTitle>Banking Sector</CardTitle></CardHeader><CardContent><StockTable stocks={banking} loading={loading} /></CardContent></Card>
+          <Card className="bg-[var(--color-bg-primary)] border-[var(--color-border)]"><CardHeader><CardTitle>Banking Sector</CardTitle></CardHeader><CardContent><StockTable stocks={banking} loading={loading} /></CardContent></Card>
         </TabsContent>
         <TabsContent value="telecom" className="mt-6">
-          <Card className="bg-slate-900 border-slate-800"><CardHeader><CardTitle>Telecommunications Sector</CardTitle></CardHeader><CardContent><StockTable stocks={telecom} loading={loading} /></CardContent></Card>
+          <Card className="bg-[var(--color-bg-primary)] border-[var(--color-border)]"><CardHeader><CardTitle>Telecommunications Sector</CardTitle></CardHeader><CardContent><StockTable stocks={telecom} loading={loading} /></CardContent></Card>
         </TabsContent>
         <TabsContent value="diversified" className="mt-6">
-          <Card className="bg-slate-900 border-slate-800"><CardHeader><CardTitle>Diversified & Conglomerates</CardTitle></CardHeader><CardContent><StockTable stocks={diversified} loading={loading} /></CardContent></Card>
+          <Card className="bg-[var(--color-bg-primary)] border-[var(--color-border)]"><CardHeader><CardTitle>Diversified & Conglomerates</CardTitle></CardHeader><CardContent><StockTable stocks={diversified} loading={loading} /></CardContent></Card>
         </TabsContent>
         <TabsContent value="manufacturing" className="mt-6">
-          <Card className="bg-slate-900 border-slate-800"><CardHeader><CardTitle>Manufacturing & Industrial</CardTitle></CardHeader><CardContent><StockTable stocks={manufacturing} loading={loading} /></CardContent></Card>
+          <Card className="bg-[var(--color-bg-primary)] border-[var(--color-border)]"><CardHeader><CardTitle>Manufacturing & Industrial</CardTitle></CardHeader><CardContent><StockTable stocks={manufacturing} loading={loading} /></CardContent></Card>
         </TabsContent>
         <TabsContent value="insurance" className="mt-6">
-          <Card className="bg-slate-900 border-slate-800"><CardHeader><CardTitle>Insurance Sector</CardTitle></CardHeader><CardContent><StockTable stocks={insurance} loading={loading} /></CardContent></Card>
+          <Card className="bg-[var(--color-bg-primary)] border-[var(--color-border)]"><CardHeader><CardTitle>Insurance Sector</CardTitle></CardHeader><CardContent><StockTable stocks={insurance} loading={loading} /></CardContent></Card>
         </TabsContent>
         <TabsContent value="energy" className="mt-6">
-          <Card className="bg-slate-900 border-slate-800"><CardHeader><CardTitle>Energy & Utilities Sector</CardTitle></CardHeader><CardContent><StockTable stocks={energy} loading={loading} /></CardContent></Card>
+          <Card className="bg-[var(--color-bg-primary)] border-[var(--color-border)]"><CardHeader><CardTitle>Energy & Utilities Sector</CardTitle></CardHeader><CardContent><StockTable stocks={energy} loading={loading} /></CardContent></Card>
         </TabsContent>
       </Tabs>
     </div>

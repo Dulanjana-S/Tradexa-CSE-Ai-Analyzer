@@ -45,7 +45,7 @@ export function ChartCard({
 
   const filteredData = (() => {
     if (selectedTimeframe === "ALL") return data;
-    
+
     let count = 30;
     switch (selectedTimeframe) {
       case "1M": count = 30; break;
@@ -54,33 +54,33 @@ export function ChartCard({
       case "1Y": count = 365; break;
       default: count = data.length;
     }
-    
+
     return data.slice(-count);
   })();
 
-  const isTrendingUp = filteredData.length >= 2 
+  const isTrendingUp = filteredData.length >= 2
     ? filteredData[filteredData.length - 1].value >= filteredData[0].value
     : true;
-  
+
   const trendColor = isTrendingUp ? "#10b981" : "#ef4444";
 
   if (loading) {
     return (
-      <Card className="bg-[#111823] border-[#1e2938] shadow-sm">
+      <Card className="bg-[var(--color-bg-secondary)] border-[var(--color-border)] shadow-sm">
         <CardHeader className="pb-4">
           <CardTitle>{title}</CardTitle>
           {description && <CardDescription>{description}</CardDescription>}
         </CardHeader>
         <CardContent>
-          <div className="h-80 bg-[#0a0e14] animate-pulse rounded-lg" />
+          <div className="h-80 bg-[var(--color-bg-primary)] animate-pulse rounded-lg" />
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="bg-[#111823] border-[#1e2938] shadow-sm overflow-hidden">
-      <CardHeader className="pb-4 border-b border-[#1e2938]">
+    <Card className="bg-[var(--color-bg-secondary)] border-[var(--color-border)] shadow-sm overflow-hidden">
+      <CardHeader className="pb-4 border-b border-[var(--color-border)]">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1 flex-1">
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -93,18 +93,17 @@ export function ChartCard({
               </CardDescription>
             )}
           </div>
-          <div className="flex items-center gap-0.5 bg-[#0a0e14] rounded-lg p-0.5 border border-[#1e2938]">
+          <div className="flex items-center gap-0.5 bg-[var(--color-bg-primary)] rounded-lg p-0.5 border border-[var(--color-border)]">
             {timeframes.map((tf) => (
               <Button
                 key={tf}
                 variant="ghost"
                 size="sm"
                 onClick={() => handleTimeframeChange(tf)}
-                className={`h-7 px-3 text-[11px] font-semibold transition-all ${
-                  selectedTimeframe === tf
+                className={`h-7 px-3 text-[11px] font-semibold transition-all ${selectedTimeframe === tf
                     ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'text-[#768390] hover:text-[#e6edf3] hover:bg-[#161b22]'
-                }`}
+                    : 'text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)]'
+                  }`}
               >
                 {tf}
               </Button>
@@ -112,19 +111,19 @@ export function ChartCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="pt-6 pb-4 bg-[#0a0e14]">
+      <CardContent className="pt-6 pb-4 bg-[var(--color-bg-primary)]">
         <ResponsiveContainer width="100%" height={320}>
           {type === "area" ? (
             <AreaChart data={filteredData} margin={{ top: 0, right: 8, left: -20, bottom: 0 }}>
               <defs>
-                <linearGradient id={`colorValue-${title}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={trendColor} stopOpacity={0.25} />
+                <linearGradient id={`colorValue-${title.replace(/\s+/g, '-')}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={trendColor} stopOpacity={0.3} />
                   <stop offset="95%" stopColor={trendColor} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid 
+               <CartesianGrid 
                 strokeDasharray="3 3" 
-                stroke="#1e2938" 
+                stroke="var(--color-border)" 
                 vertical={false}
                 strokeOpacity={0.5}
               />
@@ -163,14 +162,14 @@ export function ChartCard({
                 stroke={trendColor}
                 strokeWidth={2.5}
                 fillOpacity={1}
-                fill={`url(#colorValue-${title})`}
+                fill={`url(#colorValue-${title.replace(/\s+/g, '-')})`}
               />
             </AreaChart>
           ) : (
             <LineChart data={filteredData} margin={{ top: 0, right: 8, left: -20, bottom: 0 }}>
-              <CartesianGrid 
-                strokeDasharray="3 3" 
-                stroke="#1e2938" 
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="#1e2938"
                 vertical={false}
                 strokeOpacity={0.5}
               />

@@ -37,25 +37,25 @@ export function Watchlist() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold text-slate-100">My Watchlist</h1>
-          <p className="text-slate-400 mt-1">Track your favorite stocks and monitor their performance</p>
+          <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">My Watchlist</h1>
+          <p className="text-[var(--color-text-tertiary)] mt-1">Track your favorite stocks and monitor their performance</p>
         </div>
         <div className="flex items-center gap-2">
           <Input
             placeholder="e.g., JKH.N0000"
             value={newSymbol}
             onChange={(e) => setNewSymbol(e.target.value)}
-            className="w-44 border-slate-700 bg-slate-900 text-slate-100"
+            className="w-44 border-[var(--color-border)] bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]"
           />
           <Button onClick={addStock} className="bg-emerald-600 hover:bg-emerald-700"><Plus className="h-4 w-4 mr-2" />Add Stock</Button>
         </div>
       </div>
 
-      <Card className="bg-slate-900 border-slate-800">
+      <Card className="bg-[var(--color-bg-primary)] border-[var(--color-border)]">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Watched Stocks ({titleCount})</CardTitle>
-            <Button variant="outline" size="sm" className="border-slate-700 text-red-400" onClick={clearAll}>
+            <Button variant="outline" size="sm" className="border-[var(--color-border)] text-red-400" onClick={clearAll}>
               <Trash2 className="h-4 w-4 mr-2" />Clear All
             </Button>
           </div>
