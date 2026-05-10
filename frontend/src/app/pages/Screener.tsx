@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import { Filter, Download, Save, X, Search, Loader2 } from "lucide-react";
+import { Filter, Download, X, Search, Loader2 } from "lucide-react";
 import { Label } from "../components/ui/label";
 import { Slider } from "../components/ui/slider";
 import { marketApi } from "../../lib/api/services";
@@ -136,9 +136,6 @@ export function Screener() {
           <div className="flex gap-2">
             <Button variant="ghost" onClick={exportCsv} className="text-[var(--color-text-tertiary)] hover:text-white h-9">
               <Download className="h-4 w-4 mr-2" /> Export
-            </Button>
-            <Button variant="outline" className="border-[var(--color-border)] text-[var(--color-text-secondary)] h-9">
-              <Save className="h-4 w-4 mr-2" /> Save
             </Button>
           </div>
         </div>
