@@ -98,6 +98,8 @@ def ensure_bootstrap_admin() -> None:
     if existing:
         if normalize_role(existing.get('role')) != ROLE_ADMIN:
             _storage.set_user_role(username, ROLE_ADMIN)
+        if not verify_password(password, str(existing.get('password_hash') or '')):
+            _storage.set_user_password_hash(username, hash_password(password))
         return
     _storage.upsert_user(username=username, password_hash=hash_password(password), role=ROLE_ADMIN, display_name='Administrator', email=None)
 

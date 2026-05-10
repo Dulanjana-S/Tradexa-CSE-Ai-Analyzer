@@ -10,7 +10,11 @@ MAX_REQUESTS = 5
 _rate_limits = defaultdict(list)
 
 def rate_limit_auth(request: Request):
-    client_ip = request.client.host if request.client else "unknown"
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        client_ip = forwarded_for.split(",")[0].strip()
+    else:
+        client_ip = request.client.host if request.client else "unknown"
     now = time.time()
     
     # Clean old requests
