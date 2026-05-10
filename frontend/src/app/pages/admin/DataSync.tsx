@@ -26,6 +26,7 @@ export function DataSync() {
   const [lastImport, setLastImport] = useState<any>(null);
   const [uploadPreview, setUploadPreview] = useState<any>(null);
   const [schedulerSettings, setSchedulerSettings] = useState<any>(null);
+  const [schedulerLoading, setSchedulerLoading] = useState(true);
   const [dragActive, setDragActive] = useState(false);
   const [macroFile, setMacroFile] = useState<File | null>(null);
   const [macroPreview, setMacroPreview] = useState<any>(null);
@@ -36,13 +37,26 @@ export function DataSync() {
   const [modelHealth, setModelHealth] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Fast, independent fetch for scheduler settings only — resolves immediately
+  // without waiting for slow endpoints (getJobs, getModelHealth, etc.)
+  const loadSchedulerSettings = async () => {
+    try {
+      const systemSettings = await adminApi.getSystemSettings();
+      setSchedulerSettings(systemSettings?.settings || {});
+    } catch {
+      setSchedulerSettings({});
+    } finally {
+      setSchedulerLoading(false);
+    }
+  };
+
   const load = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
       const [jobsData, statusData, systemSettings, healthData] = await Promise.all([adminApi.getJobs(), adminApi.getStatus(), adminApi.getSystemSettings(), adminApi.getModelHealth()]);
       setJobs(jobsData);
       setStatus(statusData);
-      setSchedulerSettings(systemSettings?.settings || null);
+      setSchedulerSettings(systemSettings?.settings || {});
       setModelHealth(healthData);
     } finally {
       if (!silent) setLoading(false);
@@ -50,10 +64,13 @@ export function DataSync() {
   };
 
   useEffect(() => {
+    // Load scheduler settings immediately — fast path, doesn't block anything
+    loadSchedulerSettings();
+    // Load the rest of the heavy data in parallel
     load().catch(() => setLoading(false));
     const timer = window.setInterval(() => {
       load(true).catch(() => undefined);
-    }, 5000);
+    }, 30000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -448,29 +465,59 @@ export function DataSync() {
             <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Automatically sync end-of-day data and retrain after market close.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-              <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-3 xl:col-span-1">
-                <div>
-                  <div className="text-[13px] font-medium text-[var(--color-text-primary)]">Enable daily pipeline</div>
-                  <div className="text-[12px] text-[var(--color-text-tertiary)]">Runs in backend scheduler thread</div>
-                </div>
-                <Switch checked={Boolean(schedulerSettings?.dailyPipelineEnabled)} onCheckedChange={(checked) => setSchedulerSettings((prev: any) => ({ ...(prev || {}), dailyPipelineEnabled: checked }))} />
+            {schedulerLoading ? (
+              <div className="flex items-center gap-2 py-6 text-[var(--color-text-tertiary)]">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-[13px]">Loading scheduler settings…</span>
               </div>
-              <div className="space-y-2 xl:col-span-1"><Label className="text-[var(--color-text-tertiary)]">Run time</Label><Input value={schedulerSettings?.dailyPipelineTime || "18:10"} onChange={(e) => setSchedulerSettings((prev: any) => ({ ...(prev || {}), dailyPipelineTime: e.target.value }))} className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]" /></div>
-              <div className="space-y-2 xl:col-span-1"><Label className="text-[var(--color-text-tertiary)]">Top N</Label><Input type="number" value={schedulerSettings?.dailyPipelineTopN || 80} onChange={(e) => setSchedulerSettings((prev: any) => ({ ...(prev || {}), dailyPipelineTopN: e.target.value }))} className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]" /></div>
-              <div className="space-y-2 xl:col-span-1"><Label className="text-[var(--color-text-tertiary)]">History days</Label><Input type="number" value={schedulerSettings?.dailyPipelineDays || 520} onChange={(e) => setSchedulerSettings((prev: any) => ({ ...(prev || {}), dailyPipelineDays: e.target.value }))} className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]" /></div>
-              <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-3 xl:col-span-1">
-                <div>
-                  <div className="text-[13px] font-medium text-[var(--color-text-primary)]">Retrain after sync</div>
-                  <div className="text-[12px] text-[var(--color-text-tertiary)]">Keeps tomorrow’s model current</div>
+            ) : (
+              <>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                  <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-3 xl:col-span-1">
+                    <div>
+                      <div className="text-[13px] font-medium text-[var(--color-text-primary)]">Enable daily pipeline</div>
+                      <div className="text-[12px] text-[var(--color-text-tertiary)]">Runs in backend scheduler thread</div>
+                    </div>
+                    <Switch checked={Boolean(schedulerSettings?.dailyPipelineEnabled)} onCheckedChange={(checked) => setSchedulerSettings((prev: any) => ({ ...(prev || {}), dailyPipelineEnabled: checked }))} />
+                  </div>
+                  <div className="space-y-2 xl:col-span-1"><Label className="text-[var(--color-text-tertiary)]">Run time</Label><Input value={schedulerSettings?.dailyPipelineTime || "18:10"} onChange={(e) => setSchedulerSettings((prev: any) => ({ ...(prev || {}), dailyPipelineTime: e.target.value }))} className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]" /></div>
+                  <div className="space-y-2 xl:col-span-1"><Label className="text-[var(--color-text-tertiary)]">Top N</Label><Input type="number" value={schedulerSettings?.dailyPipelineTopN ?? 80} onChange={(e) => setSchedulerSettings((prev: any) => ({ ...(prev || {}), dailyPipelineTopN: Number(e.target.value) || 80 }))} className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]" /></div>
+                  <div className="space-y-2 xl:col-span-1"><Label className="text-[var(--color-text-tertiary)]">History days</Label><Input type="number" value={schedulerSettings?.dailyPipelineDays ?? 520} onChange={(e) => setSchedulerSettings((prev: any) => ({ ...(prev || {}), dailyPipelineDays: Number(e.target.value) || 520 }))} className="border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]" /></div>
+                  <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-3 xl:col-span-1">
+                    <div>
+                      <div className="text-[13px] font-medium text-[var(--color-text-primary)]">Retrain after sync</div>
+                      <div className="text-[12px] text-[var(--color-text-tertiary)]">Keeps tomorrow's model current</div>
+                    </div>
+                    <Switch checked={Boolean(schedulerSettings?.dailyPipelineTrain)} onCheckedChange={(checked) => setSchedulerSettings((prev: any) => ({ ...(prev || {}), dailyPipelineTrain: checked }))} />
+                  </div>
                 </div>
-                <Switch checked={Boolean(schedulerSettings?.dailyPipelineTrain)} onCheckedChange={(checked) => setSchedulerSettings((prev: any) => ({ ...(prev || {}), dailyPipelineTrain: checked }))} />
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <Button onClick={saveScheduler} disabled={busyAction !== null} className="bg-blue-600 text-white hover:bg-blue-700">{busyAction === "scheduler" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Clock className="mr-2 h-4 w-4" />} Save Scheduler</Button>
-              <Button onClick={async () => { setBusyAction("daily-pipeline"); try { await adminApi.triggerDailyPipeline({ top_n: topN, days, announcements, horizon_days: horizonDays, train_after_sync: true, model_family: modelFamily }); await load(true); } finally { setBusyAction(null); } }} disabled={busyAction !== null} variant="outline" className="border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]">{busyAction === "daily-pipeline" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />} Run Daily Pipeline Now</Button>
-            </div>
+                <div className="flex gap-3">
+                  <Button onClick={saveScheduler} disabled={busyAction !== null} className="bg-blue-600 text-white hover:bg-blue-700">{busyAction === "scheduler" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Clock className="mr-2 h-4 w-4" />} Save Scheduler</Button>
+                  <Button
+                    onClick={async () => {
+                      setBusyAction("daily-pipeline");
+                      try {
+                        await adminApi.triggerDailyPipeline({
+                          top_n: Number(schedulerSettings?.dailyPipelineTopN) || 80,
+                          days: Number(schedulerSettings?.dailyPipelineDays) || 520,
+                          horizon_days: horizonDays,
+                          train_after_sync: Boolean(schedulerSettings?.dailyPipelineTrain ?? true),
+                          model_family: modelFamily,
+                        });
+                        await load(true);
+                      } finally {
+                        setBusyAction(null);
+                      }
+                    }}
+                    disabled={busyAction !== null}
+                    variant="outline"
+                    className="border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]"
+                  >
+                    {busyAction === "daily-pipeline" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />} Run Daily Pipeline Now
+                  </Button>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
