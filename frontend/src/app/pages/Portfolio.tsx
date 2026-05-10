@@ -89,14 +89,14 @@ type NoteItem = {
 };
 
 const portfolioPanels: Array<{ key: PortfolioPanel; label: string; description: string }> = [
-  { key: "cash", label: "Cash", description: "cash balance, deposits and withdrawals" },
-  { key: "smart", label: "AI Guidance", description: "fully automated ai intelligence, risk monitoring and guidance" },
-  { key: "analytics", label: "Analytics", description: "sectors, gainers, losers and income mix" },
-  { key: "performance", label: "Performance", description: "charts, periods and benchmarks" },
   { key: "holdings", label: "Holdings", description: "open positions and smart status" },
+  { key: "performance", label: "Performance", description: "charts, periods and benchmarks" },
+  { key: "analytics", label: "Analytics", description: "sectors, gainers, losers and income mix" },
+  { key: "smart", label: "AI Guidance", description: "fully automated ai intelligence, risk monitoring and guidance" },
   { key: "events", label: "Events", description: "corporate actions and held-stock calendar" },
-  { key: "import", label: "Import", description: "broker statements and CSV import" },
   { key: "transactions", label: "Transactions", description: "trade history and corrections" },
+  { key: "import", label: "Import", description: "broker statements and CSV import" },
+  { key: "cash", label: "Cash", description: "cash balance, deposits and withdrawals" },
   { key: "journal", label: "Journal", description: "trader notes and strategy" },
 ];
 
@@ -147,7 +147,7 @@ export function Portfolio() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [chartDays, setChartDays] = useState(365);
-  const [activePanel, setActivePanel] = useState<PortfolioPanel>("performance");
+  const [activePanel, setActivePanel] = useState<PortfolioPanel>("holdings");
   const [error, setError] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [importingCsv, setImportingCsv] = useState(false);
@@ -799,24 +799,32 @@ export function Portfolio() {
           <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className={`flex h-10 w-10 items-center justify-center rounded-md ${portfolio.summary.realizedPl >= 0 ? "bg-amber-500/10" : "bg-red-500/10"}`}>{portfolio.summary.realizedPl >= 0 ? <TrendingUp className="h-5 w-5 text-amber-500" /> : <TrendingDown className="h-5 w-5 text-red-500" />}</div><div><p className="text-[13px] text-[var(--color-text-tertiary)]">Realized P/L</p><p className={`text-[24px] font-bold ${portfolio.summary.realizedPl >= 0 ? "text-amber-400" : "text-red-400"}`}>{money(portfolio.summary.realizedPl)}</p><p className="text-[12px] text-[var(--color-text-tertiary)]">{portfolio.summary.positionsCount} open positions</p></div></div></CardContent></Card>
         </div>
 
-        <Card className="sticky top-0 z-10 border-[var(--color-border)] bg-[var(--color-bg-secondary)]/95 backdrop-blur">
-          <CardContent className="p-3">
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {portfolioPanels.map((panel) => (
-                <button
-                  key={panel.key}
-                  type="button"
-                  onClick={() => setActivePanel(panel.key)}
-                  title={panel.description}
-                  className={activePanel === panel.key ? "whitespace-nowrap rounded-md bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white" : "whitespace-nowrap rounded-md border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] px-4 py-2 text-[13px] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-elevated)] hover:text-[var(--color-text-primary)]"}
-                >
-                  {panel.label}
-                </button>
-              ))}
+        <div className="sticky top-0 z-10 -mx-6 bg-[var(--color-bg-primary)]/80 px-6 py-4 backdrop-blur-xl border-b border-[var(--color-border)]/50">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
+                {portfolioPanels.map((panel) => (
+                  <button
+                    key={panel.key}
+                    type="button"
+                    onClick={() => setActivePanel(panel.key)}
+                    className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-[13px] font-bold transition-all duration-200 ${
+                      activePanel === panel.key 
+                        ? "bg-blue-600 text-white shadow-[0_0_20px_rgba(37,99,235,0.3)] ring-1 ring-blue-400/50" 
+                        : "bg-[var(--color-bg-tertiary)] text-[var(--color-text-tertiary)] border border-[var(--color-border)]/50 hover:bg-[var(--color-bg-elevated)] hover:text-[var(--color-text-primary)] hover:border-blue-500/30"
+                    }`}
+                  >
+                    {panel.label}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="mt-2 px-1 text-[12px] text-[var(--color-text-tertiary)]">{portfolioPanels.find((panel) => panel.key === activePanel)?.description}</div>
-          </CardContent>
-        </Card>
+            <div className="flex items-center gap-2 text-[12px] text-[var(--color-text-tertiary)]">
+              <div className="h-1 w-1 rounded-full bg-blue-500 shadow-[0_0_5px_rgba(37,99,235,0.5)]" />
+              {portfolioPanels.find((panel) => panel.key === activePanel)?.description}
+            </div>
+          </div>
+        </div>
 
         <div className={activePanel === "cash" ? "grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]" : "hidden"}>
           <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)] xl:col-span-2">
@@ -1189,28 +1197,7 @@ export function Portfolio() {
           </div>
         )}
 
-          <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-[18px] text-[var(--color-text-primary)]"><ShoppingBag className="h-5 w-5 text-emerald-500" />Quick add from watchlist</CardTitle>
-              <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Turn watched symbols into real holdings faster. We prefill the symbol and trade date for you.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {watchlistCandidates.length === 0 ? (
-                <p className="text-[13px] text-[var(--color-text-tertiary)]">Your current watchlist items are already in the portfolio, or the watchlist is still empty.</p>
-              ) : (
-                watchlistCandidates.map((item) => (
-                  <div key={item.symbol} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-3">
-                    <div>
-                      <p className="text-[13px] font-semibold text-[var(--color-text-primary)]">{item.symbol}</p>
-                      <p className="text-[12px] text-[var(--color-text-tertiary)]">{item.company}</p>
-                      <p className="text-[12px] text-[var(--color-text-tertiary)]">Last {money(item.lastPrice)}</p>
-                    </div>
-                    <Button onClick={() => openAddDialog(item.symbol)} className="bg-emerald-600 text-white hover:bg-emerald-700"><Plus className="mr-2 h-4 w-4" />Add buy</Button>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
+
 
         <Card className={activePanel === "holdings" ? "border-[var(--color-border)] bg-[var(--color-bg-tertiary)]" : "hidden"}>
           <CardHeader className="flex flex-row items-center justify-between gap-3">
@@ -1250,7 +1237,41 @@ export function Portfolio() {
                     <TableCell>{(() => { const item = intelligence.holdings.find((h) => h.symbol === position.symbol); return item ? <div className="space-y-1"><Badge variant="outline" className={statusBadgeClass(item.status)}>{item.statusLabel}</Badge><div className="text-[11px] text-[var(--color-text-tertiary)]">Fit {item.fitScore}/100 · Risk {item.riskScore}/100</div></div> : <span className="text-[var(--color-text-tertiary)]">—</span>; })()}</TableCell>
                   </TableRow>
                 ))}
-                {!loading && portfolio.positions.length === 0 && <TableRow><TableCell colSpan={8} className="py-8 text-center text-[var(--color-text-tertiary)]">No holdings yet. Add your first buy transaction to start tracking your portfolio.</TableCell></TableRow>}
+                {!loading && portfolio.positions.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={8} className="py-12 text-center">
+                      <div className="flex flex-col items-center justify-center space-y-4">
+                        <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center mb-2">
+                           <ShoppingBag className="h-8 w-8 text-blue-500/50" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[var(--color-text-primary)] font-medium">No holdings yet</p>
+                          <p className="text-[13px] text-[var(--color-text-tertiary)]">Add your first buy transaction to start tracking your portfolio.</p>
+                        </div>
+                        {watchlistCandidates.length > 0 && (
+                          <div className="mt-8 w-full max-w-md space-y-3 pt-6 border-t border-[var(--color-border)]/50">
+                            <p className="text-[12px] font-bold text-emerald-400 uppercase tracking-widest text-center">Quick Add from Watchlist</p>
+                            <div className="grid grid-cols-1 gap-2">
+                              {watchlistCandidates.slice(0, 3).map((item) => (
+                                <button 
+                                  key={item.symbol} 
+                                  onClick={() => openAddDialog(item.symbol)}
+                                  className="flex items-center justify-between p-3 rounded-xl bg-[var(--color-bg-secondary)] border border-[var(--color-border)] hover:border-emerald-500/30 hover:bg-emerald-500/5 transition-all group"
+                                >
+                                  <div className="text-left">
+                                    <p className="text-[13px] font-bold text-[var(--color-text-primary)]">{item.symbol}</p>
+                                    <p className="text-[11px] text-[var(--color-text-tertiary)]">{item.company.slice(0, 20)}...</p>
+                                  </div>
+                                  <Plus className="h-4 w-4 text-emerald-500 group-hover:scale-125 transition-transform" />
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </CardContent>
@@ -1329,48 +1350,89 @@ export function Portfolio() {
           </CardContent>
         </Card>
 
-        <Card className={activePanel === "transactions" ? "border-[var(--color-border)] bg-[var(--color-bg-tertiary)]" : "hidden"}>
-          <CardHeader>
-            <CardTitle className="text-[18px] text-[var(--color-text-primary)]">Transaction history</CardTitle>
-            <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Every trade used to calculate positions, cost basis, and performance. You can edit mistakes without re-entering everything.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow className="border-[var(--color-border)] hover:bg-transparent">
-                  <TableHead className="text-[var(--color-text-tertiary)]">Date</TableHead>
-                  <TableHead className="text-[var(--color-text-tertiary)]">Symbol</TableHead>
-                  <TableHead className="text-[var(--color-text-tertiary)]">Type</TableHead>
-                  <TableHead className="text-[var(--color-text-tertiary)]">Quantity</TableHead>
-                  <TableHead className="text-[var(--color-text-tertiary)]">Price</TableHead>
-                  <TableHead className="text-[var(--color-text-tertiary)]">Fees</TableHead>
-                  <TableHead className="text-[var(--color-text-tertiary)]">Notes</TableHead>
-                  <TableHead className="text-right text-[var(--color-text-tertiary)]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {portfolio.transactions.map((tx) => (
-                  <TableRow key={tx.id} className="border-[var(--color-border)] hover:bg-[var(--color-bg-elevated)]">
-                    <TableCell className="text-[var(--color-text-primary)]">{compactDate(tx.tradedAt || tx.createdAt)}</TableCell>
-                    <TableCell className="font-medium text-[var(--color-text-primary)]">{tx.symbol}</TableCell>
-                    <TableCell><Badge className={tx.type === "buy" ? "bg-emerald-600/20 text-emerald-400 border-emerald-500/30" : "bg-red-600/20 text-red-400 border-red-500/30"}>{tx.type.toUpperCase()}</Badge></TableCell>
-                    <TableCell className="text-[var(--color-text-primary)]">{tx.quantity.toLocaleString("en-LK")}</TableCell>
-                    <TableCell className="text-[var(--color-text-primary)]">{money(tx.price)}</TableCell>
-                    <TableCell className="text-[var(--color-text-primary)]">{money(tx.fees)}</TableCell>
-                    <TableCell className="max-w-[280px] text-[var(--color-text-tertiary)]">{tx.notes || "—"}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="outline" size="sm" onClick={() => openEditDialog(tx)} className="border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]"><Pencil className="mr-2 h-4 w-4" />Edit</Button>
-                        <Button variant="outline" size="sm" onClick={() => deleteTransaction(tx.id)} className="border-red-500/30 text-red-400 hover:bg-red-500/10"><Trash2 className="mr-2 h-4 w-4" />Delete</Button>
-                      </div>
-                    </TableCell>
+        <div className={activePanel === "transactions" ? "grid gap-6 xl:grid-cols-[1fr_300px]" : "hidden"}>
+          <Card className="border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
+            <CardHeader>
+              <CardTitle className="text-[18px] text-[var(--color-text-primary)]">Transaction history</CardTitle>
+              <CardDescription className="text-[13px] text-[var(--color-text-tertiary)]">Every trade used to calculate positions, cost basis, and performance.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-[var(--color-border)] hover:bg-transparent">
+                    <TableHead className="text-[var(--color-text-tertiary)]">Date</TableHead>
+                    <TableHead className="text-[var(--color-text-tertiary)]">Symbol</TableHead>
+                    <TableHead className="text-[var(--color-text-tertiary)]">Type</TableHead>
+                    <TableHead className="text-[var(--color-text-tertiary)]">Quantity</TableHead>
+                    <TableHead className="text-[var(--color-text-tertiary)]">Price</TableHead>
+                    <TableHead className="text-[var(--color-text-tertiary)]">Fees</TableHead>
+                    <TableHead className="text-[var(--color-text-tertiary)]">Notes</TableHead>
+                    <TableHead className="text-right text-[var(--color-text-tertiary)]">Actions</TableHead>
                   </TableRow>
-                ))}
-                {!loading && portfolio.transactions.length === 0 && <TableRow><TableCell colSpan={8} className="py-8 text-center text-[var(--color-text-tertiary)]">No transactions recorded yet.</TableCell></TableRow>}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                </TableHeader>
+                <TableBody>
+                  {portfolio.transactions.map((tx) => (
+                    <TableRow key={tx.id} className="border-[var(--color-border)] hover:bg-[var(--color-bg-elevated)]">
+                      <TableCell className="text-[var(--color-text-primary)]">{compactDate(tx.tradedAt || tx.createdAt)}</TableCell>
+                      <TableCell className="font-medium text-[var(--color-text-primary)]">{tx.symbol}</TableCell>
+                      <TableCell><Badge className={tx.type === "buy" ? "bg-emerald-600/20 text-emerald-400 border-emerald-500/30" : "bg-red-600/20 text-red-400 border-red-500/30"}>{tx.type.toUpperCase()}</Badge></TableCell>
+                      <TableCell className="text-[var(--color-text-primary)]">{tx.quantity.toLocaleString("en-LK")}</TableCell>
+                      <TableCell className="text-[var(--color-text-primary)]">{money(tx.price)}</TableCell>
+                      <TableCell className="text-[var(--color-text-primary)]">{money(tx.fees)}</TableCell>
+                      <TableCell className="max-w-[280px] text-[var(--color-text-tertiary)]">{tx.notes || "—"}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="outline" size="sm" onClick={() => openEditDialog(tx)} className="border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]"><Pencil className="mr-2 h-4 w-4" />Edit</Button>
+                          <Button variant="outline" size="sm" onClick={() => deleteTransaction(tx.id)} className="border-red-500/30 text-red-400 hover:bg-red-500/10"><Trash2 className="mr-2 h-4 w-4" />Delete</Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {!loading && portfolio.transactions.length === 0 && <TableRow><TableCell colSpan={8} className="py-8 text-center text-[var(--color-text-tertiary)]">No transactions recorded yet.</TableCell></TableRow>}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          <div className="space-y-6">
+            <Card className="border-[var(--color-border)] bg-[var(--color-bg-secondary)]/50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-[14px] font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-2">
+                  <ShoppingBag className="h-4 w-4" />
+                  Watchlist Quick Add
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {watchlistCandidates.length === 0 ? (
+                  <p className="text-[12px] text-[var(--color-text-tertiary)]">No new candidates in your watchlist.</p>
+                ) : (
+                  watchlistCandidates.slice(0, 5).map((item) => (
+                    <div key={item.symbol} className="flex items-center justify-between gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] p-3 group hover:border-emerald-500/30 transition-colors">
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-bold text-[var(--color-text-primary)] truncate">{item.symbol}</p>
+                        <p className="text-[11px] text-[var(--color-text-tertiary)] truncate">{money(item.lastPrice)}</p>
+                      </div>
+                      <Button size="sm" onClick={() => openAddDialog(item.symbol)} className="h-8 w-8 rounded-lg bg-emerald-600/10 text-emerald-500 hover:bg-emerald-600 hover:text-white transition-all">
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-[var(--color-border)] bg-blue-600/5">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center gap-2 text-blue-400">
+                  <FileUp className="h-4 w-4" />
+                  <span className="text-[12px] font-bold uppercase tracking-wider">Bulk Import</span>
+                </div>
+                <p className="text-[12px] text-[var(--color-text-tertiary)]">Have a lot of trades? Use the Import tool to upload your broker statements directly.</p>
+                <Button variant="outline" size="sm" onClick={() => setActivePanel("import")} className="w-full border-blue-500/30 text-blue-400 hover:bg-blue-500/10">Go to Import</Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
 
         {/* Journal Panel */}
         <div className={activePanel === "journal" ? "block space-y-4" : "hidden"}>
