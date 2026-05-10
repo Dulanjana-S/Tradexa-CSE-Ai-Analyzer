@@ -277,13 +277,25 @@ def api_auth_register(payload: Dict[str, Any] = Body(...), background_tasks: Bac
     #     raise HTTPException(status_code=400, detail="Invalid CAPTCHA")
 
     username = _derive_username(payload)
-    display_name = payload.get('display_name') or payload.get('name') or username
-    user = create_user(username, str(payload.get("password") or ""), role="user", display_name=display_name, email=payload.get("email"))
+    display_name = payload.get("display_name") or payload.get("name") or username
+
+    user = create_user(
+        username,
+        str(payload.get("password") or ""),
+        role="user",
+        display_name=display_name,
+        email=payload.get("email"),
+    )
+
     if user.get("email"):
         from .services.auth_service import send_welcome_email
-        background_tasks.add_task(send_welcome_email, str(user.get("email")), display_name)
-    return jsonable_encoder({"ok": True, "user": user})
+        background_tasks.add_task(
+            send_welcome_email,
+            str(user.get("email")),
+            display_name,
+        )
 
+    return jsonable_encoder({"ok": True, "user": user})
 
 @app.post("/api/auth/login", dependencies=[Depends(rate_limit_auth)])
 def api_auth_login(payload: Dict[str, Any] = Body(...)):
@@ -291,14 +303,15 @@ def api_auth_login(payload: Dict[str, Any] = Body(...)):
     # if not verify_captcha(None, captcha_answer):
     #     raise HTTPException(status_code=400, detail="Invalid CAPTCHA")
 
-    identifier = str(payload.get("username") or payload.get('email') or "").strip()
+    identifier = str(payload.get("username") or payload.get("email") or "").strip()
     resolved = identifier
-    if '@' in identifier:
+
+    if "@" in identifier:
         matched = _find_user_by_email(identifier)
-        if matched and matched.get('username'):
-            resolved = str(matched['username'])
+        if matched and matched.get("username"):
+            resolved = str(matched["username"])
         else:
-            resolved = identifier.split('@', 1)[0]
+            resolved = identifier.split("@", 1)[0]
 
     result = login(resolved, str(payload.get("password") or ""))
 
@@ -310,7 +323,8 @@ def api_auth_login(payload: Dict[str, Any] = Body(...)):
 
     resp = JSONResponse(content=content)
     resp.set_cookie(
-        SESSION_COOKIE, result["session_id"],
+        SESSION_COOKIE,
+        result["session_id"],
         httponly=True,
         samesite=settings.session_cookie_samesite,
         secure=settings.session_cookie_secure,
