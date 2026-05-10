@@ -260,10 +260,10 @@ def api_auth_me(request: Request):
 
 @app.post("/api/auth/register", dependencies=[Depends(rate_limit_auth)])
 def api_auth_register(payload: Dict[str, Any] = Body(...), background_tasks: BackgroundTasks = BackgroundTasks()):
-    captcha_id = payload.get("captcha_id")
-    captcha_answer = payload.get("captcha_answer")
-    if not verify_captcha(captcha_id, captcha_answer):
-        raise HTTPException(status_code=400, detail="Invalid CAPTCHA")
+    # captcha_id = payload.get("captcha_id")
+    # captcha_answer = payload.get("captcha_answer")
+    # if not verify_captcha(captcha_id, captcha_answer):
+    #     raise HTTPException(status_code=400, detail="Invalid CAPTCHA")
 
     username = _derive_username(payload)
     display_name = payload.get('display_name') or payload.get('name') or username
@@ -276,9 +276,9 @@ def api_auth_register(payload: Dict[str, Any] = Body(...), background_tasks: Bac
 
 @app.post("/api/auth/login", dependencies=[Depends(rate_limit_auth)])
 def api_auth_login(payload: Dict[str, Any] = Body(...)):
-    captcha_answer = payload.get("captcha_answer")
-    if not verify_captcha(None, captcha_answer):
-        raise HTTPException(status_code=400, detail="Invalid CAPTCHA")
+    # captcha_answer = payload.get("captcha_answer")
+    # if not verify_captcha(None, captcha_answer):
+    #     raise HTTPException(status_code=400, detail="Invalid CAPTCHA")
 
     identifier = str(payload.get("username") or payload.get('email') or "").strip()
     resolved = identifier

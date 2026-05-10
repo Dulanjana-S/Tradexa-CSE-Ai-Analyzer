@@ -32,15 +32,17 @@ export function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    /*
     if (!captchaToken) {
       setError("Please verify that you are not a robot");
       return;
     }
+    */
 
     setIsLoading(true);
 
     try {
-      await login({ email, password, captcha_answer: captchaToken });
+      await login({ email, password, captcha_answer: captchaToken || undefined });
     } catch (err) {
       const apiError = err as APIError;
       setError(apiError.message || "Login failed. Please try again.");
@@ -136,6 +138,7 @@ export function Login() {
                 </div>
               </div>
 
+              {/* 
               <div className="flex justify-center my-4">
                 <ReCAPTCHA
                   ref={recaptchaRef}
@@ -144,6 +147,7 @@ export function Login() {
                   theme={theme === 'dark' ? 'dark' : 'light'}
                 />
               </div>
+              */}
 
               <Button
                 type="submit"

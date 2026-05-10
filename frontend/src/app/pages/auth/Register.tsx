@@ -46,10 +46,12 @@ export function Register() {
       return;
     }
 
+    /*
     if (!captchaToken) {
       setError("Please verify that you are not a robot");
       return;
     }
+    */
 
     setIsLoading(true);
 
@@ -183,6 +185,7 @@ export function Register() {
                 </div>
               </div>
 
+              {/* 
               <div className="flex justify-center my-4">
                 <ReCAPTCHA
                   ref={recaptchaRef}
@@ -191,6 +194,7 @@ export function Register() {
                   theme={theme === 'dark' ? 'dark' : 'light'}
                 />
               </div>
+              */}
 
               <Button
                 type="submit"
