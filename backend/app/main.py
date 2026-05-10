@@ -221,7 +221,7 @@ def _check_admin_access(request: Request, x_admin_key: Optional[str] = None) -> 
     if user and is_staff_role(user.get("role")):
         return user
     required = settings.admin_api_key
-    provided = x_admin_key or request.headers.get("X-Admin-Key") or request.query_params.get("admin_key")
+    provided = x_admin_key or request.headers.get("X-Admin-Key")
     if required and provided == required:
         return {"username": "api-key-admin", "role": "admin"}
     raise HTTPException(status_code=401, detail="Admin access required")
