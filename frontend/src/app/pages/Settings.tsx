@@ -165,6 +165,10 @@ export function Settings() {
       setMessage("New passwords do not match.");
       return;
     }
+    if (passwords.next.length < 6) {
+      setMessage("New password must be at least 6 characters.");
+      return;
+    }
     setSaving(true);
     setMessage(null);
     try {
