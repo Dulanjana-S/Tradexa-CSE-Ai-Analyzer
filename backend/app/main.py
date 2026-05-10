@@ -13,6 +13,8 @@ from fastapi import BackgroundTasks, Body, Depends, FastAPI, File, Form, Header,
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse, Response
+from fastapi.encoders import jsonable_encoder
+
 
 from .config import settings
 from .import_tools import persist_upload_zip, preview_dataset
@@ -280,7 +282,7 @@ def api_auth_register(payload: Dict[str, Any] = Body(...), background_tasks: Bac
     if user.get("email"):
         from .services.auth_service import send_welcome_email
         background_tasks.add_task(send_welcome_email, str(user.get("email")), display_name)
-    return {"ok": True, "user": user}
+    return jsonable_encoder({"ok": True, "user": user})
 
 
 @app.post("/api/auth/login", dependencies=[Depends(rate_limit_auth)])
@@ -297,8 +299,16 @@ def api_auth_login(payload: Dict[str, Any] = Body(...)):
             resolved = str(matched['username'])
         else:
             resolved = identifier.split('@', 1)[0]
+
     result = login(resolved, str(payload.get("password") or ""))
-    resp = JSONResponse({"ok": True, "user": result["user"], "expires_at": result["expires_at"]})
+
+    content = jsonable_encoder({
+        "ok": True,
+        "user": result["user"],
+        "expires_at": result["expires_at"],
+    })
+
+    resp = JSONResponse(content=content)
     resp.set_cookie(
         SESSION_COOKIE, result["session_id"],
         httponly=True,
@@ -307,7 +317,6 @@ def api_auth_login(payload: Dict[str, Any] = Body(...)):
         max_age=settings.session_ttl_days * 86400,
     )
     return resp
-
 
 @app.post("/api/auth/logout")
 def api_auth_logout(request: Request):
