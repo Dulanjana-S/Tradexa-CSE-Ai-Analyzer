@@ -269,38 +269,102 @@ def cmd_train(args: argparse.Namespace) -> None:
 
 
 def _parse_eod_date(s: str) -> str:
-    s = (s or "").strip()
-    return datetime.strptime(s, "%d %b %Y").date().isoformat()
+    raw = str(s or "").strip().replace("\ufeff", "")
+    if not raw:
+        raise ValueError("empty date")
+
+    if "T" in raw:
+        raw = raw.split("T", 1)[0].strip()
+
+    formats = [
+        "%d %b %Y",
+        "%d %B %Y",
+        "%Y-%m-%d",
+        "%Y/%m/%d",
+        "%Y.%m.%d",
+        "%d/%m/%Y",
+        "%d-%m-%Y",
+        "%d.%m.%Y",
+        "%m/%d/%Y",
+        "%m-%d-%Y",
+        "%Y%m%d",
+    ]
+
+    for fmt in formats:
+        try:
+            return datetime.strptime(raw, fmt).date().isoformat()
+        except ValueError:
+            pass
+
+    raise ValueError(f"unsupported date format: {raw}")
 
 
 def _read_symbol_csv(fp: io.TextIOBase) -> List[dict]:
-    reader = csv.DictReader(fp)
+    text = fp.read()
+    if not text or not text.strip():
+        return []
+
+    try:
+        dialect = csv.Sniffer().sniff(text[:4096], delimiters=",;\t|")
+    except Exception:
+        dialect = csv.excel
+
+    reader = csv.DictReader(io.StringIO(text), dialect=dialect)
+
+    def norm_key(k: str) -> str:
+        return "".join(
+            ch.lower()
+            for ch in str(k or "").replace("\ufeff", "").strip()
+            if ch.isalnum()
+        )
+
     out: List[dict] = []
-    for r in reader:
-        if not r:
+
+    for raw_row in reader:
+        if not raw_row:
             continue
-        d = r.get("Date") or r.get("date")
+
+        row = {
+            norm_key(k): v
+            for k, v in raw_row.items()
+            if k is not None
+        }
+
+        def fkey(*keys):
+            for key in keys:
+                value = row.get(norm_key(key))
+                if value not in (None, ""):
+                    return value
+            return None
+
+        d = fkey(
+            "Date",
+            "Trade Date",
+            "Trading Date",
+            "Business Date",
+            "Price Date",
+            "Date Time",
+            "Datetime",
+        )
+
         if not d:
             continue
+
         try:
             iso = _parse_eod_date(str(d))
         except Exception:
             continue
-
-        def fkey(*keys):
-            for k in keys:
-                if k in r and r[k] not in (None, ""):
-                    return r[k]
-            return None
 
         def to_float(v):
             if v is None:
                 return None
             if isinstance(v, (int, float)):
                 return float(v)
+
             s = str(v).strip().replace(",", "")
             if not s or s.lower() in {"n/a", "na", "null", "none", "-", "--"}:
                 return None
+
             try:
                 return float(s)
             except ValueError:
@@ -311,24 +375,79 @@ def _read_symbol_csv(fp: io.TextIOBase) -> List[dict]:
                 return 0
             if isinstance(v, (int, float)):
                 return int(v)
+
             s = str(v).strip().replace(",", "")
             if not s or s.lower() in {"n/a", "na", "null", "none", "-", "--"}:
                 return 0
+
             try:
                 return int(float(s))
             except ValueError:
                 return 0
 
+        open_price = to_float(fkey(
+            "Open",
+            "Open Rs",
+            "Open (Rs.)",
+            "Open Price",
+            "Open Price Rs",
+            "open_price",
+        ))
+
+        high_price = to_float(fkey(
+            "High",
+            "High Rs",
+            "High (Rs.)",
+            "High Price",
+            "High Price Rs",
+            "high_price",
+        ))
+
+        low_price = to_float(fkey(
+            "Low",
+            "Low Rs",
+            "Low (Rs.)",
+            "Low Price",
+            "Low Price Rs",
+            "low_price",
+        ))
+
+        close_price = to_float(fkey(
+            "Close",
+            "Close Rs",
+            "Close (Rs.)",
+            "Close Price",
+            "Closing Price",
+            "Last",
+            "Last Traded Price",
+            "LTP",
+            "close_price",
+        ))
+
+        volume = to_int(fkey(
+            "Share Volume",
+            "Share Volume No",
+            "Volume",
+            "Trade Volume",
+            "Qty",
+            "Quantity",
+            "volume",
+        ))
+
+        if close_price is None and open_price is None and high_price is None and low_price is None:
+            continue
+
         out.append(
             {
                 "date": iso,
-                "open": to_float(fkey("Open", "Open (Rs.)", "open", "open_price")),
-                "high": to_float(fkey("High (Rs.)", "High", "high", "high_price")),
-                "low": to_float(fkey("Low (Rs.)", "Low", "low", "low_price")),
-                "close": to_float(fkey("Close (Rs.)", "Close", "close", "close_price")),
-                "volume": to_int(fkey("Share Volume", "share_volume", "Volume", "volume")),
+                "open": open_price,
+                "high": high_price,
+                "low": low_price,
+                "close": close_price,
+                "volume": volume,
             }
         )
+
     out.sort(key=lambda x: x["date"])
     return out
 
