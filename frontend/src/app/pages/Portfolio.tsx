@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { alertsApi, marketApi, portfolioApi, watchlistApi } from "../../lib/api/services";
 import type { EventCalendar, PortfolioAccount, PortfolioAnalytics, PortfolioData, PortfolioIntelligence, TradeFitPreview, PortfolioPerformancePoint, PortfolioPeriodPerformance, PortfolioTransaction, Stock, Watchlist } from "../../lib/api/types";
@@ -159,6 +159,9 @@ export function Portfolio() {
   const [newNoteText, setNewNoteText] = useState("");
   const [isSavingJournal, setIsSavingJournal] = useState(false);
   const [reminderTime, setReminderTime] = useState("");
+  // Track whether initial load is done to prevent double-firing of effects
+  const initialised = useRef(false);
+  const prevPortfolioId = useRef<string>("");
 
   useEffect(() => {
     if (portfolio?.portfolio) {
@@ -239,21 +242,29 @@ export function Portfolio() {
   const [symbolSearchOpen, setSymbolSearchOpen] = useState(false);
   const [symbolSearchLoading, setSymbolSearchLoading] = useState(false);
 
-  const loadPortfolio = async (portfolioId = selectedPortfolioId) => {
+  // Core data loaders — each has a single responsibility.
+  // loadPortfolioList: only called on init and portfolio create/archive actions.
+  const loadPortfolioList = async () => {
     const [portfolioRows, watchlistData] = await Promise.all([portfolioApi.listPortfolios(), watchlistApi.get()]);
     setPortfolios(portfolioRows);
-    const activeId = portfolioId || portfolioRows.find((item) => item.isDefault)?.portfolioId || portfolioRows[0]?.portfolioId || "";
-    if (activeId && activeId !== selectedPortfolioId) setSelectedPortfolioId(activeId);
-    const portfolioData = await portfolioApi.get(activeId || undefined);
-    setPortfolio(portfolioData);
     setWatchlist(watchlistData);
-    return activeId;
+    return portfolioRows;
   };
 
-  const loadPerformance = async (days: number, portfolioId = selectedPortfolioId) => {
+  // loadPortfolio: loads holdings/transactions for the given portfolio id.
+  const loadPortfolio = async (portfolioId: string) => {
+    const portfolioData = await portfolioApi.get(portfolioId || undefined);
+    setPortfolio(portfolioData);
+    return portfolioId;
+  };
+
+  const loadPerformance = async (days: number, portfolioId: string) => {
     setChartLoading(true);
     try {
-      const [series, periods] = await Promise.all([portfolioApi.getPerformance(days, portfolioId || undefined), portfolioApi.getPeriodPerformance(portfolioId || undefined)]);
+      const [series, periods] = await Promise.all([
+        portfolioApi.getPerformance(days, portfolioId || undefined),
+        portfolioApi.getPeriodPerformance(portfolioId || undefined),
+      ]);
       setPerformance(series);
       setPeriodPerformance(periods);
     } finally {
@@ -261,7 +272,7 @@ export function Portfolio() {
     }
   };
 
-  const loadAnalytics = async (days: number, portfolioId = selectedPortfolioId) => {
+  const loadAnalytics = async (days: number, portfolioId: string) => {
     setAnalyticsLoading(true);
     try {
       const payload = await portfolioApi.getAnalytics(days, portfolioId || undefined);
@@ -271,27 +282,64 @@ export function Portfolio() {
     }
   };
 
-  const loadIntelligence = async (portfolioId = selectedPortfolioId) => {
+  const loadIntelligence = async (portfolioId: string) => {
     const payload = await portfolioApi.getIntelligence(portfolioId || undefined);
     setIntelligence(payload);
   };
 
-  const loadCalendar = async (portfolioId = selectedPortfolioId) => {
+  const loadCalendar = async (portfolioId: string) => {
     const payload = await marketApi.getCalendar({ portfolioId: portfolioId || undefined, days: 180 });
     setCalendar(payload);
   };
 
+  // Initial load — fires once on mount.
   useEffect(() => {
     (async () => {
-      const activeId = await loadPortfolio();
-      await Promise.all([loadPerformance(chartDays, activeId), loadAnalytics(chartDays, activeId), loadIntelligence(activeId)]);
+      const rows = await loadPortfolioList();
+      const activeId = rows.find((item) => item.isDefault)?.portfolioId || rows[0]?.portfolioId || "";
+      if (activeId) {
+        prevPortfolioId.current = activeId;
+        setSelectedPortfolioId(activeId);
+        await Promise.all([
+          loadPortfolio(activeId),
+          loadPerformance(chartDays, activeId),
+          loadAnalytics(chartDays, activeId),
+          loadIntelligence(activeId),
+        ]);
+      }
+      initialised.current = true;
     })().finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // When the selected portfolio changes, reload all portfolio-level data.
+  // This is intentionally NOT triggered by chartDays — see the effect below.
   useEffect(() => {
+    if (!initialised.current) return; // skip: initial load handles this
     if (!selectedPortfolioId) return;
-    Promise.all([loadPortfolio(selectedPortfolioId), loadPerformance(chartDays, selectedPortfolioId).catch(() => setPerformance([])), loadAnalytics(chartDays, selectedPortfolioId).catch(() => setAnalytics(emptyAnalytics)), loadIntelligence(selectedPortfolioId).catch(() => setIntelligence(emptyIntelligence))]);
-  }, [selectedPortfolioId, chartDays]);
+    if (prevPortfolioId.current === selectedPortfolioId) return; // skip: same portfolio
+    prevPortfolioId.current = selectedPortfolioId;
+    const pid = selectedPortfolioId;
+    Promise.all([
+      loadPortfolio(pid),
+      loadPerformance(chartDays, pid),
+      loadAnalytics(chartDays, pid),
+      loadIntelligence(pid),
+    ]).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPortfolioId]);
+
+  // When only the chart timeframe changes, only reload performance + analytics (not holdings/intelligence).
+  useEffect(() => {
+    if (!initialised.current) return;
+    if (!selectedPortfolioId) return;
+    const pid = selectedPortfolioId;
+    Promise.all([
+      loadPerformance(chartDays, pid),
+      loadAnalytics(chartDays, pid),
+    ]).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chartDays]);
 
   useEffect(() => {
     let alive = true;
@@ -419,9 +467,17 @@ export function Portfolio() {
         tradedAt: form.tradedAt,
         notes: form.notes.trim() || undefined,
       };
-      const updated = editingId ? await portfolioApi.updateTransaction(editingId, payload, selectedPortfolioId || undefined) : await portfolioApi.addTransaction(payload, selectedPortfolioId || undefined);
+      const updated = editingId
+        ? await portfolioApi.updateTransaction(editingId, payload, selectedPortfolioId || undefined)
+        : await portfolioApi.addTransaction(payload, selectedPortfolioId || undefined);
       setPortfolio(updated);
-      await Promise.all([loadPerformance(chartDays, selectedPortfolioId), loadAnalytics(chartDays, selectedPortfolioId), watchlistApi.get().then(setWatchlist), loadPortfolio(selectedPortfolioId), loadIntelligence(selectedPortfolioId), loadCalendar(selectedPortfolioId)]);
+      const pid = selectedPortfolioId;
+      await Promise.all([
+        loadPerformance(chartDays, pid),
+        loadAnalytics(chartDays, pid),
+        loadIntelligence(pid),
+        watchlistApi.get().then(setWatchlist),
+      ]);
       resetDialog();
     } catch (err: any) {
       setError(err?.message || "Could not save portfolio transaction");
@@ -433,7 +489,12 @@ export function Portfolio() {
   const deleteTransaction = async (transactionId: string) => {
     const updated = await portfolioApi.deleteTransaction(transactionId, selectedPortfolioId || undefined);
     setPortfolio(updated);
-    await Promise.all([loadPerformance(chartDays, selectedPortfolioId), loadAnalytics(chartDays, selectedPortfolioId), loadPortfolio(selectedPortfolioId), loadIntelligence(selectedPortfolioId), loadCalendar(selectedPortfolioId)]);
+    const pid = selectedPortfolioId;
+    await Promise.all([
+      loadPerformance(chartDays, pid),
+      loadAnalytics(chartDays, pid),
+      loadIntelligence(pid),
+    ]);
   };
 
   const previewCsvImport = async (file: File) => {
@@ -504,7 +565,12 @@ export function Portfolio() {
     const updated = await portfolioApi.addCashMovement({ movementType: cashForm.movementType, amount, movementDate: cashForm.movementDate, notes: cashForm.notes || undefined }, selectedPortfolioId || undefined);
     setPortfolio(updated);
     setCashForm({ movementType: "deposit", amount: "", movementDate: new Date().toISOString().slice(0, 10), notes: "" });
-    await Promise.all([loadPerformance(chartDays, selectedPortfolioId), loadAnalytics(chartDays, selectedPortfolioId), loadPortfolio(selectedPortfolioId), loadIntelligence(selectedPortfolioId), loadCalendar(selectedPortfolioId)]);
+    const pid = selectedPortfolioId;
+    await Promise.all([
+      loadPerformance(chartDays, pid),
+      loadAnalytics(chartDays, pid),
+      loadIntelligence(pid),
+    ]);
   };
 
   const importCsvTransactions = async () => {
@@ -514,7 +580,12 @@ export function Portfolio() {
     try {
       const updated = await portfolioApi.importTransactions(csvFile, selectedPortfolioId || undefined);
       setPortfolio(updated);
-      await Promise.all([loadPerformance(chartDays, selectedPortfolioId), loadAnalytics(chartDays, selectedPortfolioId), loadPortfolio(selectedPortfolioId), loadIntelligence(selectedPortfolioId), loadCalendar(selectedPortfolioId)]);
+      const pid = selectedPortfolioId;
+      await Promise.all([
+        loadPerformance(chartDays, pid),
+        loadAnalytics(chartDays, pid),
+        loadIntelligence(pid),
+      ]);
       setCsvFile(null);
       setCsvPreview(null);
     } catch (err: any) {
