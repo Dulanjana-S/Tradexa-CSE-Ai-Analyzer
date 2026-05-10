@@ -73,4 +73,5 @@ jobs:
         with:
           app-name: 'tradexalk-api'
           slot-name: 'Production'
+          package: ./backend
           
