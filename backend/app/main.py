@@ -24,9 +24,9 @@ from .services.auth_service import SESSION_COOKIE, change_password, complete_pas
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 app = FastAPI(
-    title="CSE AI Analyzer",
-    description="CSE market analytics backend with live data support, auth, admin controls, and ML prediction.",
-    version="0.7.0",
+    title="TradexaLK — CSE AI Analytics",
+    description="Professional AI analytics platform for the Colombo Stock Exchange. Live market data, ML predictions, portfolio management, and alerts.",
+    version="1.0.0",
 )
 
 app.add_middleware(
@@ -272,7 +272,13 @@ def api_auth_login(payload: Dict[str, Any] = Body(...)):
             resolved = identifier.split('@', 1)[0]
     result = login(resolved, str(payload.get("password") or ""))
     resp = JSONResponse({"ok": True, "user": result["user"], "expires_at": result["expires_at"]})
-    resp.set_cookie(SESSION_COOKIE, result["session_id"], httponly=True, samesite="lax", secure=False, max_age=settings.session_ttl_days * 86400)
+    resp.set_cookie(
+        SESSION_COOKIE, result["session_id"],
+        httponly=True,
+        samesite=settings.session_cookie_samesite,
+        secure=settings.session_cookie_secure,
+        max_age=settings.session_ttl_days * 86400,
+    )
     return resp
 
 

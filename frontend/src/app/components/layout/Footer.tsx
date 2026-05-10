@@ -23,20 +23,20 @@ export function Footer() {
     company: [
       { name: "About Us", path: "/about" },
       { name: "Contact", path: "/contact" },
-      { name: "Careers", path: "/careers" },
       { name: "Blog", path: "/blog" },
+      { name: "CSE Official", path: "https://www.cse.lk" },
     ],
     legal: [
+      { name: "CSE Regulations", path: "https://www.cse.lk/pages/regulatory-framework/regulatory-framework.html" },
+      { name: "SEC Sri Lanka", path: "https://www.sec.gov.lk" },
       { name: "Terms of Service", path: "/terms" },
       { name: "Privacy Policy", path: "/privacy" },
       { name: "Cookie Policy", path: "/cookies" },
       { name: "Disclaimer", path: "/disclaimer" },
+    
     ],
     support: [
-      { name: "Help Center", path: "/help" },
-      { name: "API Documentation", path: "/api-docs" },
-      { name: "System Status", path: "/admin" },
-      { name: "Contact Support", path: "/support" },
+      { name: "Contact Support", path: "mailto:support@tradexalk.com" },
     ],
   };
 
@@ -113,12 +113,23 @@ export function Footer() {
             <ul className="space-y-2.5">
               {footerLinks.company.map((link) => (
                 <li key={link.path}>
-                  <Link
-                    to={link.path}
-                    className="text-sm text-[var(--color-text-tertiary)] hover:text-emerald-500 transition-colors"
-                  >
-                    {link.name}
-                  </Link>
+                  {link.path.startsWith('/') ? (
+                    <Link
+                      to={link.path}
+                      className="text-sm text-[var(--color-text-tertiary)] hover:text-emerald-500 transition-colors"
+                    >
+                      {link.name}
+                    </Link>
+                  ) : (
+                    <a
+                      href={link.path}
+                      target={link.path.startsWith('http') ? '_blank' : undefined}
+                      rel={link.path.startsWith('http') ? 'noopener noreferrer' : undefined}
+                      className="text-sm text-[var(--color-text-tertiary)] hover:text-emerald-500 transition-colors"
+                    >
+                      {link.name}
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>
@@ -132,12 +143,23 @@ export function Footer() {
             <ul className="space-y-2.5">
               {footerLinks.legal.map((link) => (
                 <li key={link.path}>
-                  <Link
-                    to={link.path}
-                    className="text-sm text-[var(--color-text-tertiary)] hover:text-emerald-500 transition-colors"
-                  >
-                    {link.name}
-                  </Link>
+                  {link.path.startsWith('/') ? (
+                    <Link
+                      to={link.path}
+                      className="text-sm text-[var(--color-text-tertiary)] hover:text-emerald-500 transition-colors"
+                    >
+                      {link.name}
+                    </Link>
+                  ) : (
+                    <a
+                      href={link.path}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-[var(--color-text-tertiary)] hover:text-emerald-500 transition-colors"
+                    >
+                      {link.name}
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>
@@ -151,12 +173,21 @@ export function Footer() {
             <ul className="space-y-2.5">
               {footerLinks.support.map((link) => (
                 <li key={link.path}>
-                  <Link
-                    to={link.path}
-                    className="text-sm text-[var(--color-text-tertiary)] hover:text-emerald-500 transition-colors"
-                  >
-                    {link.name}
-                  </Link>
+                  {link.path.startsWith('/') ? (
+                    <Link
+                      to={link.path}
+                      className="text-sm text-[var(--color-text-tertiary)] hover:text-emerald-500 transition-colors"
+                    >
+                      {link.name}
+                    </Link>
+                  ) : (
+                    <a
+                      href={link.path}
+                      className="text-sm text-[var(--color-text-tertiary)] hover:text-emerald-500 transition-colors"
+                    >
+                      {link.name}
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>

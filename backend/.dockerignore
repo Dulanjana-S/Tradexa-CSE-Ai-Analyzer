@@ -1,0 +1,19 @@
+# Never bake secrets or local artefacts into the Docker image
+.env
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+catboost_info/
+.pytest_cache/
+tests/
+scratch/
+_debug_raw.py
+_check_module.py
+check_inventory.py
+health_check.py
+fix_admin.py
+ASPI.csv
+SL20.csv
+indices.zip

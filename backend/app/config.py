@@ -43,12 +43,17 @@ class Settings:
     session_cookie_name: str = os.getenv("SESSION_COOKIE_NAME", "cse_session")
     session_ttl_days: int = int(os.getenv("SESSION_TTL_DAYS", "7"))
     bootstrap_admin_username: str = os.getenv("BOOTSTRAP_ADMIN_USERNAME", "admin")
-    bootstrap_admin_password: str = os.getenv("BOOTSTRAP_ADMIN_PASSWORD", "admin123")
+    # Set this explicitly in .env — empty string disables bootstrap admin creation.
+    bootstrap_admin_password: str = os.getenv("BOOTSTRAP_ADMIN_PASSWORD", "")
     frontend_origins: str = os.getenv(
         "FRONTEND_ORIGINS",
         "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174",
     )
     frontend_public_url: str = os.getenv("FRONTEND_PUBLIC_URL", "http://localhost:5173")
+
+    # Cookie security — set SESSION_COOKIE_SECURE=true in production (HTTPS).
+    session_cookie_secure: bool = os.getenv("SESSION_COOKIE_SECURE", "false").lower() in {"1", "true", "yes"}
+    session_cookie_samesite: str = os.getenv("SESSION_COOKIE_SAMESITE", "lax")
 
     password_reset_ttl_minutes: int = int(os.getenv("PASSWORD_RESET_TTL_MINUTES", "30"))
     smtp_host: str = os.getenv("SMTP_HOST", "")
