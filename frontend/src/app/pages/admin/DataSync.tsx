@@ -52,12 +52,22 @@ export function DataSync() {
 
   const load = async (silent = false) => {
     if (!silent) setLoading(true);
+    
+    // 1. Heavier/Slow health check moved to background so it doesn't block UI
+    adminApi.getModelHealth().then(data => setModelHealth(data)).catch(() => null);
+
+    // 2. Fast critical data (Jobs, Status, Settings)
     try {
-      const [jobsData, statusData, systemSettings, healthData] = await Promise.all([adminApi.getJobs(), adminApi.getStatus(), adminApi.getSystemSettings(), adminApi.getModelHealth()]);
+      const [jobsData, statusData, systemSettings] = await Promise.all([
+        adminApi.getJobs(), 
+        adminApi.getStatus(), 
+        adminApi.getSystemSettings()
+      ]);
       setJobs(jobsData);
       setStatus(statusData);
       setSchedulerSettings(systemSettings?.settings || {});
-      setModelHealth(healthData);
+    } catch (err) {
+      console.error("Refresh failed", err);
     } finally {
       if (!silent) setLoading(false);
     }
@@ -249,10 +259,7 @@ export function DataSync() {
           </div>
           <div className="flex gap-3">
             <Button variant="outline" className="border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]" onClick={() => load()}>
-              <RefreshCw className="mr-2 h-4 w-4" /> Refresh
-            </Button>
-            <Button onClick={runSyncTraining} disabled={busyAction !== null} className="bg-emerald-600 text-white hover:bg-emerald-700">
-              {busyAction === "sync-train" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />} Sync Then Train
+              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
             </Button>
           </div>
         </div>
