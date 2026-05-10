@@ -153,7 +153,7 @@ def cmd_sync(args: argparse.Namespace) -> None:
                 print(f"Index {name}: {count}")
 
         try:
-            anns = prov.get_announcements(None, limit=min(args.announcements, 200))
+            anns = prov.get_announcements(None, limit=min(args.announcements, 1000))
         except Exception as e:
             anns = []
             details["announcements_error"] = str(e)
