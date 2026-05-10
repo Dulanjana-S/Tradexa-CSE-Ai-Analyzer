@@ -142,6 +142,27 @@ def logout(session_id: Optional[str]) -> None:
         _storage.delete_session(session_id)
 
 
+def _coerce_utc_datetime(value: Any) -> Optional[datetime]:
+    if value is None:
+        return None
+    try:
+        if isinstance(value, datetime):
+            dt = value
+        else:
+            raw = str(value).strip()
+            if not raw:
+                return None
+            if raw.endswith('Z'):
+                raw = raw[:-1] + '+00:00'
+            dt = datetime.fromisoformat(raw)
+
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except Exception:
+        return None
+
+
 def current_user_from_request(request: Request) -> Optional[Dict[str, Any]]:
     ensure_bootstrap_admin()
     sid = request.cookies.get(SESSION_COOKIE)
@@ -150,14 +171,16 @@ def current_user_from_request(request: Request) -> Optional[Dict[str, Any]]:
     sess = _storage.get_session(sid)
     if not sess:
         return None
-    try:
-        exp = datetime.fromisoformat(str(sess.get('expires_at')))
-    except Exception:
+
+    exp = _coerce_utc_datetime(sess.get('expires_at'))
+    if exp is None:
         _storage.delete_session(sid)
         return None
+
     if exp < _utc_now():
         _storage.delete_session(sid)
         return None
+
     user = _storage.get_user(str(sess.get('username') or ''))
     if not user:
         _storage.delete_session(sid)
