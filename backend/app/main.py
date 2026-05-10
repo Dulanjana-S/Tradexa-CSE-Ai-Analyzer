@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 
 import shutil
 import tempfile
@@ -8,6 +9,7 @@ import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from contextlib import asynccontextmanager
 from fastapi import BackgroundTasks, Body, Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
@@ -25,11 +27,19 @@ from .services.auth_service import SESSION_COOKIE, change_password, complete_pas
 from .rate_limit import rate_limit_auth, generate_captcha, verify_captcha
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+logger = logging.getLogger("tradexalk.api")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    ensure_bootstrap_admin()
+    start_job_system()
+    yield
 
 app = FastAPI(
     title="TradexaLK — CSE AI Analytics",
     description="Professional AI analytics platform for the Colombo Stock Exchange. Live market data, ML predictions, portfolio management, and alerts.",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -49,9 +59,6 @@ def _custom_openapi() -> Dict[str, Any]:
 
 
 app.openapi = _custom_openapi
-ensure_bootstrap_admin()
-start_job_system()
-
 
 
 
@@ -257,46 +264,66 @@ def api_auth_captcha():
 @app.get("/api/auth/me")
 def api_auth_me(request: Request):
     user = current_user_from_request(request)
-    return {"authenticated": bool(user), "user": user}
+    return jsonable_encoder({"authenticated": bool(user), "user": user})
 
 
 @app.post("/api/auth/register", dependencies=[Depends(rate_limit_auth)])
 def api_auth_register(payload: Dict[str, Any] = Body(...), background_tasks: BackgroundTasks = BackgroundTasks()):
+    # CAPTCHA is currently disabled in UI/backend. Re-enable only after both Vercel and Azure keys are set.
     # captcha_id = payload.get("captcha_id")
     # captcha_answer = payload.get("captcha_answer")
     # if not verify_captcha(captcha_id, captcha_answer):
     #     raise HTTPException(status_code=400, detail="Invalid CAPTCHA")
 
-    username = _derive_username(payload)
+    email = str(payload.get("email") or "").strip().lower()
+    password = str(payload.get("password") or "")
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+    if len(password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    if _find_user_by_email(email):
+        raise HTTPException(status_code=409, detail="An account with this email already exists")
+
+    username = _derive_username({**payload, "email": email})
     display_name = payload.get("display_name") or payload.get("name") or username
 
-    user = create_user(
-        username,
-        str(payload.get("password") or ""),
-        role="user",
-        display_name=display_name,
-        email=payload.get("email"),
-    )
-
-    if user.get("email"):
-        from .services.auth_service import send_welcome_email
-        background_tasks.add_task(
-            send_welcome_email,
-            str(user.get("email")),
-            display_name,
+    try:
+        user = create_user(
+            username,
+            password,
+            role="user",
+            display_name=display_name,
+            email=email,
         )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Registration failed for email=%s username=%s", email, username)
+        message = str(exc).lower()
+        if "duplicate" in message or "unique" in message or "already exists" in message:
+            raise HTTPException(status_code=409, detail="An account with this email or username already exists")
+        raise HTTPException(status_code=500, detail="Registration failed. Please check backend logs.")
+
+    # Welcome email is optional. Do not let email delivery break registration.
+    if user.get("email") and settings.smtp_host:
+        try:
+            from .services.auth_service import send_welcome_email
+            background_tasks.add_task(send_welcome_email, str(user.get("email")), str(display_name))
+        except Exception:
+            logger.exception("Unable to queue welcome email for %s", email)
 
     return jsonable_encoder({"ok": True, "user": user})
 
+
 @app.post("/api/auth/login", dependencies=[Depends(rate_limit_auth)])
 def api_auth_login(payload: Dict[str, Any] = Body(...)):
+    # CAPTCHA is currently disabled in UI/backend. Re-enable only after both Vercel and Azure keys are set.
     # captcha_answer = payload.get("captcha_answer")
     # if not verify_captcha(None, captcha_answer):
     #     raise HTTPException(status_code=400, detail="Invalid CAPTCHA")
 
     identifier = str(payload.get("username") or payload.get("email") or "").strip()
     resolved = identifier
-
     if "@" in identifier:
         matched = _find_user_by_email(identifier)
         if matched and matched.get("username"):
@@ -305,7 +332,6 @@ def api_auth_login(payload: Dict[str, Any] = Body(...)):
             resolved = identifier.split("@", 1)[0]
 
     result = login(resolved, str(payload.get("password") or ""))
-
     content = jsonable_encoder({
         "ok": True,
         "user": result["user"],
@@ -323,12 +349,17 @@ def api_auth_login(payload: Dict[str, Any] = Body(...)):
     )
     return resp
 
+
 @app.post("/api/auth/logout")
 def api_auth_logout(request: Request):
     sid = request.cookies.get(SESSION_COOKIE)
     logout(sid)
-    resp = JSONResponse({"ok": True})
-    resp.delete_cookie(SESSION_COOKIE)
+    resp = JSONResponse(content={"ok": True})
+    resp.delete_cookie(
+        SESSION_COOKIE,
+        samesite=settings.session_cookie_samesite,
+        secure=settings.session_cookie_secure,
+    )
     return resp
 
 
@@ -338,56 +369,55 @@ def api_auth_forgot_password(payload: Dict[str, Any] = Body(...)):
     user = _find_user(identifier)
     if not user:
         return {"ok": True, "message": "If an account exists for that email, a reset link has been prepared."}
-    
+
     result = start_password_reset(user)
-    response = {"ok": True, "sent": result.get("sent", False)}
-    
+    response: Dict[str, Any] = {"ok": True, "sent": result.get("sent", False)}
+
     if result.get("sent"):
         response["message"] = "A password reset link has been sent to your email address."
     else:
         response["message"] = "A password reset link has been prepared."
-        # Only expose the link in API if explicitly allowed in config (dev mode)
         if settings.allow_password_reset_preview and result.get("preview_reset_link"):
             response["preview_reset_link"] = result.get("preview_reset_link")
-            
+
     if result.get("expires_at"):
         response["expires_at"] = result.get("expires_at")
-        
-    return response
+
+    return jsonable_encoder(response)
 
 
 @app.post("/api/auth/reset-password")
 def api_auth_reset_password(payload: Dict[str, Any] = Body(...)):
     token = str(payload.get("token") or "").strip()
     new_password = str(payload.get("new_password") or "")
-    
+
     if not token:
         raise HTTPException(status_code=400, detail="Reset token is missing.")
     if len(new_password) < 6:
         raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
-        
+
     success = complete_password_reset(token, new_password)
     if not success:
         raise HTTPException(
-            status_code=400, 
-            detail="Failed to reset password. The link may have expired or already been used."
+            status_code=400,
+            detail="Failed to reset password. The link may have expired or already been used.",
         )
-        
+
     return {"ok": True, "message": "Password has been reset successfully."}
 
 
 @app.post("/api/auth/change-password")
 def api_auth_change_password(request: Request, payload: Dict[str, Any] = Body(...)):
     user = require_user(request)
-    change_password(user['username'], str(payload.get('current_password') or ''), str(payload.get('new_password') or ''))
-    return {'ok': True}
+    change_password(user["username"], str(payload.get("current_password") or ""), str(payload.get("new_password") or ""))
+    return {"ok": True}
 
 
 @app.post("/api/profile")
 def api_profile_update(request: Request, payload: Dict[str, Any] = Body(...)):
     user = require_user(request)
-    updated = update_profile(user['username'], display_name=payload.get('display_name'), email=payload.get('email'))
-    return {'ok': True, 'user': updated}
+    updated = update_profile(user["username"], display_name=payload.get("display_name"), email=payload.get("email"))
+    return jsonable_encoder({"ok": True, "user": updated})
 
 @app.post("/api/contact")
 def api_contact_submit(payload: Dict[str, Any] = Body(...), background_tasks: BackgroundTasks = BackgroundTasks()):

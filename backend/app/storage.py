@@ -18,6 +18,7 @@ try:  # Optional dependency; SQLite mode works without it.
         DateTime,
         Float,
         Integer,
+        inspect,
         MetaData,
         String,
         Table,
@@ -29,7 +30,7 @@ try:  # Optional dependency; SQLite mode works without it.
     from sqlalchemy.engine import Engine
 except Exception:  # pragma: no cover
     Column = Date = DateTime = Float = Integer = MetaData = String = Table = Text = None  # type: ignore
-    create_engine = or_ = select = None  # type: ignore
+    create_engine = or_ = select = inspect = None  # type: ignore
     Engine = Any  # type: ignore
 
 
@@ -442,6 +443,34 @@ class Storage:
             self._engine = create_engine(self.database_url, future=True, pool_pre_ping=True)
         return self._engine
 
+    def _ensure_sql_schema_compat(self) -> None:
+        """Lightweight production migration for existing PostgreSQL tables.
+
+        metadata.create_all() creates missing tables but it does not add columns to
+        tables that already exist. Azure deployments can therefore keep an older
+        users/sessions schema and then fail during registration/login. This helper
+        adds any missing nullable columns defined in SQLAlchemy metadata.
+        """
+        if self._is_sqlite() or metadata is None or inspect is None:
+            return
+        engine = self.engine()
+        if engine.dialect.name != "postgresql":
+            return
+        inspector = inspect(engine)
+        existing_tables = set(inspector.get_table_names())
+        with engine.begin() as conn:
+            for table in metadata.sorted_tables:
+                if table.name not in existing_tables:
+                    continue
+                existing_columns = {col["name"] for col in inspector.get_columns(table.name)}
+                for column in table.columns:
+                    if column.name in existing_columns:
+                        continue
+                    col_type = column.type.compile(dialect=engine.dialect)
+                    table_name = table.name.replace('"', '""')
+                    column_name = column.name.replace('"', '""')
+                    conn.exec_driver_sql(f'ALTER TABLE "{table_name}" ADD COLUMN IF NOT EXISTS "{column_name}" {col_type}')
+
     def init(self) -> None:
         if self._is_sqlite():
             with self._sqlite() as conn:
@@ -772,6 +801,7 @@ class Storage:
         if metadata is None:
             raise RuntimeError("SQLAlchemy metadata is unavailable")
         metadata.create_all(self.engine())
+        self._ensure_sql_schema_compat()
 
     # ---- Companies ----
     def upsert_companies(self, rows: Iterable[Dict[str, Any]]) -> int:
