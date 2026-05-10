@@ -103,7 +103,7 @@ export default function ChatWidget() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="mb-4 w-[380px] sm:w-[420px] h-[600px] max-h-[80vh] max-w-[95vw] flex flex-col rounded-2xl shadow-2xl overflow-hidden border border-white/20 bg-white/80 dark:bg-[var(--color-bg-primary)]/90 backdrop-blur-xl"
+            className="mb-4 w-[380px] sm:w-[420px] h-[600px] max-h-[80vh] max-w-[95vw] flex flex-col rounded-2xl shadow-2xl overflow-hidden border border-blue-200/50 dark:border-white/10 bg-gradient-to-br from-teal-50 via-blue-100 to-indigo-100 dark:from-[#0a1128] dark:to-[#080c1e] backdrop-blur-xl"
           >
             {/* Header */}
             <div className="px-5 py-4 bg-gradient-to-r from-teal-600 to-indigo-700 text-white flex items-center justify-between shadow-md">
@@ -157,13 +157,18 @@ export default function ChatWidget() {
                     <p className="text-[10px] text-[var(--color-text-tertiary)] uppercase tracking-widest font-bold mb-3">Try asking:</p>
                     <div className="flex flex-wrap gap-2 justify-center">
                       {suggestedQuestions.map((q, idx) => (
-                        <button
+                        <motion.button
                           key={idx}
                           onClick={() => onSelectSuggestion(q)}
-                          className="px-3 py-1.5 text-xs bg-white dark:bg-[var(--color-bg-secondary)] border border-slate-200 dark:border-[var(--color-border)] rounded-full hover:border-teal-500 hover:text-teal-600 dark:hover:text-teal-400 transition-all shadow-sm"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: idx * 0.1 + 0.3 }}
+                          whileHover={{ scale: 1.05, y: -2 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="px-4 py-2 text-xs font-medium bg-slate-800 dark:bg-slate-700 border border-slate-700 dark:border-slate-600 rounded-full text-white shadow-md hover:bg-teal-600 hover:border-teal-500 hover:shadow-lg hover:shadow-teal-500/20 transition-colors"
                         >
                           {q}
-                        </button>
+                        </motion.button>
                       ))}
                     </div>
                   </div>
