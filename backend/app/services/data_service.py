@@ -809,7 +809,7 @@ def prediction(symbol: str) -> Dict[str, Any]:
         return _json_safe({
             "available": False,
             "symbol": symbol.upper(),
-            "reason": "Insufficient end-of-day price history for this symbol. Import more data before showing a model signal.",
+            "reason": "Insufficient end-of-day price history for this symbol.",
             "required_history_points": 120,
             "history_points": len(hist),
         })
@@ -1914,14 +1914,19 @@ def get_portfolio_period_performance(username: str, portfolio_id: Optional[str] 
                 cutoff = latest_date - timedelta(days=delta_days)
                 eligible = [p for p in series if date.fromisoformat(str(p.get("date"))[:10]) <= cutoff]
                 start = eligible[-1] if eligible else series[0]
-            start_val = float(start.get("total_equity") or start.get("market_value") or 0.0)
-            end_val = float(latest.get("total_equity") or latest.get("market_value") or 0.0)
-            if abs(start_val) < 1e-9:
-                start_ret = float(start.get("return_pct") or 0.0)
-                end_ret = float(latest.get("return_pct") or 0.0)
-                ret = end_ret - start_ret
-            else:
-                ret = _safe_pct(end_val - start_val, start_val)
+            start_equity = float(start.get("total_equity") or start.get("market_value") or 0.0)
+            end_equity = float(latest.get("total_equity") or latest.get("market_value") or 0.0)
+            start_total_return = float(start.get("total_return") or 0.0)
+            end_total_return = float(latest.get("total_return") or 0.0)
+            period_return_value = end_total_return - start_total_return
+
+            # Use a stable base for period % return to avoid inflated values when start equity is zero/tiny.
+            start_cost_basis = float(start.get("cost_basis") or 0.0)
+            start_net_contrib = float(start.get("net_contributions") or 0.0)
+            end_net_contrib = float(latest.get("net_contributions") or 0.0)
+            period_net_contrib = end_net_contrib - start_net_contrib
+            return_base = max(abs(start_equity), abs(start_cost_basis), abs(period_net_contrib))
+            ret = _safe_pct(period_return_value, return_base) if return_base > 1e-9 else 0.0
             benchmark_days = delta_days or max(30, (latest_date - date.fromisoformat(str(start.get("date"))[:10])).days)
             aspi = _benchmark_series("ASPI", latest_date - timedelta(days=benchmark_days), benchmark_days + 1)
             sp20 = _benchmark_series("S&P SL20", latest_date - timedelta(days=benchmark_days), benchmark_days + 1)
