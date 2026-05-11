@@ -16,10 +16,37 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Show backend files
+        run: |
+          pwd
+          ls
+          ls backend
+          ls backend/app
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate backend requirements
+        run: |
+          test -f backend/requirements.txt
+          test -d backend/app
+          test -f backend/app/main.py
+
       - name: Create backend deployment package
         run: |
           cd backend
-          zip -r ../backend-release.zip .
+          zip -r ../backend-release.zip . \
+            -x "*.pyc" \
+            -x "*/__pycache__/*" \
+            -x ".venv/*" \
+            -x "data/*" \
+            -x "models/*" \
+            -x "catboost_info/*" \
+            -x "*.db" \
+            -x "*.sqlite" \
+            -x "*.zip"
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
