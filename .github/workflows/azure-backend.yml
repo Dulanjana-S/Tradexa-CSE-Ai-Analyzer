@@ -1,6 +1,7 @@
 name: Deploy Backend to Azure App Service
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -16,39 +17,23 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Show backend files
+      - name: Confirm backend files exist
         run: |
-          pwd
           ls
           ls backend
           ls backend/app
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Validate backend requirements
-        run: |
           test -f backend/requirements.txt
-          test -d backend/app
           test -f backend/app/main.py
 
-      - name: Create backend deployment package
+      - name: Create clean backend package
         run: |
-          cd backend
-          zip -r ../backend-release.zip . \
-            -x "*.pyc" \
-            -x "*/__pycache__/*" \
-            -x ".venv/*" \
-            -x "data/*" \
-            -x "models/*" \
-            -x "catboost_info/*" \
-            -x "*.db" \
-            -x "*.sqlite" \
-            -x "*.zip"
+          mkdir deploy_backend
+          cp -r backend/app deploy_backend/app
+          cp backend/requirements.txt deploy_backend/requirements.txt
+          cd deploy_backend
+          zip -r ../backend-release.zip .
 
-      - name: Deploy to Azure Web App
+      - name: Deploy backend package to Azure
         uses: azure/webapps-deploy@v3
         with:
           app-name: tradexalk-api-bvhhacbhewcradbr
