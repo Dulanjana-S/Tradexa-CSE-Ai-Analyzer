@@ -36,6 +36,6 @@ jobs:
       - name: Deploy backend package to Azure
         uses: azure/webapps-deploy@v3
         with:
-          app-name: tradexalk-api-bvhhacbhewcradbr
+          app-name: tradexalk-api
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: backend-release.zip
