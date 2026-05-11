@@ -303,7 +303,8 @@ export function Header({ onMenuClick }: HeaderProps) {
             <Button asChild variant="ghost" size="sm" className="h-8 text-[13px] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)] hover:text-[var(--color-text-primary)]">
               <Link to="/login">Sign in</Link>
             </Button>
-            <Button asChild size="sm" className="h-8 bg-emerald-600 text-[13px] text-white hover:bg-emerald-700">
+            {/* Hidden on mobile, shown on sm and up */}
+            <Button asChild size="sm" className="hidden sm:inline-flex h-8 bg-emerald-600 text-[13px] text-white hover:bg-emerald-700">
               <Link to="/register">Sign up</Link>
             </Button>
           </>

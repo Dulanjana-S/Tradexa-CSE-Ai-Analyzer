@@ -62,9 +62,9 @@ export function Dashboard() {
               Last updated: {new Date(overview.lastUpdated).toLocaleString("en-LK", { dateStyle: "medium", timeStyle: "short" })}
             </p>
           </div>
-          <div className="flex items-center gap-2.5 rounded-full border border-[#bf953f]/30 bg-[#bf953f]/5 px-4 py-1.5 backdrop-blur-md transition-all hover:border-[#bf953f]/60 hover:bg-[#bf953f]/10 shadow-[0_0_15px_-5px_rgba(191,149,63,0.2)]">
-            <div className="h-1.5 w-1.5 rounded-full bg-[#bf953f] animate-pulse shadow-[0_0_10px_#bf953f]" />
-            <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.25em] text-[#bf953f]">
+          <div className="flex items-center gap-2.5 rounded-full border border-amber-500/50 bg-transparent px-4 py-1.5 backdrop-blur-md transition-all hover:border-amber-500 hover:bg-amber-500/10">
+            <div className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+            <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.25em] text-amber-400">
               Trade With Confidence
             </span>
           </div>

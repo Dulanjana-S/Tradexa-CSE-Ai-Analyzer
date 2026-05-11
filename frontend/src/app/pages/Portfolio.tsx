@@ -817,7 +817,7 @@ export function Portfolio() {
 
                         <div className="space-y-4">
                           <h4 className="text-sm font-bold text-[var(--color-text-tertiary)] uppercase tracking-widest flex items-center gap-2">
-                            <ShieldCheck className="h-4 w-4 text-emerald-400" /> Real-World Impact
+                            <ShieldCheck className="h-4 w-4 text-emerald-400" /> Impact
                           </h4>
                           <div className="space-y-3">
                             {tradePreview.reasons.map((reason, idx) => (
@@ -835,7 +835,7 @@ export function Portfolio() {
                           <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
                             <div className="flex items-center gap-2 mb-2">
                               <Lightbulb className="h-4 w-4 text-amber-400" />
-                              <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">AI Suggestion</span>
+                              <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Suggestion</span>
                             </div>
                             <p className="text-[13px] text-amber-200/80 italic leading-relaxed">
                               "{tradePreview.suggestions[0]}"
@@ -849,7 +849,7 @@ export function Portfolio() {
                               <TrendingUp className="h-4 w-4 text-violet-400" />
                             </div>
                             <div>
-                              <p className="text-[11px] font-bold text-violet-400 uppercase">Pro Tip</p>
+                              <p className="text-[11px] font-bold text-violet-400 uppercase">tip</p>
                               <p className="text-[12px] text-[var(--color-text-tertiary)]">This {tradePreview.txType} will result in a {tradePreview.newStockWeightPct > 15 ? 'concentrated' : 'balanced'} position in your portfolio.</p>
                             </div>
                           </div>
