@@ -98,7 +98,7 @@ export function StockDetail() {
           <p className="text-lg text-[var(--color-text-tertiary)]">{stock.company}</p>
           <p className="text-sm text-slate-500 mt-1">Market Cap: Rs. {((stock.marketCap || 0) / 1e9).toFixed(2)}B</p>
         </div>
-        <div className="flex items-center gap-3"><Button variant="outline" className="border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)]" onClick={toggleWatchlist}><Star className="h-4 w-4 mr-2" />{watching ? "Remove from Watchlist" : "Add to Watchlist"}</Button></div>
+        <div className="flex items-center gap-3"><Button variant="outline" className={watching ? "border-amber-500/50 text-amber-400 hover:bg-amber-500/10 hover:border-amber-500" : "border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500"} onClick={toggleWatchlist}><Star className="h-4 w-4 mr-2" />{watching ? "Remove from Watchlist" : "Add to Watchlist"}</Button></div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
