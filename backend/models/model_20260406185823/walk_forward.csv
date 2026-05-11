@@ -1,2 +1,0 @@
-train_end,test_start,test_end,rows_train,rows_test,acc_up,auc_up
-2025-08-05,2025-08-06,2026-04-01,9311,2803,0.5369247235105244,0.5244851181659849
