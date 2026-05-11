@@ -436,6 +436,11 @@ def api_contact_submit(payload: Dict[str, Any] = Body(...), background_tasks: Ba
 
 
 # ---- API: health ----
+
+@app.get("/")
+def root():
+    return {"ok": True, "service": "cse-ai-analyzer", "version": app.version}
+
 @app.get("/healthz")
 def healthz():
     return {"ok": True, "service": "cse-ai-analyzer", "version": app.version}

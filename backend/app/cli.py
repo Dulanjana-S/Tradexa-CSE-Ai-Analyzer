@@ -591,10 +591,9 @@ def cmd_smoke_test(args: argparse.Namespace) -> None:
 
     app = _get_app()
     paths = [
-        "/",
         "/healthz",
         "/readyz",
-        "/admin/status",
+        "/api/admin/status",
         "/api/provider",
         "/api/model/status",
         "/api/system/status",
