@@ -821,7 +821,7 @@ def prediction(symbol: str) -> Dict[str, Any]:
         except Exception as e:
             return _json_safe({"available": False, "symbol": symbol.upper(), "reason": f"Prediction failed: {getattr(e, 'detail', e)}", "history_points": len(hist)})
     if not settings.allow_prediction_fallback:
-        return _json_safe({"available": False, "symbol": symbol.upper(), "reason": "Model not trained yet. Run training before showing predictions.", "history_points": len(hist)})
+        return _json_safe({"available": False, "symbol": symbol.upper(), "reason": "Prediction Currently Unavailble 404", "history_points": len(hist)})
     try:
         idx = indices().get("ASPI")
         pred = demo_prediction(hist, index_series=idx if isinstance(idx, list) else None)
