@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main
+      - deployment
     paths:
       - "backend/**"
       - ".github/workflows/azure-backend.yml"
@@ -27,6 +27,7 @@ jobs:
 
       - name: Create clean backend package
         run: |
+          rm -rf deploy_backend backend-release.zip
           mkdir deploy_backend
           cp -r backend/app deploy_backend/app
           cp backend/requirements.txt deploy_backend/requirements.txt
