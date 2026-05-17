@@ -69,7 +69,7 @@ export function AdminDashboard() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1.5">
             <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[var(--color-text-primary)]">Administrative Console</h1>
-            <p className="text-[13px] text-[var(--color-text-tertiary)]">Operational overview of system infrastructure, staff privileges, and predictive intelligence.</p>
+            <p className="text-[13px] text-[var(--color-text-tertiary)]">Operational overview of system infrastructure, staff privileges, and model management.</p>
           </div>
           <Button onClick={() => load()} className="bg-emerald-600 text-white hover:bg-emerald-700">
             <RefreshCw className="mr-2 h-4 w-4" /> Refresh
@@ -148,8 +148,8 @@ export function AdminDashboard() {
             </CardHeader>
             <CardContent className="space-y-3">
               {[
-                ["/admin/sync", "Infrastructure Sync", BriefcaseBusiness],
-                ["/admin/models", "Predictive Intelligence", Cpu],
+                ["/admin/sync", "Data Sync", BriefcaseBusiness],
+                ["/admin/models", "Model Management", Cpu],
                 ["/admin/users", "Access Control", Users],
                 ["/admin/settings", "Security & System", ShieldCheck],
               ].map(([to, label, Icon]: any) => (

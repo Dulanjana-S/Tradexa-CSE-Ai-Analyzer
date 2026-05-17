@@ -44,12 +44,12 @@ const userBottomItems = [
 // Admin navigation items
 const adminNavItems = [
   { to: "/admin", label: "Console", icon: LayoutDashboard },
-  { to: "/admin/models", label: "Predictive Intelligence", icon: Brain },
-  { to: "/admin/sync", label: "Infrastructure Sync", icon: Database },
-  { to: "/admin/jobs", label: "System Logs", icon: FileText },
+  { to: "/admin/models", label: "Model Management", icon: Brain },
+  { to: "/admin/sync", label: "Data Sync", icon: Database },
+  { to: "/admin/jobs", label: "Job Logs", icon: FileText },
   { to: "/admin/users", label: "Access Control", icon: Users },
   { to: "/admin/announcements", label: "Market Announcements", icon: Megaphone },
-  { to: "/admin/alerts", label: "Alert Infrastructure", icon: BellRing },
+  { to: "/admin/alerts", label: "Alert Monitor", icon: BellRing },
   { to: "/admin/settings", label: "Security & Config", icon: Shield },
   { to: "/admin/audit", label: "Governance Logs", icon: ClipboardList },
 ];
