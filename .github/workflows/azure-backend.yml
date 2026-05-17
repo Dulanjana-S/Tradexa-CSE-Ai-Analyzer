@@ -1,6 +1,7 @@
 name: Deploy Backend to Azure App Service
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -16,14 +17,25 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Create backend deployment package
+      - name: Confirm backend files exist
         run: |
-          cd backend
+          ls
+          ls backend
+          ls backend/app
+          test -f backend/requirements.txt
+          test -f backend/app/main.py
+
+      - name: Create clean backend package
+        run: |
+          mkdir deploy_backend
+          cp -r backend/app deploy_backend/app
+          cp backend/requirements.txt deploy_backend/requirements.txt
+          cd deploy_backend
           zip -r ../backend-release.zip .
 
-      - name: Deploy to Azure Web App
+      - name: Deploy backend package to Azure
         uses: azure/webapps-deploy@v3
         with:
-          app-name: tradexalk-api-bvhhacbhewcradbr
+          app-name: tradexalk-api
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: backend-release.zip
