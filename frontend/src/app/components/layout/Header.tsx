@@ -60,7 +60,7 @@ export function Header({ onMenuClick }: HeaderProps) {
     }
     if (normalized.includes("close") || normalized.includes("holiday")) {
       return {
-        label: marketStatus,
+        label: normalized.includes("close") ? "Market Unavailable" : marketStatus,
         dotClass: "bg-rose-500",
         badgeClass: "border-rose-400/60 bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-[0_0_14px_rgba(244,63,94,0.2)]",
       };
