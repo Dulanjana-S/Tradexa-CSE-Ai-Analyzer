@@ -128,15 +128,15 @@ export function PredictionCard({
             <div
               className="absolute h-full bg-gradient-to-r from-red-500 via-amber-500 to-emerald-500"
               style={{
-                left: `${((expectedRange.low - currentPrice) / currentPrice) * 100 + 50}%`,
-                right: `${50 - ((expectedRange.high - currentPrice) / currentPrice) * 100}%`,
+                left: `${Math.max(0, Math.min(100, ((expectedRange.low - currentPrice) / (currentPrice || 1)) * 100 + 50))}%`,
+                right: `${Math.max(0, Math.min(100, 50 - ((expectedRange.high - currentPrice) / (currentPrice || 1)) * 100))}%`,
               }}
             />
           </div>
         </div>
 
         {/* Probability & Confidence */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
               Upward Probability
@@ -170,9 +170,9 @@ export function PredictionCard({
           </div>
           <div className="space-y-3">
             {topFeatures.map((feature, idx) => (
-              <div key={idx} className="flex items-center justify-between gap-3">
-                <span className="text-sm text-[var(--color-text-tertiary)]">{feature.feature}</span>
-                <div className="flex items-center gap-2">
+              <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--color-border)]/30 sm:border-none pb-2 sm:pb-0">
+                <span className="text-sm text-[var(--color-text-tertiary)] break-all">{feature.feature}</span>
+                <div className="flex items-center gap-2 shrink-0">
                   <div className="w-24 h-1.5 bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-full overflow-hidden">
                     <div
                       className="h-full bg-emerald-600 rounded-full"

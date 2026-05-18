@@ -43,6 +43,15 @@ export function ProfessionalChart({
   const chartRef = useRef<IChartApi | null>(null);
   const [timeframe, setTimeframe] = useState('ALL');
   const [showIndicators, setShowIndicators] = useState(true);
+  const [chartHeight, setChartHeight] = useState(window.innerWidth < 640 ? 350 : 500);
+
+  useEffect(() => {
+    const handleResizeHeight = () => {
+      setChartHeight(window.innerWidth < 640 ? 350 : 500);
+    };
+    window.addEventListener('resize', handleResizeHeight);
+    return () => window.removeEventListener('resize', handleResizeHeight);
+  }, []);
 
   const candles = useMemo(() => toCandles(data), [data]);
   const currentPrice = candles[candles.length - 1]?.close || 0;
@@ -88,7 +97,7 @@ export function ProfessionalChart({
         secondsVisible: false,
       },
       width: chartContainerRef.current.clientWidth,
-      height: 500,
+      height: chartHeight,
     });
 
     chartRef.current = chart;
@@ -131,7 +140,11 @@ export function ProfessionalChart({
 
     const handleResize = () => {
       if (chartContainerRef.current) {
-        chart.applyOptions({ width: chartContainerRef.current.clientWidth });
+        const isMobile = window.innerWidth < 640;
+        chart.applyOptions({ 
+          width: chartContainerRef.current.clientWidth,
+          height: isMobile ? 350 : 500
+        });
       }
     };
 
@@ -175,16 +188,16 @@ export function ProfessionalChart({
 
   return (
     <Card className="border-[var(--color-border)] bg-[var(--color-bg-primary)] shadow-none overflow-hidden">
-      <CardHeader className="border-b border-[var(--color-border)] px-5 py-3">
+      <CardHeader className="border-b border-[var(--color-border)] px-4 sm:px-5 py-3">
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex flex-wrap items-baseline gap-3">
               <div>
                 <h3 className="text-base font-bold text-[var(--color-text-primary)]">{symbol}</h3>
                 <p className="text-[11px] text-[var(--color-text-tertiary)]">{companyName}</p>
               </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold tabular-nums text-[var(--color-text-primary)]">
+              <div className="flex flex-wrap items-baseline gap-2">
+                <span className="text-xl sm:text-2xl font-bold tabular-nums text-[var(--color-text-primary)]">
                   {currentPrice.toFixed(2)}
                 </span>
                 <Badge
@@ -199,7 +212,7 @@ export function ProfessionalChart({
               </div>
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 self-end sm:self-auto">
               <Button
                 variant="ghost"
                 size="icon"
@@ -218,14 +231,14 @@ export function ProfessionalChart({
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-0.5 bg-[var(--color-bg-primary)] rounded-lg p-0.5 border border-[var(--color-border)]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-0.5 bg-[var(--color-bg-primary)] rounded-lg p-0.5 border border-[var(--color-border)] overflow-x-auto scrollbar-none whitespace-nowrap max-w-full">
               {timeframes.map((tf) => (
                 <Button
                   key={tf}
                   variant="ghost"
                   size="sm"
-                  className={`h-7 px-3 text-[11px] font-semibold transition-all ${timeframe === tf
+                  className={`h-7 px-3 text-[11px] font-semibold transition-all shrink-0 ${timeframe === tf
                     ? 'bg-emerald-600 text-white shadow-sm'
                     : 'text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)]'
                     }`}
@@ -236,7 +249,7 @@ export function ProfessionalChart({
               ))}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 self-start sm:self-auto">
               <Button
                 variant="ghost"
                 size="sm"
@@ -255,9 +268,9 @@ export function ProfessionalChart({
       </CardHeader>
       <div className="p-0">
         {candles.length > 0 ? (
-          <div ref={chartContainerRef} className="w-full" style={{ height: '500px' }} />
+          <div ref={chartContainerRef} className="w-full" style={{ height: `${chartHeight}px` }} />
         ) : (
-          <div className="flex h-[500px] items-center justify-center text-sm text-[var(--color-text-tertiary)]">
+          <div className="flex items-center justify-center text-sm text-[var(--color-text-tertiary)]" style={{ height: `${chartHeight}px` }}>
             No historical chart data available.
           </div>
         )}
